@@ -142,16 +142,42 @@ const RIPPLE_FOLLOW = { delay: 0.26, strength: 0.5 }; // the second, fainter rin
 // hub read as lit 3D orbs, not flat faceted suns (user). The nodes are instanced (per-instance
 // aBase/aEmissive) so their material can't be reused directly; this replays the same shader tail
 // against the material's own emissive. Smooth-shade the mesh (drop flatShading) so the rim is even.
-function applyOrbFresnel(mat: THREE.MeshStandardMaterial): void {
+function applyOrbFresnel(mat: THREE.MeshStandardMaterial, coreLit = false): void {
   mat.onBeforeCompile = (shader) => {
+    if (coreLit) {
+      shader.uniforms.uCoreView = CORE_LIGHT_U.view;
+      shader.uniforms.uCoreAmt = CORE_LIGHT_U.amt;
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <common>",
+        "#include <common>\nuniform vec3 uCoreView;\nuniform vec2 uCoreAmt;",
+      );
+    }
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <emissivemap_fragment>",
       // The SHARED orb rim chunk (NodeFabric.ORB_FRESNEL_*) — one curve for instanced nodes
       // and these single orbs, so tuning it can never diverge the two materials.
-      `#include <emissivemap_fragment>\n${ORB_FRESNEL_GLSL}totalEmissiveRadiance *= ${ORB_FRESNEL_MIX};`,
+      `#include <emissivemap_fragment>\n${ORB_FRESNEL_GLSL}totalEmissiveRadiance *= ${ORB_FRESNEL_MIX};` +
+        // THE CORE'S LIGHT (see CORE_LIGHT): how squarely this fragment faces the core, in view
+        // space (`-vViewPosition` is the fragment), from fully away (0) to fully toward (1).
+        (coreLit
+          ? "\nfloat coreFace = 0.5 + 0.5 * dot(normal, normalize(uCoreView + vViewPosition));" +
+            "\ntotalEmissiveRadiance *= mix(1.0 - uCoreAmt.x, 1.0 + uCoreAmt.y, coreFace);"
+          : ""),
     );
   };
 }
+
+/** THE CORE LIGHTS ITS METAGRAPHS (user, 2026-11-22): a hub is brighter on the side that faces
+ *  the core and darker on the side that faces away, so the structure reads as one system lit from
+ *  its centre and each hub shows where the core is as the camera orbits. It is a shading term on
+ *  the hub's own glow, not a light: a point light inside the field lights every node from a
+ *  different direction and flattens the population (the rig's header). `shade` is how much glow
+ *  the far side gives up, `lift` how much the near side gains. Dark only — on paper the hub is
+ *  ink, and a lit face would have to carry less of it. */
+export const CORE_LIGHT: Readonly<{ shade: number; lift: number }> = { shade: 0.42, lift: 0.22 };
+/** One uniform pair under every hub's material: the core's position in VIEW space, written once a
+ *  frame, and the two amounts, written on a theme flip. */
+const CORE_LIGHT_U = { view: { value: new THREE.Vector3() }, amt: { value: new THREE.Vector2(CORE_LIGHT.shade, CORE_LIGHT.lift) } };
 
 // One orbiting metagraph hub record in HyperView.metas (the exact shape the constructor
 // builds — scene/Globe.ts (via `layers.metas.find`, keying off `.cfg.id`/`.group`) and
@@ -272,6 +298,7 @@ export class HyperView implements SceneView {
     this._ink = structureInk(colors);
     this._colors = colors;
     this._paper = isLightGround(colors);
+    CORE_LIGHT_U.amt.value.set(this._paper ? 0 : CORE_LIGHT.shade, this._paper ? 0 : CORE_LIGHT.lift);
     this.stage = stage;
     this.root = new THREE.Group();
     // Tilt the hub/tether/hoop structure to read top-down from the shared overview camera (Globe
@@ -447,7 +474,7 @@ export class HyperView implements SceneView {
         color: col, emissive: col, emissiveIntensity: 1.1,
         roughness: 0.5, metalness: 0.2, transparent: true, // match the node orbs (smooth + fresnel)
       });
-      applyOrbFresnel(hubMat);
+      applyOrbFresnel(hubMat, true);
       const hub = new THREE.Mesh(HUB_ORB, hubMat);
       joinBloom(hub);
       hub.userData.pick = { kind: "meta", cfg, title: cfg.name, sub: `Metagraph · ${cfg.ticker}` };
@@ -514,6 +541,7 @@ export class HyperView implements SceneView {
     this._ink = structureInk(c);
     this._colors = c;
     this._paper = isLightGround(c);
+    CORE_LIGHT_U.amt.value.set(this._paper ? 0 : CORE_LIGHT.shade, this._paper ? 0 : CORE_LIGHT.lift);
     // The GROUND changed, so hyper's furniture switches between additive glow and normal-blended
     // ink (see glowBlend) — additive on paper draws nothing. Every material that carries a fade in
     // its own `opacity` needs only this; the tethers re-blend through their own `setColors` and
@@ -738,9 +766,12 @@ export class HyperView implements SceneView {
   // out to the map (Globe) instead.
   // `spinFrozen` (set when the camera is zoomed in to inspect) stops the overall SPHERE spin — the
   // core + hub meshes — so a close-up reads still; the per-node axis spin (Globe) keeps going.
-  update(dt: number, morph = 0, coreDimTarget = 0, spinFrozen = false, _cam?: THREE.Camera, dagFocused = false) {
+  update(dt: number, morph = 0, coreDimTarget = 0, spinFrozen = false, cam?: THREE.Camera, dagFocused = false) {
     this.clock += dt;
     const t = this.clock;
+    // The core in view space, for the hubs' core-facing shade (CORE_LIGHT). The core sits at the
+    // view root's origin.
+    if (cam) CORE_LIGHT_U.view.value.copy(this.root.position).applyMatrix4(cam.matrixWorldInverse);
 
     // Snapshots view: the hubs/tethers are hidden (set once in setLedger) and ledger.js owns the
     // metagraph blocks, so there's nothing to orbit here. A ripple started meanwhile is DROPPED, not
