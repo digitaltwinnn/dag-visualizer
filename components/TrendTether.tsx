@@ -7,6 +7,8 @@ import { createPortal } from "react-dom";
 
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { useStore } from "@/src/store/store";
+import { displayNetwork } from "@/src/data/unlisted";
+import { cardNetwork } from "@/src/engine/domain/trendStack";
 
 // THE TETHER — the History timeline's span drawn up to the front chart's TIME AXIS (design round
 // 2026-09-29, "A + B, the time-only tether"; user: the band "feels a bit disconnected from the
@@ -37,9 +39,12 @@ import { useStore } from "@/src/store/store";
 // so the pills' box (`[data-tether-avoid]`) is masked out of the lines: they pass behind the pills
 // and in front of everything else.
 
-const TETHER_STROKE = {
-  stroke: "light-dark(color-mix(in oklch, var(--primary-ink) 80%, transparent), color-mix(in oklch, var(--primary) 45%, transparent))",
-} as const;
+/** The legs' colour for a hue: the front card's own (`TrendTrack` gives the window the same), so
+ *  the thread from the window to the card reads as one coloured piece. Paper takes more of it. */
+const tetherStroke = (hue: string) => ({
+  stroke: `light-dark(color-mix(in oklch, ${hue} 85%, transparent), color-mix(in oklch, ${hue} 55%, transparent))`,
+  transition: "stroke 0.3s ease",
+});
 
 export default function TrendTether() {
   const svg = useRef<SVGSVGElement>(null);
@@ -47,6 +52,9 @@ export default function TrendTether() {
   const range = useStore((s) => s.trendRange);
   const windowId = useStore((s) => s.trendWindow);
   const focus = useStore((s) => s.trendFocus);
+  const cardId = useStore((s) => cardNetwork(s.filter, s.trendFocus, s.trendFront));
+  const hue = (cardId !== "all" && displayNetwork(cardId)?.hue) || "var(--primary)";
+  const legStroke = tetherStroke(hue);
   // Not `trendIds` — that is React's one-way publish to the engine (publishChannelBoundary). A
   // re-rank moves the planes, which raises `sceneMoving`; paging is the other front-plane change.
   const scroll = useStore((s) => s.trendScroll);
@@ -199,10 +207,10 @@ export default function TrendTether() {
         </mask>
       </defs>
       <g mask="url(#trend-tether-mask)">
-        <line style={TETHER_STROKE} strokeWidth={1} strokeDasharray="3 4" />
-        <line style={TETHER_STROKE} strokeWidth={1} strokeDasharray="3 4" />
+        <line style={legStroke} strokeWidth={1} strokeDasharray="3 4" />
+        <line style={legStroke} strokeWidth={1} strokeDasharray="3 4" />
         {/* The axis mark is a HAIRLINE: at 2px in the full accent it outweighed the series above it. */}
-        <line stroke="var(--primary)" strokeOpacity={0.7} strokeWidth={1} strokeLinecap="round" />
+        <line stroke={hue} strokeOpacity={0.7} strokeWidth={1} strokeLinecap="round" style={{ transition: "stroke 0.3s ease" }} />
       </g>
     </svg>,
     host,

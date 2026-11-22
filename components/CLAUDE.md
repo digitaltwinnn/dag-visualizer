@@ -526,6 +526,14 @@ rotation is written at once and the card taking the front drops into it (`"in"`)
 one is pending lands the pending one first. Reduced motion commits at once. The swipe's duration
 is read from the events' own `timeStamp`, not the clock inside the handler.
 
+**The timeline's window wears the front card's colour** (`TrendTrack`, `TrendTether`; user,
+2026-11-23: give the band's chart "an effect of the card it shows, like the sliding window with
+some color-effects according to the card color"): the window's frame, its grips, a soft wash inside
+it and the tether's legs and axis mark take the identity hue of the card `cardNetwork` names — the
+plane brought forward, else the filter, else the plane in front — and turn with the deck. ⚠️ The
+band's LINE stays the structural accent: it is the whole network's series, and in a card's colour it
+would claim to be that card's.
+
 **The front card's plot states its scale** (`TrendChart yTicks`, 2026-11-22): the gridlines sit on
 round values (`yTickValues` — one home for the recharts grid and the figures beside it) and each
 carries a small figure at its left end, the top one with the plot's unit at its cadence ("2.5K per
