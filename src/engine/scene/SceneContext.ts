@@ -231,7 +231,7 @@ const HOLD_SHADER = {
   `,
 };
 
-export const BACKDROP_LOOK: Readonly<{ pool: number; reach: number; subject: number }> = {
+export const BACKDROP_LOOK: Readonly<{ pool: number; reach: number; subject: number; subjectPaper: number }> = {
   pool: 0.7, // the pool's peak, as a fraction of the panel token's own display value
   reach: 0.95, // its radius, in canvas heights
   // THE SUBJECT'S AIR (user, 2026-11-22: use the Hypergraph's blur more, "maybe combine it with a
@@ -240,16 +240,21 @@ export const BACKDROP_LOOK: Readonly<{ pool: number; reach: number; subject: num
   // the reader is standing in it rather than looking at it. The pool BECOMES the hue rather than
   // taking it on top (added over the pool's blue, an orange landed as a grey-brown): `subject` is
   // the hue's level at the pool's peak, as a fraction of its display value.
-  // DARK ONLY. Paper had a tint of the page toward the hue for an afternoon, and a page that is
-  // warm under one network and cool under the next reads as paper of two colours, not as a
-  // subject (user: the background "sometimes looks a bit warm/brown and sometimes cold/blue").
-  // The Print plate is one flat colour.
-  subject: 0.1,
+  // THE HUE IS DARK'S ALONE. Paper had a tint of the page toward the hue for an afternoon, and a
+  // page that is warm under one network and cool under the next reads as paper of two colours,
+  // not as a subject (user: the background "sometimes looks a bit warm/brown and sometimes
+  // cold/blue"). On paper the subject gets the SAME effect whichever network it is (user: "a
+  // uniform color effect for each selected metagraph that makes it stand out … not warm/cold"):
+  // the page falls off evenly toward its edges, a neutral shade that keeps the sheet's own colour
+  // and leaves the middle, where the subject stands, as it was. `subjectPaper` is how much of its
+  // light the page gives up at the far corners.
+  subject: 0.1, subjectPaper: 0.08,
 };
 const FINISH_SHADER = {
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null },
     uPool: { value: new THREE.Vector3() },
+    uShade: { value: 0 }, // paper's subject shade: the share of light given up at the far edge
     uReach: { value: 0.95 },
     uAspect: { value: 1 },
   },
@@ -260,6 +265,7 @@ const FINISH_SHADER = {
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse;
     uniform vec3 uPool;
+    uniform float uShade;
     uniform float uReach;
     uniform float uAspect;
     varying vec2 vUv;
@@ -269,6 +275,8 @@ const FINISH_SHADER = {
       vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0);
       float f = 1.0 - smoothstep(0.0, uReach, length(p));
       vec3 rgb = 1.0 - (1.0 - base.rgb) * (1.0 - uPool * f * f);
+      // Paper's subject shade: every channel by the same factor, so the page keeps its colour.
+      rgb *= 1.0 - uShade * (1.0 - f) * (1.0 - f);
       float n = ign(gl_FragCoord.xy) + ign(gl_FragCoord.xy + vec2(47.0, 17.0)) - 1.0;
       gl_FragColor = vec4(rgb + n / 255.0, base.a);
     }
@@ -310,7 +318,8 @@ export interface SceneCtx {
   setClearColor(bg: number): void;
   setGround(light: boolean): void;
   /** THE SUBJECT'S AIR (`BACKDROP_LOOK.subject`): the dark backdrop's pool turns to one network's
-   *  colour. `hue` is the network's identity colour; `mix` 0 to 1 how far the pool has turned.
+   *  colour; on paper the page shades evenly toward its edges, the same for every network.
+   *  `hue` is the network's identity colour; `mix` 0 to 1 how far the change is in.
    *  Plain data in, per frame; allocation-free. */
   setBackdropTint(hue: number, mix: number): void;
   /**
@@ -663,7 +672,9 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   }
   function setBackdropTint(hue: number, mix: number) {
     // The pool turns from its resting colour INTO the hue. Display values, like the pool: this
-    // pass runs after the sRGB encode. Paper has no pool (`poolRest` is zero there) and takes none.
+    // pass runs after the sRGB encode. Paper has no pool (`poolRest` is zero there) and takes its
+    // own neutral shade instead.
+    finish.uniforms.uShade.value = isPaper ? BACKDROP_LOOK.subjectPaper * mix : 0;
     const m = isPaper ? 0 : mix;
     const k = (BACKDROP_LOOK.subject * m) / 255;
     finish.uniforms.uPool.value.set(
