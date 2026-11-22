@@ -196,6 +196,42 @@ const SEL_MIX_SHADER = {
  * threshold of sight. It has to come after the encode, which is why this is its own pass and not
  * a term in the composite.
  */
+/**
+ * THE HUE HOLD — the dark ground's last step before the tone map.
+ *
+ * The filmic curve rolls a bright colour's channels off one by one, so a mark driven past 1 loses
+ * its hue on the way: a boosted orange bar came out peach, a hub's core near-white (the trade the
+ * tone-mapping note above accepted). The hold scales a pixel's three channels TOGETHER so its
+ * brightest one never exceeds `ceil` — soft from `knee` up — which keeps the hue and the
+ * saturation exactly and gives up only the peak the curve was about to bleach. Below the knee a
+ * pixel is untouched, so the resting scene is byte-identical. Khronos Neutral, which holds hue by
+ * design, was tried again in its place (2026-11-22) and still casts dark halos around the globe's
+ * coloured nodes. Paper runs no tone map and no hold.
+ */
+export const HUE_HOLD: Readonly<{ knee: number; ceil: number }> = { knee: 0.6, ceil: 1.05 };
+const HOLD_SHADER = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    uHold: { value: new THREE.Vector2(HUE_HOLD.knee, HUE_HOLD.ceil) },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform vec2 uHold;
+    varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      float m = max(c.r, max(c.g, c.b));
+      float span = uHold.y - uHold.x;
+      float held = m <= uHold.x ? m : uHold.x + span * (1.0 - exp(-(m - uHold.x) / span));
+      gl_FragColor = vec4(c.rgb * (held / max(m, 1e-5)), c.a);
+    }
+  `,
+};
+
 export const BACKDROP_LOOK: Readonly<{ pool: number; reach: number }> = {
   pool: 0.7, // the pool's peak, as a fraction of the panel token's own display value
   reach: 0.95, // its radius, in canvas heights
@@ -418,6 +454,9 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // conversion to the composited result. Without it an EffectComposer bypasses the renderer's
   // output step, so `toneMapping` above was effectively a no-op (three r150+ standardised on
   // OutputPass as the correct chain end).
+  // The hue hold (see HUE_HOLD): after everything that adds light, before the tone map.
+  const hold = new ShaderPass(HOLD_SHADER);
+  composer.addPass(hold);
   const outputPass = new OutputPass();
   composer.addPass(outputPass);
 
@@ -465,7 +504,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     c.addPass(bp);
     c.setSize(w, h);
     const mx = new ShaderPass(SEL_MIX_SHADER); // its texture is pointed per frame, by ground
-    composer.insertPass(mx, composer.passes.indexOf(outputPass));
+    composer.insertPass(mx, composer.passes.indexOf(hold));
     sel = { composer: c, render: rp, bloom: bp, mix: mx };
   }
 
@@ -583,6 +622,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     sel?.composer.dispose();
     sel?.bloom.dispose();
     composer.dispose();
+    hold.dispose();
     finish.dispose();
     nodeEnvTex?.dispose(); // the chips' PMREM studio env (null if no chip material ever built)
   }
@@ -604,6 +644,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     renderer.toneMapping = light ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = light ? 1 : 0.82;
     isPaper = light;
+    hold.enabled = !light;
     applyBackground();
     applyFinish(light);
   }
@@ -645,6 +686,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
 
   applyBackground(); // construction honours the current ground (a light boot starts on the backdrop)
   finish.uniforms.uAspect.value = box0.w / box0.h;
+  hold.enabled = !isPaper;
   applyFinish(isPaper);
 
   return {
