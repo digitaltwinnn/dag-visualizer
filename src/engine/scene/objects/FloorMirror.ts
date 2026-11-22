@@ -190,15 +190,19 @@ export class FloorMirror {
   }
 
   /** THE SELECTION'S POOL, per frame: `x` is the held or pointed-at row's place along the trail
-   *  (the parent's frame), null for none. The level eases in and out; the pool slides between rows
-   *  while it is lit and starts where it is asked for when it was dark. Allocation-free. */
+   *  (the parent's frame), null for none. The level eases in and out; the pool crosses to another
+   *  row almost at once while it is lit, and starts where it is asked for when it was dark.
+   *  Allocation-free. */
   pool(x: number | null, dt: number): void {
-    const k = 1 - Math.exp(-6 * dt);
+    // Two rates. The pool MOVES at the pace the rest of the chamber answers a hover (the ribbons
+    // and the tiles re-light within a frame or two — at the level's own rate the pool was still
+    // crossing the floor when everything else had arrived; user, 2026-11-23: "lagging … takes too
+    // long to arrive"). Its LEVEL eases in and out more gently, so it never pops.
     if (x != null) {
       const u = (x - this._cx) / this._w + 0.5;
-      this._poolU = this._pool < 0.02 ? u : this._poolU + (u - this._poolU) * k;
+      this._poolU = this._pool < 0.02 ? u : this._poolU + (u - this._poolU) * (1 - Math.exp(-26 * dt));
     }
-    this._pool += ((x != null ? 1 : 0) - this._pool) * k;
+    this._pool += ((x != null ? 1 : 0) - this._pool) * (1 - Math.exp(-10 * dt));
     const pu = (this.mesh.material as THREE.ShaderMaterial).uniforms.uPool.value as THREE.Vector2;
     pu.set(this._poolU, this._pool * this._alpha * (this._paper ? MIRROR_LOOK.poolPaper : MIRROR_LOOK.pool));
   }
