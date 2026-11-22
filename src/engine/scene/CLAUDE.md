@@ -983,8 +983,9 @@ the chamber is on screen. Four rules, each a user round the same day:
   read SHARP, from a 2048×1280 target: a softer mip and the first 1024×640 target both read as
   "fuzzy blocks" (user, same day). The gap separates block from image; the spill carries the softness.
 - **Dark adds it, paper MULTIPLIES it**: the reflection divided by the plate's colour is 1 where the
-  mirror sees the page and the mark's ink where it sees a mark. Levels are the user's (image 0.2 on
-  both grounds after "too strong" twice).
+  mirror sees the page and the mark's ink where it sees a mark. Levels are the user's (image 0.2
+  dark; paper 0.13 with its spill at 0.22, after the multiply of the trail's grey-teal bars read as
+  "dirty gray/green"). `depth` is 0.17 ("a bit closer to the plane again", from 0.3).
 - **Only bright marks spill on dark** (`spillFloor`): the spill is a blur, and blurring every dim
   trail bar laid a haze over the trail that read as "fuzzy blocks"; below the floor a mark lights
   nothing and keeps its sharp image alone.

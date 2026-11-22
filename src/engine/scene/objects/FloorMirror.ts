@@ -47,14 +47,17 @@ export const MIRROR_LOOK: Readonly<{
   strength: number; strengthPaper: number; spill: number; spillPaper: number; spillFloor: number;
   depth: number; soft: number; feather: number; back: number;
 }> = {
-  strength: 0.2, strengthPaper: 0.2,
-  spill: 1.1, spillPaper: 0.8, // the soft pool's level, per ground (it is spread thin, so it reads above the image's number)
+  strength: 0.2, strengthPaper: 0.13,
+  spill: 1.1, spillPaper: 0.22, // the soft pool's level, per ground (it is spread thin, so it reads above the image's number)
+  // (Paper's two are low on purpose: there the mirror MULTIPLIES, and the trail's bars are a
+  // translucent grey-teal ink, so a strong image and a strong blurred pool of it darkened the
+  // floor to a dirty grey-green — user, 2026-11-22: "make it lighter".)
   // ONLY BRIGHT MARKS SPILL (dark). The spill is a blur, and a blur of every dim trail bar lay a
   // teal haze over the whole trail that read as "fuzzy blocks" (user, 2026-11-22; toggled live:
   // with the spill off the reflections were crisp). Light below this level lights no floor, so
   // the pool belongs to the lead bar and the sheets, and the trail keeps its sharp image alone.
   spillFloor: 0.3,
-  depth: 0.3, soft: 0, feather: 0.08, back: 0.4,
+  depth: 0.17, soft: 0, feather: 0.08, back: 0.4,
 };
 /** THE MIRROR LAYER — membership in the floor's reflection. `joinMirror` only ENABLES the layer,
  *  so a member still draws on layer 0 exactly as before; the mirror's camera sees this layer alone. */
