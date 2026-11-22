@@ -81,6 +81,9 @@ const STAMP_FLIP_PX = 160;
  *  stack is looking. */
 const MIN_BRUSH_PX = 3;
 
+/** A grip's painted centre: the span's edge, held 3px (half the grip) inside the track's box. */
+const gripX = (x: number, w: number): number => Math.min(Math.max(x, 3), Math.max(3, w - 3));
+
 export default function TrendTrack({
   overview,
   metric,
@@ -414,7 +417,7 @@ export default function TrendTrack({
           </defs>
         )}
         {[false, true].map((lit) => (lit && !(brush && box.w > 0) ? null : (
-        <g key={lit ? "lit" : "base"} clipPath={lit ? `url(#${clipId})` : undefined} opacity={!lit && brush && box.w > 0 ? 0.35 : 1}>
+        <g key={lit ? "lit" : "base"} clipPath={lit ? `url(#${clipId})` : undefined} opacity={!lit && brush && box.w > 0 ? 0.5 : 1}>
         {runs.map((run, i) => (
           <g key={i}>
             {run.length === 1 ? (
@@ -427,7 +430,7 @@ export default function TrendTrack({
                   d={`${path(run)} L${run[run.length - 1].x.toFixed(1)} ${plotH} L${run[0].x.toFixed(1)} ${plotH} Z`}
                   fill={`url(#${fadeId})`}
                 />
-                <path d={path(run)} fill="none" stroke="var(--primary)" strokeWidth={1} opacity={0.75} />
+                <path d={path(run)} fill="none" stroke="var(--primary)" strokeWidth={1} strokeLinejoin="round" strokeLinecap="round" opacity={0.75} />
               </>
             )}
           </g>
@@ -443,9 +446,11 @@ export default function TrendTrack({
               // `data-brush`: the History TETHER measures this frame to draw the span up to the
               // front chart's time axis (`components/TrendTether.tsx`).
               data-brush=""
-              x={xAtMs(brush.fromMs, geom)}
+              // Held half a pixel inside the track: a span that reaches the newest bucket ends ON
+              // the box's edge, where the clip took half the frame's stroke.
+              x={Math.max(0.5, xAtMs(brush.fromMs, geom))}
               y={0.5}
-              width={Math.max(MIN_BRUSH_PX, xAtMs(brush.toMs, geom) - xAtMs(brush.fromMs, geom))}
+              width={Math.max(MIN_BRUSH_PX, Math.min(box.w - 0.5, xAtMs(brush.toMs, geom)) - Math.max(0.5, xAtMs(brush.fromMs, geom)))}
               height={Math.max(0, plotH - 1)}
               fill="none"
               stroke="var(--primary)"
@@ -458,8 +463,10 @@ export default function TrendTrack({
                 unchanged. */}
             {[xAtMs(brush.fromMs, geom), xAtMs(brush.fromMs, geom) + Math.max(MIN_BRUSH_PX, xAtMs(brush.toMs, geom) - xAtMs(brush.fromMs, geom))].map((gx, i) => (
               <g key={i} className="cursor-ew-resize">
-                <rect x={gx - 3} y={plotH * 0.2} width={6} height={plotH * 0.6} rx={2} fill="var(--primary)" />
-                <line x1={gx} y1={plotH * 0.38} x2={gx} y2={plotH * 0.62} stroke="var(--background)" strokeWidth={1.5} strokeLinecap="round" />
+                {/* A grip at either end of the track stands whole inside it (the clip cut the newest
+                    edge's grip in half); `gripX` is paint only, the hit test reads the span. */}
+                <rect x={gripX(gx, box.w) - 3} y={plotH * 0.2} width={6} height={plotH * 0.6} rx={2} fill="var(--primary)" />
+                <line x1={gripX(gx, box.w)} y1={plotH * 0.38} x2={gripX(gx, box.w)} y2={plotH * 0.62} stroke="var(--background)" strokeWidth={1.5} strokeLinecap="round" />
               </g>
             ))}
           </>
