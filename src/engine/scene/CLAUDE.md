@@ -785,12 +785,14 @@ in the bloom set, not pickable — the tile under it answers the click). **Its p
 tile's boxes take the next slots (`si`), so `count` draws exactly the boxes standing this frame and
 nothing past them needs zeroing; a tile the register does not draw writes none. **The column HOVERS OVER A MIST**
 (`objects/LiftMist.ts`, `MIST_LOOK`; `DATA_HOVER`; user, 2026-11-23: "what about some levitating /
-glow / mist from the snapshot instead of hard lines?"). One instanced shell per drawn column stands
-on the tile: the tile's footprint narrowing to the block's, with no edge anywhere (each face fades
-out at its own sides), strongest where it leaves the tile and gone before it reaches the block, a
-slow band drifting up it; the column's ink, added light on dark and a thin wash on paper. The
-shell's proportions are `DATA_MARK`'s, fractions of the tile, so one unit geometry serves every
-column at its tile's size; its pool is packed like the boxes' (`li`). The column itself rides up
+glow / mist from the snapshot instead of hard lines?"). One instanced SHEET per drawn column stands
+on the tile and always faces the viewer (turned in the vertex shader): as wide as the tile at its
+foot, narrowing to the block's width, soft right across, strongest where it leaves the tile and
+gone before it reaches the block, a slow band drifting up it; the column's ink, added light on dark
+and a thin wash on paper. It was a four-faced shell for an hour, and four faces read as four blades
+with corners between them ("the mist has 4 corners, can we make it more smooth?"). Its proportions
+are `DATA_MARK`'s, fractions of the tile, so one unit geometry serves every column at its tile's
+size; its pool is packed like the boxes' (`li`). The column itself rides up
 and down `DATA_HOVER.rise` of its tile's size, each on its own phase. Reduced motion holds both
 still (`LedgerView.setStill`, from the Engine). A drawn tie was tried twice the same day — one
 hairline up the middle (from 2026-11-09), then four from the tile's corners — and a drawn tie reads

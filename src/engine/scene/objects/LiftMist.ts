@@ -5,12 +5,12 @@
 // A block was tied to its snapshot by one hairline (2026-11-09), then by four from the tile's
 // corners. Both are DRAWN ties, and a drawn tie reads as a strut: the block stood on a frame. What
 // the lift should say is that the block came off the snapshot and hangs there — so the tie is
-// light, not line. One instanced shell per drawn column: the tile's footprint at the bottom,
-// narrowing to the block's at the top, with NO edge anywhere — each face fades to nothing at its
-// own sides, the column is strongest where it leaves the tile and gone before it reaches the
-// block, and a slow band drifts up it, so the eye is led from the snapshot to the block.
+// light, not line. One instanced sheet per drawn column, always facing the viewer: as wide as the
+// tile at the bottom, narrowing to the block's width at the top, with NO edge anywhere — soft
+// right across, strongest where it leaves the tile and gone before it reaches the block, and a
+// slow band drifts up it, so the eye is led from the snapshot to the block.
 //
-// The shell's proportions are the lift's own (`DATA_MARK`), which are fractions of the TILE — so
+// The sheet's proportions are the lift's own (`DATA_MARK`), which are fractions of the TILE — so
 // one unit geometry serves every column, scaled by its tile's size. Colour is per instance, the
 // column's ink that frame. The ground decides how it lands (the question every additive site
 // answers): added light on dark, a thin wash of the ink on paper.
@@ -22,9 +22,9 @@ import * as THREE from "three";
  *  band carries, and `seconds` how long one band takes to climb the column. */
 export const MIST_LOOK: Readonly<{ dark: number; paper: number; reach: number; drift: number; seconds: number }> = {
   // Quieter and finer on 2026-11-23 (user: "a bit more subtle and refined, but I do like it"):
-  // the level down from 0.5 / 0.34, the band slower and fainter (0.35 over 3.2 s), and each face
-  // narrowed to a soft core (the shader's squared profile) so the column reads as a wisp.
-  dark: 0.3, paper: 0.22, reach: 0.88, drift: 0.2, seconds: 4.4,
+  // the level down from 0.5 / 0.34, the band slower and fainter (0.35 over 3.2 s). A single sheet
+  // stacks no faces, so the level came back up a little when the shell went (0.3 → 0.42).
+  dark: 0.42, paper: 0.3, reach: 0.88, drift: 0.2, seconds: 4.4,
 };
 
 export class LiftMist {
@@ -32,54 +32,57 @@ export class LiftMist {
   private readonly _mat: THREE.ShaderMaterial;
   private _paper: boolean;
 
-  /** `max` columns; the shell is `foot` of the tile's footprint wide at its top and `height` tall,
+  /** `max` columns; the sheet is `foot` of the tile's footprint wide at its top and `height` tall,
    *  both in tile sizes (a column's instance scale is its tile's size). */
   constructor(parent: THREE.Object3D, max: number, foot: number, height: number, paper: boolean) {
     this._paper = paper;
-    // Four faces, bottom (the tile's edge) to top (the block's): uv.x runs across a face, uv.y up it.
-    const pos: number[] = [], uv: number[] = [], idx: number[] = [];
-    const b = 0.5, t = 0.5 * foot;
-    const ring = [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const;
-    for (let f = 0; f < 4; f++) {
-      const [ax, az] = ring[f]!, [bx, bz] = ring[(f + 1) % 4]!;
-      const o = pos.length / 3;
-      pos.push(ax * b, 0, az * b, bx * b, 0, bz * b, bx * t, height, bz * t, ax * t, height, az * t);
-      uv.push(0, 0, 1, 0, 1, 1, 0, 1);
-      idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
-    }
+    // ONE SHEET THAT FACES THE VIEWER, not a shell (user, 2026-11-23: "the mist has 4 corners, can
+    // we make it more smooth?"). The shell was four faces, each fading at its own sides, and from
+    // any angle they read as four blades with corners between them. A column of mist has no
+    // sides: this is a single quad per column, turned to the camera in the vertex shader, as wide
+    // as the tile at its foot and as the block at its top, soft right across — the same from
+    // every direction. `position.x` is −1 to 1 across the sheet, `position.y` 0 to 1 up it.
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
-    geo.setIndex(idx);
+    geo.setAttribute("position", new THREE.Float32BufferAttribute([-1, 0, 0, 1, 0, 0, 1, 1, 0, -1, 1, 0], 3));
+    geo.setIndex([0, 1, 2, 0, 2, 3]);
     this._mat = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, side: THREE.DoubleSide,
       uniforms: {
         uOp: { value: 0 },
         uTime: { value: 0 },
         uLook: { value: new THREE.Vector2(MIST_LOOK.reach, MIST_LOOK.drift) },
+        // The column's shape in tile sizes: its half-width at the foot and at the top, its height.
+        // The foot is a little wider than half the tile, between the square's side and its diagonal.
+        uShape: { value: new THREE.Vector3(0.6, 0.6 * foot, height) },
       },
       vertexShader: /* glsl */ `
+        uniform vec3 uShape;
         varying vec2 vUv; varying vec3 vCol;
         void main() {
-          vUv = uv;
+          vUv = vec2(position.x, position.y);
           vCol = vec3(1.0);
           #ifdef USE_INSTANCING_COLOR
             vCol = instanceColor;
           #endif
-          vec4 p = vec4(position, 1.0);
+          // The column's spine in view space, then out along the screen's own horizontal: a sheet
+          // that always faces the viewer. The instance's scale is its tile's size (x across, y up).
+          mat4 im = mat4(1.0);
           #ifdef USE_INSTANCING
-            p = instanceMatrix * p;
+            im = instanceMatrix;
           #endif
-          gl_Position = projectionMatrix * modelViewMatrix * p;
+          float sx = length(im[0].xyz);
+          vec4 mv = modelViewMatrix * im * vec4(0.0, position.y * uShape.z, 0.0, 1.0);
+          mv.x += position.x * mix(uShape.x, uShape.y, position.y) * sx;
+          gl_Position = projectionMatrix * mv;
         }
       `,
       fragmentShader: /* glsl */ `
         uniform float uOp; uniform float uTime; uniform vec2 uLook;
         varying vec2 vUv; varying vec3 vCol;
         void main() {
-          // No edge on a face: it fades out toward both of its sides.
-          float across = sin(3.14159265 * vUv.x);
-          across *= across;
+          // Soft right across: full along the spine, nothing at either side, no edge between.
+          float c = cos(1.5707963 * clamp(abs(vUv.x), 0.0, 1.0));
+          float across = c * c * c;
           // Strongest at the tile, gone by uLook.x of the way up.
           float up = 1.0 - smoothstep(0.0, uLook.x, vUv.y);
           up *= up;
