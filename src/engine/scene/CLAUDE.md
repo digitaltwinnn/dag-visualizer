@@ -284,7 +284,7 @@ level and peaking at 0.6 + `stripeLine` (1.6) = 2.2× it — items in a stream o
 one continuous state. It takes no lining: the stripes already draw its shape, and the two registers stay
 apart. Both are **one fragment term over a per-vertex across-sheet coordinate** (0 → n), antialiased
 in screen space with `fwidth` — the triangular 1-device-pixel profile of `SoftLines` — because the
-renderer has no MSAA and the half-res bloom haloes a hard step into a crawling fringe. The lining sits
+scene target's few MSAA samples do not resolve a 1px stripe and the half-res bloom haloes a hard step into a crawling fringe. The lining sits
 one pixel INSIDE each edge, never on the polygon's own stepped edge; stripes closer than ~3 px hand
 over to their average and linings on a sheet under ~6 px wide hand over to the plain sheet, so nothing
 aliases as the camera moves. Both ride the sheet's alpha, so `inkPresence` on paper and the dims and
@@ -698,7 +698,7 @@ endpoints from the same `referenceSegments` walk), dissolve by zero-scale, and d
 their slot's entry beat. Links are SOFT LINES (`objects/SoftLines.ts`, 2026-11-09 — user: "color/jagged artifacts for the lines
 from certain angles … more with the bloom"): each segment a screen-space strip whose alpha falls off
 linearly to 0 one DEVICE pixel from its centre, so a link carries a 1px line's light without the
-stair-step the MSAA-less renderer gave a GL line — the step the whole-frame bloom haloed into a
+beaded stair-step a GL line keeps even under the scene target's MSAA — the step the whole-frame bloom haloes into a
 crawling fringe. FXAA over the whole frame was tried and dropped the same day: it smeared every 1px
 mark (the floor's ordinals, the dotted anchor lines). Positions at event time, alpha per segment end
 per frame, ranged uploads, `glowBlend` on each ground. The silent stretch is one dashed `LineSegments` flush in the floor
@@ -845,8 +845,8 @@ re-tuning the stagger re-tunes the ground with it.
 is a MARK — it reads as a gridline or a reading, and there is nothing to read. Each rung is now a quad
 billboard hanging `SHADOW_H` below the floor line, its alpha rising over a short lip and decaying to
 nothing (`shadowTexture`, a luminance canvas — three reads an alphaMap's green channel, so a canvas
-that varies only in alpha uploads as a solid slab), feathered at both ends, in the NEUTRAL ink
-(`SceneColors.fg`) rather than the accent. Below the desktop tier the rungs stack straight up with
+that varies only in alpha uploads as a solid slab), feathered at both ends, in a NEUTRAL ink
+(`SceneColors.fg` on paper, the cooler `muted` on dark) rather than the accent. Below the desktop tier the rungs stack straight up with
 the deck (`trendStack.stepX`, the `narrow` flag `face()` takes).
 
 Four decisions are recorded in the file's header and worth knowing before touching it:
@@ -931,3 +931,31 @@ included (user: "I don't want the text to bloom", on the gather legend). Two cos
 opt-in, one mark at a time: a member draws OVER everything (right for a legend above the staging
 grids, wrong for most marks), and it goes around the OutputPass's tone map, so it sets
 `toneMapped = false`. Its one member today is the gather legend (`Globe._rebuildGatherLabels`).
+
+## The finish — antialiasing, the backdrop pool, the dither, face shading
+
+Four things that belong to the frame rather than to a view (2026-11-22, user: "ignore what I decided
+in the past, make it looks more refined" — which lifted the earlier no-MSAA and flat-void decisions).
+
+**The scene target is multisampled** (`SceneContext`, `msaa`): the composer's own targets carry the
+samples — 4 at a pixel ratio ≤ 1.5, 2 above — and the renderer's `antialias` stays false, because only
+the final quad reaches the default framebuffer. It smooths geometry edges (coast walls, chips, tiles)
+and softens GL lines; the analytic strips (`SoftLines`, the ribbon linings) stay, since a few samples
+do not resolve a 1px mark. ⚠️ Measured on a desktop GPU only, where the whole frame is under 1 ms
+either way; a phone or tablet's cost is unmeasured.
+
+**The last pass is the FINISH** (`FINISH_SHADER`, after the OutputPass, so in display space): the
+backdrop POOL — a radial lift toward `SceneColors.panel`, screen-blended, dark ground only
+(`BACKDROP_LOOK`) — and one LSB of triangular DITHER on both grounds. The pool takes the token's own
+bytes: a `THREE.Color` hands back the linear value, a third of the level. It is screen-space, so it
+never changes with the camera's distance. The overlay layer draws after it and is untouched.
+
+**The globe has an ATMOSPHERE on dark** (`GeoView.buildAtmosphere`, `ATMO_LOOK`): one back-faced
+additive shell shaded by how close each line of sight passes to the centre — a halo outside the limb,
+a rim light inside — leaning on the rig's sun. The limb carries the roundness, so the far side's walls
+and graticule rest at `FAR_SIDE` (0.14). Paper never draws it and keeps its ocean plate.
+
+**The chamber's boxes are FACE-SHADED** (`objects/faceShade.ts`): the bars, lane tiles, data marks and
+blocks stay unlit, and a per-vertex multiplier by face direction is baked into the geometry (the
+material sets `vertexColors`). It multiplies the instance colour, so every emphasis tier keeps its
+order and the top face keeps its level.

@@ -104,8 +104,8 @@ export const STRIPES_MIN = 3;
 
 /** The stripes, in the sheet's own fragment (`setStriped`). `vStripe` runs 0 → n across the sheet
  *  (one unit per stripe; a stripe stands at each half-integer), so a stripe follows the sheet's own
- *  eased sweep and converges with it. ANTIALIASED IN SCREEN SPACE, not by geometry: the renderer has
- *  no MSAA and the half-res bloom haloes a hard 1px step into a crawling fringe (the soft-lines
+ *  eased sweep and converges with it. ANTIALIASED IN SCREEN SPACE, not by geometry: the scene
+ *  target's few MSAA samples do not resolve a 1px stripe, and the half-res bloom haloes a hard step into a crawling fringe (the soft-lines
  *  lesson, `SoftLines.ts`), so a stripe's coverage falls off linearly to 0 one device pixel from its
  *  centre (`fwidth`), the same triangular profile. Where the stripes crowd closer than ~3 pixels
  *  (the sheet's narrow foot, a far row) they hand over to their own average, so nothing aliases or
@@ -113,7 +113,7 @@ export const STRIPES_MIN = 3;
 //
 // THE LINING (the Metagraph snapshots register) rides the same coordinate: a hairline one device pixel
 // INSIDE each long edge (`vStripe.y` is n, the right edge), with the same triangular profile — kept
-// off the edge itself, because the polygon's own edge is a hard, stepped one (no MSAA), and a bright
+// off the edge itself, because the polygon's own edge is only as smooth as the scene target's few samples, and a bright
 // line laid on it would light every step. Where the sheet narrows to under ~6 pixels the two linings
 // would merge into a bar, so they hand over to the plain sheet there.
 const STRIPE_GLSL = `{

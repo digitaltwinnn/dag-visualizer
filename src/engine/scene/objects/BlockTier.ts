@@ -102,8 +102,8 @@ export class BlockTier {
 
   // ── links: SOFT LINES (antialiased strips, `SoftLines`), positions written at event time, alpha per
   // frame (the threads' idiom). They were a LineSegments until 2026-11-09 (user: "color/jagged
-  // artifacts for the lines from certain angles … more with the bloom"): a 1px GL line is a stair-step
-  // without MSAA, and the whole-frame bloom haloed each step.
+  // artifacts for the lines from certain angles … more with the bloom"): a 1px GL line is a beaded
+  // stair-step even under the scene target's MSAA, and the whole-frame bloom haloes each step.
   private readonly _maxLinks: number;
   private readonly _links: SoftLines;
   private _linkChain: string[] = [];

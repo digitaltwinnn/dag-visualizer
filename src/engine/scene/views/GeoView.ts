@@ -409,8 +409,8 @@ function buildCompassRose(globe: GeoViewHost) {
 // CanvasTexture: alpha-encoded canvas uploads proved PATH-DEPENDENT in Chrome (premultiplied
 // GPU-canvas fast paths vs readback produce different texels than getImageData reports, and
 // the result flipped between mipmapped and direct uploads). Luminance survives every path.
-// Mipmaps then do the minification anti-aliasing that analytic per-fragment lines can't get
-// under the postprocessing composer (no MSAA there) — no shimmer as the globe turns.
+// Mipmaps then do the minification anti-aliasing that analytic per-fragment lines can't get —
+// MSAA samples geometry edges, never a texture's interior — so nothing shimmers as the globe turns.
 type LandFeature = { geometry: { type: string; coordinates: unknown } };
 function makeLandTexture(features: LandFeature[]): THREE.DataTexture {
   // 4096×2048: POWER-OF-TWO on purpose — NPOT dimensions combined with the wrong wrap/filter

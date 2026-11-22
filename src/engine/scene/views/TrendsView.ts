@@ -15,7 +15,8 @@
 // It was an accent hairline, and an accent line is a MARK — the eye reads it as a gridline or a
 // reading, and there is nothing to read. So each rung is a soft band hanging from the floor line:
 // a quad billboard `shadowH` tall whose alpha rises over the top `SHADOW_LIP` and decays to
-// nothing at the bottom (`shadowTexture`), in the NEUTRAL ink (`SceneColors.fg`) rather than the
+// nothing at the bottom (`shadowTexture`), in a NEUTRAL ink (`SceneColors.fg` on paper, the cooler
+// `muted` on dark, where the foreground's near-white read as a grey smear) rather than the
 // accent, with the ends feathered so nothing about it has an edge. Furniture that recedes into the
 // ground it sits on, on both grounds: additive haze on dark, ink on paper.
 //
@@ -129,7 +130,9 @@ const groundY = (centre: number, f: PlaneFormat): number => PLANE_Y - centre * f
 // legible — still above dark's number, for the reason given above — without the dirt. 0.34 since
 // 2026-10-25 (user: "light mode should have a shadow too … for those cards"): at 0.11 the cards
 // stood on almost nothing on paper, while dark's bands read plainly under its deck.
-const GROUND_PRESENCE = { dark: 0.07, paper: 0.34 } as const;
+// Dark is 0.1 in the muted ink (was 0.07 in the foreground's white): the tone carries less
+// luminance, and the level is what keeps the footprint as legible as it was.
+const GROUND_PRESENCE = { dark: 0.1, paper: 0.34 } as const;
 
 /** The shadow band's height in world units — how far below the floor line the soft falloff runs.
  *  A little over a tenth of the card: enough to read as a shadow's spread, not a second card. */
@@ -408,8 +411,11 @@ export class TrendsView implements SceneView {
     const paper = isLightGround(this._colors);
     const attr = this._mesh.geometry.getAttribute("color") as THREE.BufferAttribute;
     for (let v = 0; v < this._vertSlot.length; v++) {
-      // NEUTRAL: the foreground ink, never the accent — a shadow has no hue of its own.
-      this._col.setHex(this._colors.fg);
+      // On paper a shadow is NEUTRAL: the foreground ink, never the accent. On the dark ground
+      // the band is added light, and light in the foreground's near-white is a grey smear on
+      // black; it takes the MUTED ink, the HUD's cool secondary tone, so the floor sits with the
+      // navy backdrop pool instead of over it.
+      this._col.setHex(paper ? this._colors.fg : this._colors.muted);
       inkMix(this._col, slotPresence(this._vertSlot[v], paper), this._colors);
       attr.setXYZ(v, this._col.r, this._col.g, this._col.b);
     }
