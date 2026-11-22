@@ -78,8 +78,7 @@ export function joinGlow(o: THREE.Object3D): void {
 
 /**
  * THE OVERLAY LAYER — scene text that must NOT bloom (2026-09-28, user: "I don't want the text to
- * bloom", on the gather legend). On the dark ground the bloom is a whole-frame pass, so anything
- * the main chain draws above the threshold halos, text included. A member of this layer is left
+ * bloom", on the gather legend). A member of this layer is left
  * out of every composer pass (`layers.set`, so it leaves layer 0) and drawn by `renderFrame` in one
  * plain render AFTER the composer, straight onto the finished frame: crisp on both grounds, still
  * a scene object that rides group transforms and material opacity. It draws over everything —
@@ -285,8 +284,9 @@ export interface SceneCtx {
    *  each frame. Plain numbers: `renderFrame` hands them to the mark pass's blur (dark). */
   bloom: BloomKnobs;
   /**
-   * Draw one frame. The ONE home for the ground question in the render chain: dark runs the
-   * original composer alone, paper runs the selective-bloom sub-pipeline first (see BLOOM_LAYER).
+   * Draw one frame. The ONE home for the ground question in the render chain: both grounds
+   * run the mark pass first (see BLOOM_LAYER) and the composer mixes its result in the way that
+   * ground needs.
    * The Engine calls this instead of `composer.render()` so it never has to know which.
    */
   renderFrame(): void;
@@ -622,6 +622,9 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     sel?.composer.dispose();
     sel?.bloom.dispose();
     composer.dispose();
+    sel?.mix.dispose();
+    dof.dispose();
+    outputPass.dispose();
     hold.dispose();
     finish.dispose();
     nodeEnvTex?.dispose(); // the chips' PMREM studio env (null if no chip material ever built)

@@ -552,18 +552,11 @@ export class Engine {
     setColors(c: SceneColors): void;
     setSceneColors(m: Record<string, number>): void;
   }[] = [];
-  // Per-view bloom level, themed (spec §5). ON PAPER THE PASS IS OFF, and the reason is the
-  // HIGHPASS: bloom keeps what is brighter than `threshold` (0.13, low so every identity hue
-  // clears it), blurs it and adds it back. A ~0.94-L page clears that by itself, so on light the
-  // pass returns a blurred copy of the PAGE and adds it over everything — equal RGB everywhere,
-  // which lifts every dark mark toward white and crushes its saturation. That veil, not any
-  // material value, is what made the day look read as washed-out pastel (measured 2026-08-21:
-  // turning it off dropped the scene's dark marks from 140 to 65 luminance and multiplied its
-  // strongly-coloured pixels 17×). The shipped `LIGHT_LOOK.bloomMul` is 0, so on paper the
-  // whole-frame pass is SKIPPED outright (`bloom.enabled = _bloomMul > 0`; `bloomFloor` is inert
-  // while it is 0) and the identity marks halo through their own selective layer instead
-  // (SceneContext's BLOOM_LAYER sub-pipeline). The knob stays: any value > 0 re-enables the
-  // whole-frame pass at that calm level with the threshold floored high.
+  // The dark mark pass's gain on the view policy's bloom strength: 1 on dark. On paper it is
+  // `LIGHT_LOOK.bloomMul`, which is 0 — a highpass keeps what is brighter than its threshold, and
+  // a ~0.94-L page clears any threshold by itself, so a highpassed bloom returns a blurred copy of
+  // the PAGE and lifts every dark mark toward white (measured 2026-08-21). Paper's marks halo
+  // through `renderFrame`'s own paper branch instead (`LIGHT_LOOK.sel*`), which reads none of this.
   private _bloomMul = 1;
 
   constructor(canvas: HTMLCanvasElement, onReady?: () => void, onSceneReady?: () => void) {

@@ -698,7 +698,7 @@ endpoints from the same `referenceSegments` walk), dissolve by zero-scale, and d
 their slot's entry beat. Links are SOFT LINES (`objects/SoftLines.ts`, 2026-11-09 — user: "color/jagged artifacts for the lines
 from certain angles … more with the bloom"): each segment a screen-space strip whose alpha falls off
 linearly to 0 one DEVICE pixel from its centre, so a link carries a 1px line's light without the
-beaded stair-step a GL line keeps even under the scene target's MSAA — the step the whole-frame bloom haloes into a
+beaded stair-step a GL line keeps even under the scene target's MSAA — the step a bloom haloes into a
 crawling fringe. FXAA over the whole frame was tried and dropped the same day: it smeared every 1px
 mark (the floor's ordinals, the dotted anchor lines). Positions at event time, alpha per segment end
 per frame, ranged uploads, `glowBlend` on each ground. The silent stretch is one dashed `LineSegments` flush in the floor
@@ -913,8 +913,8 @@ the paper selective-bloom mark pass (`BLOOM_LAYER`). A member joins with `joinOv
 with `leaveOverlay` when disposed): `layers.set` takes it off layer 0, so NO composer pass sees it,
 and `renderFrame` draws the layer in one plain render onto the finished frame — no clear, depth
 cleared, background nulled, every field restored — and skips the render when no member is showing.
-It exists because the dark ground's bloom is a whole-frame pass that halos any bright mark, text
-included (user: "I don't want the text to bloom", on the gather legend). Two costs make membership
+It exists so scene text can sit outside the composer altogether (user: "I don't want the text to
+bloom", on the gather legend; the dark bloom was a whole-frame pass then). Two costs make membership
 opt-in, one mark at a time: a member draws OVER everything (right for a legend above the staging
 grids, wrong for most marks), and it goes around the OutputPass's tone map, so it sets
 `toneMapped = false`. Its one member today is the gather legend (`Globe._rebuildGatherLabels`).
@@ -930,6 +930,12 @@ the final quad reaches the default framebuffer. It smooths geometry edges (coast
 and softens GL lines; the analytic strips (`SoftLines`, the ribbon linings) stay, since a few samples
 do not resolve a 1px mark. ⚠️ Measured on a desktop GPU only, where the whole frame is under 1 ms
 either way; a phone or tablet's cost is unmeasured.
+
+⚠️ **The mark pass sees no LAMP.** three applies a camera's layer mask to lights as well as
+meshes, and neither the rig nor the stage light is on `BLOOM_LAYER`/`GLOW_LAYER`, so a member is
+blurred as its emissive and environment alone. The lit frame still shows the stage light's wash on
+a node; the halo around it no longer grows with the lamp. Putting the lights on the layers is the
+lever if a claim should bloom.
 
 **Dark blooms by MEMBERSHIP, like paper** (`SceneContext.renderFrame`): no whole-frame highpass sits
 in the chain. The mark pass draws `BLOOM_LAYER` plus, on dark only, `GLOW_LAYER` (`joinGlow` — the
@@ -959,7 +965,7 @@ over the pie's faint fill a ring-width gap was the darkest thing on the disc.
 
 **The global floor MIRRORS what stands on it** (`objects/FloorMirror.ts`, `MIRROR_LOOK`): three's
 planar `Reflector`, feathered at the floor's edges; one more render of the members at 2048×1280, only while
-the chamber is on screen. Four rules, each a user round the same day:
+the chamber is on screen. Five rules, each a user round the same day:
 - **Membership, like bloom** (`MIRROR_LAYER`, `joinMirror`): the mirror's camera sees only the bars,
   lane tiles, data marks, blocks, links and anchor sheets. A plain mirror also reflected the labels
   and dotted lines lying in the floor (ghost copies under their own text) and the metagraph planes a
@@ -977,7 +983,7 @@ the chamber is on screen. Four rules, each a user round the same day:
 - **Only bright marks spill on dark** (`spillFloor`): the spill is a blur, and blurring every dim
   trail bar laid a haze over the trail that read as "fuzzy blocks"; below the floor a mark lights
   nothing and keeps its sharp image alone.
-- **The floor takes LIGHT as well as an image** (`spill`, 1.1 dark / 0.8 paper after "too subtle"):
+- **The floor takes LIGHT as well as an image** (`spill`, 1.1 dark / 0.22 paper):
   the same reflection at two coarse mips is a soft pool of each mark's colour around its
   reflection, so the light is the marks' own and follows their emphasis with no lamp.
 

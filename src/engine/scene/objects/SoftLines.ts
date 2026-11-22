@@ -3,7 +3,7 @@
 // the whole frame was tried and dropped — it smeared every 1px mark, the floor's ordinals included).
 //
 // WHY NOT A LineSegments: the scene target's 2–4 MSAA samples (`SceneContext`) soften a GL line's
-// steps but leave a 1-device-pixel line beaded, and on the dark ground the whole-frame half-res bloom haloes each step
+// steps but leave a 1-device-pixel line beaded, and the half-res bloom haloes each step
 // into a fringe that crawls as the camera moves. Here every segment is a quad expanded perpendicular
 // to its SCREEN direction in the vertex shader, and the fragment's alpha falls off linearly to 0 at
 // `HALF_PX` device pixels from the centre line — a triangular coverage profile whose integral across

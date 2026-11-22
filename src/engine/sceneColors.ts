@@ -246,8 +246,8 @@ export interface LightLook {
   inkLift: number; //  how much of the headroom above rest a focus claims
   bloomMul: number; // light bloom strength as a fraction of the view policy's
   bloomFloor: number; // minimum bloom threshold on light, so the ground never halos
-  // The SELECTIVE bloom (scene/SceneContext.ts · BLOOM_LAYER). The whole-frame pass above cannot
-  // select ink darker than its ground; these drive the layer that can. Read per frame.
+  // The SELECTIVE bloom on paper (scene/SceneContext.ts · BLOOM_LAYER): a highpass cannot select
+  // ink darker than its ground; these drive the layer that can. Read per frame.
   selBleed: number;  // how far the halo multiplies the ground toward the mark's own hue
   selGlow: number;   // the additive term beside it — light added at the mark's own core
   selRadius: number; // the halo's spread
@@ -257,12 +257,11 @@ export const LIGHT_LOOK: Readonly<LightLook> = {
   // thinned (inkDimG 1.1 → 1.35) the identity lane could come UP — brighter ink reads right once
   // the de-emphasized field around it is genuinely thin.
   inkGamma: 0.15, inkDimG: 1.35, inkLift: 0.6,
-  // THE WHOLE-FRAME PASS IS OFF ON PAPER. It is a luminance highpass over the finished frame, and
-  // on paper the marks are INK — darker than the ground they lie on — so no threshold selects them;
+  // NO HIGHPASSED BLOOM ON PAPER. A highpass selects what is brighter than a threshold, and on
+  // paper the marks are INK — darker than the ground they lie on — so no threshold selects them;
   // all it ever did was blow the one place light DID clear it (the lead bar, the ribbon foot) to
-  // white. Engine's `bloom.enabled = _bloomMul > 0` skips the pass outright, so this is a look fix
-  // and a full-res pass off the light path both. `bloomFloor` is inert while this is 0 — it shapes
-  // that pass's threshold alone — and stays as the lever if the whole-frame look is ever wanted back.
+  // white. `bloomMul` 0 is that statement (the Engine's gain on the dark pass's knobs); `bloomFloor`
+  // shapes the threshold only while `bloomMul` is above 0.
   bloomMul: 0, bloomFloor: 0.5,
   // Raised from the 2026-08-28 settled 0.35/0.05/0.45: the rest-only chip calm and the
   // hubMatchBoost retirement (both 2026-08-30) fed this layer visibly less input, and the
