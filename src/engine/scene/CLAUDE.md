@@ -1018,6 +1018,15 @@ were agreed; four are built, each tied to something real, each a plain `Readonly
 - **The arrival glint** (`objects/Glint.ts`, `GLINT_LOOK`): one highlight that runs once along a
   global snapshot's bar when its exact read lands. An event, not a state; one mesh for the chamber.
 
+**The subject's air** (`SceneContext.setBackdropTint`, `BACKDROP_LOOK.subject`; user, 2026-11-22:
+use Hypergraph's blur more, "maybe combine it with a subtle background color change"). While one
+network is the subject in Hypergraph, the backdrop takes a breath of its identity colour: added to
+the pool on dark, a faint tint of the page toward it on paper. It rides the SAME eased number as the
+depth-of-field blur (`Engine._dofMix`), so the structure falling out of focus and the air changing
+colour are one move — and the blur, which used to snap on, eases with it. The DAG as subject takes
+the colour and no blur: its shells are far wider than the blur's sharp zone, and its own nodes
+came out soft.
+
 Not built: **contact pools under the lane tiles.** A shared-buffer skirt was written and removed
 the same day — the metagraph planes are seen edge-on or from below at the chamber's one pose, so
 nothing it drew reached the reader. The global floor already anchors what stands on it (the

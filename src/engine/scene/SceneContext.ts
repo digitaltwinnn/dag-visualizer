@@ -231,14 +231,23 @@ const HOLD_SHADER = {
   `,
 };
 
-export const BACKDROP_LOOK: Readonly<{ pool: number; reach: number }> = {
+export const BACKDROP_LOOK: Readonly<{ pool: number; reach: number; subject: number; subjectPaper: number }> = {
   pool: 0.7, // the pool's peak, as a fraction of the panel token's own display value
   reach: 0.95, // its radius, in canvas heights
+  // THE SUBJECT'S AIR (user, 2026-11-22: use the Hypergraph's blur more, "maybe combine it with a
+  // subtle background color change"). While one network is the subject and the rest of the
+  // structure falls out of focus, the backdrop takes a breath of that network's own colour, so
+  // the reader is standing in it rather than looking at it. `subject` is how much of the hue the
+  // dark pool adds at its peak; `subjectPaper` how far the page is tinted toward it at the centre.
+  subject: 0.085, subjectPaper: 0.05,
 };
 const FINISH_SHADER = {
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null },
     uPool: { value: new THREE.Vector3() },
+    // The subject's air: a hue (display values) and its two levels — x adds on dark, y tints paper.
+    uTint: { value: new THREE.Vector3() },
+    uTintAmt: { value: new THREE.Vector2() },
     uReach: { value: 0.95 },
     uAspect: { value: 1 },
   },
@@ -249,6 +258,8 @@ const FINISH_SHADER = {
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse;
     uniform vec3 uPool;
+    uniform vec3 uTint;
+    uniform vec2 uTintAmt;
     uniform float uReach;
     uniform float uAspect;
     varying vec2 vUv;
@@ -257,7 +268,9 @@ const FINISH_SHADER = {
       vec4 base = texture2D(tDiffuse, vUv);
       vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0);
       float f = 1.0 - smoothstep(0.0, uReach, length(p));
-      vec3 rgb = 1.0 - (1.0 - base.rgb) * (1.0 - uPool * f * f);
+      vec3 rgb = 1.0 - (1.0 - base.rgb) * (1.0 - (uPool + uTint * uTintAmt.x) * f * f);
+      // Paper cannot take added light: the page is tinted toward the hue instead, a multiply.
+      rgb *= mix(vec3(1.0), uTint, uTintAmt.y * f);
       float n = ign(gl_FragCoord.xy) + ign(gl_FragCoord.xy + vec2(47.0, 17.0)) - 1.0;
       gl_FragColor = vec4(rgb + n / 255.0, base.a);
     }
@@ -298,6 +311,10 @@ export interface SceneCtx {
    */
   setClearColor(bg: number): void;
   setGround(light: boolean): void;
+  /** THE SUBJECT'S AIR (`BACKDROP_LOOK.subject`): the backdrop's breath of one network's colour.
+   *  `hue` is the network's identity colour as the HUD draws it; `mix` 0 to 1 how far it is in.
+   *  Plain data in, per frame; allocation-free. */
+  setBackdropTint(hue: number, mix: number): void;
   /**
    * The shared chip environment texture (built lazily on first ask — PMREM needs the renderer).
    * The Engine hands it to NodeFabric.setNodeEnv once at construction; see the note at the
@@ -643,6 +660,11 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     bgColor.setHex(bg);
     applyBackground();
   }
+  function setBackdropTint(hue: number, mix: number) {
+    // Display values, like the pool: this pass runs after the sRGB encode.
+    finish.uniforms.uTint.value.set(((hue >> 16) & 255) / 255, ((hue >> 8) & 255) / 255, (hue & 255) / 255);
+    finish.uniforms.uTintAmt.value.set(isPaper ? 0 : BACKDROP_LOOK.subject * mix, isPaper ? BACKDROP_LOOK.subjectPaper * mix : 0);
+  }
   function setGround(light: boolean) {
     renderer.toneMapping = light ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = light ? 1 : 0.82;
@@ -694,6 +716,6 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
 
   return {
     scene, camera, renderer, controls, composer, dof, bloom,
-    renderFrame, resize, setClearColor, setGround, nodeEnv, dispose,
+    renderFrame, resize, setClearColor, setGround, setBackdropTint, nodeEnv, dispose,
   };
 }

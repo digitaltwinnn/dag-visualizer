@@ -74,6 +74,9 @@ import { breakpointOf } from "@/src/data/breakpoint";
 /** How often the dev instance audit sweeps — every Nth frame, one mesh per sweep. ~1s of coverage
  *  per mesh at 60fps, which finds a corrupt buffer promptly while costing nothing measurable. */
 const AUDIT_EVERY = 15;
+/** The blur the out-of-focus structure saturates to in Hypergraph while a metagraph is the subject
+ *  (see the frame's depth-of-field block for the number's history). */
+const DOF_MAX = 0.14;
 /** Dev, or `?audit` in any build — the `?stats` idiom, so a deployed instance can be checked
  *  without shipping the pass to every visitor. */
 const AUDIT_ON =
@@ -216,6 +219,11 @@ export class Engine {
   // The focused metagraph's hub record, cached on filter/mode change — kills the per-frame
   // `metas.find` the DoF read used to do every frame (Task 15 allocation fix).
   private _dofMeta: MetaHubRec | null = null;
+  /** The blur's eased level, and the subject it last stood on — whether it was the DAG, and its
+   *  identity hue — kept through the fade after the subject is released. */
+  private _dofMix = 0;
+  private _dofDag = false;
+  private _dofHue = 0;
   private _warnedUnbaked = false;
 
   // Land-sphere hit scratch for the scene country hover/click (ray→sphere analytically —
@@ -2568,13 +2576,31 @@ export class Engine {
     // Depth of field: only a single focused metagraph WITH A HUB to focus on, and only where the
     // policy allows it (hyper). Without a hub (the unlisted set, a network with no live nodes) the
     // blur had nothing in focus and smeared the whole scene (the Unlisted audit, 2026-10-07).
+    // ⚠️ THE DAG TAKES THE BACKDROP'S COLOUR AND NO BLUR (tried 2026-11-22): its shells run 12.5
+    // either side of the core, far outside the pass's sharp zone at any level that still blurs
+    // the hubs, so its own nodes came out soft — the "fuzz on the selected atom" the blur was
+    // once dropped for.
     const metaSel = this.filter !== "all" && this.filter !== "dag" && this._dofMeta != null;
+    const dagSel = this.filter === "dag";
     // …AND ONLY ONCE THE SUBJECT HAS ARRIVED (user, 2026-10-25): the morph is written to 0 at the
     // boundary, so the blur used to cover the fleet while it still stood on the staging grids.
     // The mix rides hyper's subject-arrival beat (`entryProgress` — held through the choreography,
     // the tethers' sweep after it), the same stage the hubs' tethers reach their hubs on.
-    const dofMix = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1) * this.layers.entryProgress();
-    this.ctx.dof.enabled = policy.dofEligible && metaSel && dofMix > 0.001;
+    const dofGate = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1) * this.layers.entryProgress();
+    // EASED (2026-11-22). The gate above is 0 or 1 at rest, so committing a network used to snap
+    // the blur on. `_dofMix` follows it, and the backdrop's tint rides the same number, so the
+    // background falls out of focus and takes the subject's colour as one move.
+    const dofTarget = policy.dofEligible && (metaSel || dagSel) ? dofGate : 0;
+    this._dofMix += (dofTarget - this._dofMix) * (1 - Math.exp(-4 * dt));
+    if (Math.abs(dofTarget - this._dofMix) < 0.002) this._dofMix = dofTarget;
+    const dofMix = this._dofMix;
+    // The subject outlives its own release by the fade: the last one committed is what the blur
+    // and the tint ease away from.
+    if (metaSel || dagSel) {
+      this._dofDag = dagSel;
+      this._dofHue = this._sceneColorMap[this.filter] ?? 0;
+    }
+    this.ctx.dof.enabled = dofMix > 0.001 && !this._dofDag;
     if (this.ctx.dof.enabled) {
       const meta = this._dofMeta;
       // The bokeh focal-plane distance is a RENDER property — it needs the hub's actual
@@ -2590,8 +2616,11 @@ export class Engine {
       // 0.14 with the closer hub framing (`HUB_CLOSE` 0.75; user 2026-10-04: "a bit more fuzzy, but
       // keep the selected metagraph clear"): nearer, the selection holds the sharp zone, so the
       // background can take more blur without the subject paying for it. Still under 0.16.
-      this.ctx.dof.uniforms["maxblur"].value = 0.14 * dofMix;
+      this.ctx.dof.uniforms["maxblur"].value = DOF_MAX * dofMix;
     }
+    // THE SUBJECT'S AIR (`BACKDROP_LOOK.subject`): the backdrop takes the subject's colour on the
+    // same mix, so the two read as one change of focus.
+    this.ctx.setBackdropTint(this._dofHue, dofMix);
 
     this._syncCallout();
     // The chart planes ride the SETTLED camera, so they are placed here in the scene-write phase —
