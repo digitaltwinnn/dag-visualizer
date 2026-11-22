@@ -16,6 +16,7 @@ import { type Band, type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, horizonAt, frontAt, rowOnChamber } from "../../domain/ledgerModel";
 import { snapBright, snapFocusOf, emphasisK } from "../../domain/dimModel";
 import { joinBloom, inMarkPass } from "../SceneContext";
+import { faceShade } from "./faceShade";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
 
@@ -110,7 +111,7 @@ export class ByteBar {
   group = new THREE.Group();
   pickables: THREE.Object3D[] = [];
   private _slots: Slot[] = [];
-  private _geo = new THREE.BoxGeometry(1, BAR_H, 1);
+  private _geo = faceShade(new THREE.BoxGeometry(1, BAR_H, 1));
   private _sceneColors: Record<string, number>;
   private _neutral: number;
   /** GROUND, hoisted at event time — the band loop reads a boolean, never re-derives luminance. */
@@ -139,7 +140,7 @@ export class ByteBar {
       const bands: THREE.Mesh[] = [];
       const mats: THREE.MeshBasicMaterial[] = [];
       for (let b = 0; b < BANDS_PER_SLOT; b++) {
-        const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+        const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, vertexColors: true });
         const mesh = new THREE.Mesh(this._geo, mat);
         mesh.scale.set(0, 0, 0);
         mesh.visible = false;

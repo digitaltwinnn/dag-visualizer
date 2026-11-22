@@ -25,6 +25,7 @@ import { inkMix, inkPresence, isLightGround, type SceneColors } from "../../scen
 import type { PickDescriptor } from "@/src/data/types";
 import { joinBloom } from "../SceneContext";
 import { SoftLines } from "./SoftLines";
+import { faceShade } from "./faceShade";
 
 /** One block, placed by the view (chamber-local, before the rewind offset). */
 export interface BlockItem {
@@ -126,9 +127,9 @@ export class BlockTier {
     this._bright = new Float32Array(maxBlocks);
 
     this._mat = this._glass
-      ? new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: this._glassOp() })
-      : new THREE.MeshBasicMaterial({});
-    this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), this._mat, maxBlocks);
+      ? new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: this._glassOp(), vertexColors: true })
+      : new THREE.MeshBasicMaterial({ vertexColors: true });
+    this.mesh = new THREE.InstancedMesh(faceShade(new THREE.BoxGeometry(1, 1, 1)), this._mat, maxBlocks);
     // Bounds three cannot reject with: the blocks ride the rewind and are pickable (NodeFabric.openBounds).
     this.mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
     this.mesh.frustumCulled = false;

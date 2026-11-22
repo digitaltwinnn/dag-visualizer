@@ -105,6 +105,7 @@ import { BlockTier, type BlockItem } from "../objects/BlockTier";
 import { SilentStretch, type StretchItem } from "../objects/SilentStretch";
 import type { SceneView } from "./SceneView";
 import { joinBloom, inMarkPass } from "../SceneContext";
+import { faceShade } from "../objects/faceShade";
 
 /** The lane-tile instance budget.
  *
@@ -585,8 +586,8 @@ export class LedgerView implements SceneView {
     // BRIGHTNESS (instance colour) carries the recency fade — the bloom pass still lights the
     // hot row, so the lead keeps its glow while the trail reads matte.
     this._metaTrailMesh = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(1, 1, TILE_D),
-      new THREE.MeshBasicMaterial({}),
+      faceShade(new THREE.BoxGeometry(1, 1, TILE_D), "z"), // spun −90° about X per instance: local z is up
+      new THREE.MeshBasicMaterial({ vertexColors: true }),
       META_TRAIL_MAX,
     );
     joinBloom(this._metaTrailMesh); // the lane tiles are the trail's identity marks — see BLOOM_LAYER
@@ -617,7 +618,7 @@ export class LedgerView implements SceneView {
     // The Data blocks register's marks: the tiles' own species (solid, normal-blended, depth-writing,
     // in the bloom set), one unit box scaled per instance onto its tile's top. Not pickable — a mark
     // is part of its tile, and the tile under it answers the click.
-    this._dataMarkMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({}), META_TRAIL_MAX);
+    this._dataMarkMesh = new THREE.InstancedMesh(faceShade(new THREE.BoxGeometry(1, 1, 1)), new THREE.MeshBasicMaterial({ vertexColors: true }), META_TRAIL_MAX);
     joinBloom(this._dataMarkMesh);
     this._dataMarkMesh.frustumCulled = false;
     this._dataMarkMesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
