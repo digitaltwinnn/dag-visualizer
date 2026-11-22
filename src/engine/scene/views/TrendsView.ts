@@ -15,8 +15,8 @@
 // It was an accent hairline, and an accent line is a MARK — the eye reads it as a gridline or a
 // reading, and there is nothing to read. So each rung is a soft band hanging from the floor line:
 // a quad billboard `shadowH` tall whose alpha rises over the top `SHADOW_LIP` and decays to
-// nothing at the bottom (`shadowTexture`), in the NEUTRAL ink (`SceneColors.fg`) on paper and, on dark,
-// in the identity hue of the card standing on it (`setSlotHues`) rather than the
+// nothing at the bottom (`shadowTexture`), in the identity hue of the card standing on
+// it (`setSlotHues`) rather than the
 // accent, with the ends feathered so nothing about it has an edge. Furniture that recedes into the
 // ground it sits on, on both grounds: additive haze on dark, ink on paper.
 //
@@ -105,7 +105,13 @@ const RUNG_FALLOFF = 0.16;
  *  furniture has no business making. Level, below everything, is the version that stays furniture.
  *  What the rungs say instead is each plane's FOOTPRINT on the floor: same depth, same width, same
  *  stagger — the shadow the stack would cast. */
-const groundDrop = (f: PlaneFormat): number => f.worldH / 2 + f.stepY / 2 + f.worldH * 0.12;
+//
+// THE FLOOR HUGS THE CARD (user, 2026-11-22: "bring it closer to the card"). It lay a focus step
+// and a margin below the front card's foot, a band adrift under the deck. A card is DOM and
+// composites in front of the canvas, so the floor cannot cross its plot whatever the drop: it
+// starts a hair under the card's own bottom edge, the front band reads as light falling from under
+// the card, and a focused card (half a step lower) simply covers the lip.
+const groundDrop = (f: PlaneFormat): number => f.worldH / 2 + f.worldH * 0.012;
 
 /** The floor's world height for a stagger centred on `centre` (`staggerCentre(count)`, eased):
  *  `groundDrop` below the FRONT card's centre, which `stackPoses` places from the same number. */
@@ -132,7 +138,7 @@ const groundY = (centre: number, f: PlaneFormat): number => PLANE_Y - centre * f
 // stood on almost nothing on paper, while dark's bands read plainly under its deck.
 // Dark is 0.16 in the card's identity hue (was 0.07 in the foreground's white): a saturated hue
 // carries a fraction of white's luminance, and the level is what keeps the footprint legible.
-const GROUND_PRESENCE = { dark: 0.16, paper: 0.34 } as const;
+const GROUND_PRESENCE = { dark: 0.16, paper: 0.5 } as const;
 
 /** The shadow band's height in world units — how far below the floor line the soft falloff runs.
  *  A little over a tenth of the card: enough to read as a shadow's spread, not a second card. */
@@ -184,8 +190,12 @@ function shadowTexture(): THREE.Texture {
  *  about the data that furniture has no business making. Opaque cards ended that; the falloff is
  *  kept because a floor that does not recede reads as a set of loose lines.) */
 const slotPresence = (i: number, paper: boolean): number => {
+  // ON PAPER ONLY THE FRONT CARD CASTS. Inks overlap by covering, not by adding: with the floor
+  // hugging the deck, the rear cards' washes lay over the front one's and the hues mixed to a
+  // mauve grey (seen live, 2026-11-22). One wash, in the hue of the card being read.
+  if (paper) return i === 0 ? GROUND_PRESENCE.paper : 0;
   const stack = Math.max(0, 1 - RUNG_FALLOFF * i);
-  return (paper ? GROUND_PRESENCE.paper : GROUND_PRESENCE.dark) * stack * stack;
+  return GROUND_PRESENCE.dark * stack * stack;
 };
 
 /** The slot stagger's X and Z, as `stackPoses` states them — the RISE is the one component the
@@ -214,7 +224,7 @@ export class TrendsView implements SceneView {
    *  the same geometry rather than rebuilding it. */
   private readonly _vertSlot: number[] = [];
   /** The identity hue of the network on each slot's card (0 = none known → the muted ink), handed
-   *  in by the Engine whenever the deck changes. Dark only: on paper a rung is a neutral shadow. */
+   *  in by the Engine whenever the deck or the theme changes (the hue lanes differ by ground). */
   private readonly _slotHue: number[] = RUNGS.map(() => 0);
   /** Scratch for the colour bake. Module-free and bound once; the bake is event-time either way. */
   private readonly _col = new THREE.Color();
@@ -267,7 +277,12 @@ export class TrendsView implements SceneView {
     geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
     geo.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(this._vertSlot.length * 3), 3));
-    geo.setIndex(idx);
+    // FRONT RUNG LAST. On paper the bands are normal-blended ink, and a rear rung at zero presence
+    // is page colour: drawn after the front one it painted the page back over the middle of its
+    // wash (seen live, 2026-11-22). Far to near is also simply the right order for transparents.
+    const ordered: number[] = [];
+    for (let r = RUNGS.length - 1; r >= 0; r--) ordered.push(...idx.slice(r * 6, r * 6 + 6));
+    geo.setIndex(ordered);
     this._alpha = shadowTexture();
     this._mat = new THREE.MeshBasicMaterial({
       vertexColors: true,
@@ -427,12 +442,12 @@ export class TrendsView implements SceneView {
     const paper = isLightGround(this._colors);
     const attr = this._mesh.geometry.getAttribute("color") as THREE.BufferAttribute;
     for (let v = 0; v < this._vertSlot.length; v++) {
-      // On paper a shadow is NEUTRAL: the foreground ink, never the accent. On the dark ground
-      // the band is added light, and neutral light on black is a grey smear (user, 2026-11-22:
-      // "still grey … something with color?"); there it takes the identity hue of the network
-      // whose card stands on it (`setSlotHues`), the muted ink only where no hue is known.
+      // NEVER NEUTRAL (user, 2026-11-22, of dark and then of paper: "still ugly gray"): the band
+      // takes the identity hue of the network whose card stands on it (`setSlotHues`) — added
+      // light on dark, a wash of that ink on paper (`inkMix` asks the ground) — and the muted ink
+      // only where no hue is known.
       const slot = this._vertSlot[v];
-      this._col.setHex(paper ? this._colors.fg : this._slotHue[slot] || this._colors.muted);
+      this._col.setHex(this._slotHue[slot] || this._colors.muted);
       inkMix(this._col, slotPresence(this._vertSlot[v], paper), this._colors);
       attr.setXYZ(v, this._col.r, this._col.g, this._col.b);
     }

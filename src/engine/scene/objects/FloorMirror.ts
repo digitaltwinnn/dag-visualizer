@@ -34,8 +34,8 @@ export const MIRROR_LOOK: Readonly<{
   strength: number; strengthPaper: number; spill: number; spillPaper: number;
   lift: number; feather: number; back: number;
 }> = {
-  strength: 0.2, strengthPaper: 0.4,
-  spill: 0.5, spillPaper: 0.45, // the soft pool's level, per ground (it is spread thin, so it reads above the image's number)
+  strength: 0.2, strengthPaper: 0.2,
+  spill: 1.1, spillPaper: 0.8, // the soft pool's level, per ground (it is spread thin, so it reads above the image's number)
   lift: 0.12, feather: 0.08, back: 0.4,
 };
 const MIRROR_RES = { w: 1024, h: 640 } as const;
