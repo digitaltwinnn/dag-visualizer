@@ -646,14 +646,10 @@ export default function TrendStack() {
                 ⚠️ TWO BACKGROUND LAYERS, ONE SHORTHAND: `--panel-solid` is 0.92-alpha glass, so on
                 its own the card would still leak the plane behind it. Laid over the opaque
                 `--scene-ground` it is solid — and both are tokens, so both grounds follow.
-                A PREVIEWED CARD TAKES ITS NETWORK'S HUE ON THE HAIRLINE AND AS A WASH ON ITS FACE
-                (rule 9 — hovers preview, never commit). The wash is the explorer rows' own
-                `.nb-row.subject-paired` recipe — the hue at a low mix — laid as a THIRD background
-                layer over the two below, so the card stays opaque (user, 2026-09-26: the hairline
-                alone did not read as the pairing the rows show). It was an opacity lift while the
-                cards were translucent; on an opaque deck there is no opacity left to spend, and the
-                app's `.subject-paired` glow is a box-shadow, which a transformed plane may not
-                carry (see NO BLUR, NO SHADOW above). */}
+                A PREVIEWED CARD TAKES ITS NETWORK'S HUE ON THE HAIRLINE (rule 9 — hovers preview,
+                never commit), and only there: see the style below. The app's `.subject-paired`
+                glow is a box-shadow, which a transformed plane may not carry (see NO BLUR, NO
+                SHADOW above). */}
             <div
               // `plane-card` + `--slot`: the ARRIVAL drop (globals.css `planeDrop`, 2026-10-18 — user:
               // "when we enter/leave trend view, I expect an animation like for all other views:
@@ -671,11 +667,11 @@ export default function TrendStack() {
                 ["--slot" as string]: depthRank,
                 ["--plane-h" as string]: `${fmt.pxH}px`,
                 width: fmt.pxW,
+                // PAIRED IS THE HAIRLINE ALONE (user, 2026-11-22). The face also took the hue as a
+                // 12% wash from 2026-09-26, and over a card made of a head, a plot box and an area
+                // fill it tinted each piece differently — the card read as several elements.
                 ...(pair.paired
-                  ? {
-                      borderColor: `color-mix(in oklch, ${row.hue ?? "var(--primary)"} 60%, transparent)`,
-                      background: `linear-gradient(color-mix(in oklch, ${row.hue ?? "var(--primary)"} 12%, transparent), color-mix(in oklch, ${row.hue ?? "var(--primary)"} 12%, transparent)), linear-gradient(var(--panel-solid), var(--panel-solid)), var(--scene-ground)`,
-                    }
+                  ? { borderColor: `color-mix(in oklch, ${row.hue ?? "var(--primary)"} 75%, transparent)` }
                   : {}),
               }}
             >
@@ -832,17 +828,12 @@ export default function TrendStack() {
                 // more — it sits on the card's solid face. A hover previews, it never commits
                 // (rule 9).
                 headClassName="pointer-events-auto cursor-pointer px-2 py-1 rounded-md hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
-                // The pairing's five writers, on the one element of a plane that takes pointer
-                // events at every depth. `onMouseMove` is the swap-under-pointer healer and
-                // `onFocus`/`onBlur` the keyboard mirror — one pair of functions, five props, so
-                // a keyboard walk previews exactly what a hover does.
-                headHover={{
-                  onMouseEnter: pair.onMouseEnter,
-                  onMouseMove: pair.onMouseMove,
-                  onMouseLeave: pair.onMouseLeave,
-                  onFocus: pair.onFocus,
-                  onBlur: pair.onBlur,
-                }}
+                // A CARD'S HEAD DOES NOT WRITE THE PAIRING (user, 2026-11-22: hovering a card lit
+                // its row in the Networks list and the Metagraph card in the rail, and "shows
+                // different elements" read as wrong). The head answers its own hover with the wash
+                // above and nothing else moves. The card still READS the channel (`pair.paired`):
+                // hovering that network's row or a cursor-card row turns this card's hairline to
+                // its hue, so the list points at the deck and the deck stays quiet.
                 headAction={{
                   activate: (fromKey) => activate(pose.id, fromKey),
                   pressed: focus === pose.id,

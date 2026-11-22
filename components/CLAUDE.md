@@ -653,9 +653,12 @@ also landing as a pick. Rear cards keep their bodies inert. This is also why the
 swipe gesture: a vertical touch swipe stepped the measure for a few hours, until one gesture had
 to mean two things.
 
-**Hovering pairs over `hoverFilter`, the app's own network channel** (convention 9). A Networks row, a
-plane's header strip and a cursor-card row are three ends of one pairing, with no channel of their
-own: hovering any of them turns that card's hairline to its network's hue and washes the rows. The
+**Hovering pairs over `hoverFilter`, the app's own network channel** (convention 9). A Networks row
+and a cursor-card row WRITE it; a plane READS it and writes nothing (user, 2026-11-22: hovering a
+card's head lit its row and the rail's Metagraph card, and the card's face took a 12% wash of its
+hue that tinted the head, the plot box and the area fill as separate pieces — "shows different
+elements"). So hovering a row turns that card's hairline to its network's hue, and hovering a card
+moves nothing but the head's own wash. The
 hairline is the ONLY thing that changes — a preview that re-staggered the stack would read as a
 commit, the cards are opaque so there is no opacity to lift, and `.subject-paired`'s glow is a
 box-shadow, which a transformed plane may not carry.
