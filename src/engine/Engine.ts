@@ -57,7 +57,7 @@ import { auditInstances, findingKey, type InstanceFinding } from "./scene/instan
 import { CalloutSync, type CalloutState } from "./CalloutSync";
 import { Picking } from "./Picking";
 import { TrendStackSync, type TrendStackState } from "./TrendStackSync";
-import { fitDistance, focusDepth, loneShiftPx, stackPoses, windowCount } from "./domain/trendStack";
+import { fitDistance, focusDepth, stackPoses, windowCount } from "./domain/trendStack";
 import { stackRoster } from "@/src/data/trendScope";
 import { DevTunePanel } from "./DevTunePanel";
 import { CameraDirector } from "./CameraDirector";
@@ -2468,9 +2468,8 @@ export class Engine {
     // the room like hyper's hoops and the chamber's labels.
     const trendAlpha = this.transition.furnitureAlpha("trend");
     this.trends.setViewAlpha(trendAlpha);
-    // The rungs are billboards like the cards above them — re-laid along the camera's right vector
-    // (a no-op while the camera's orientation holds still, and skipped while the view is dark).
-    // One rung per card that is there, and a lone card's rung takes the card's own screen shift.
+    // The floor follows the deck: its height rides the stagger of the cards that are there (a
+    // no-op while that holds still, and skipped while the view is dark).
     if (trendAlpha > 0.001) {
       // The published window when there is one; until React publishes (boot, a refetch) the count
       // the SCOPE will hold — so the room is built around the floor it is about to have, and a
@@ -2482,12 +2481,8 @@ export class Engine {
         this._scopeCount = stackRoster(this.filter).length; // event-time: once per filter, never per frame — the SCENE's roster (the DAG has a plane here)
       }
       const count = windowCount(n > 0 ? n : this._scopeCount);
-      const shift = loneShiftPx(count, railGapShiftPx(window.innerWidth, this.railsHidden));
-      // The canvas height is only read while a shift needs converting — it is a layout read.
-      const viewH = shift !== 0 ? this.ctx.renderer.domElement.clientHeight || window.innerHeight : 0;
       // `_frameDt`, the projector's own clock (`?slowmo` included), so floor and cards ease as one.
-      const tier = breakpointOf(window.innerWidth);
-      this.trends.face(this.ctx.camera, count, shift, viewH, this._frameDt, tier !== "desktop", tier === "phone");
+      this.trends.face(count, this._frameDt, breakpointOf(window.innerWidth) === "phone");
       this._syncTrendHues();
     }
     // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim

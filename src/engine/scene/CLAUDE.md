@@ -830,41 +830,29 @@ a naive regex counted the prose, which let the test pass with the fix deliberate
 
 ## The History view's ground
 
-`views/TrendsView.ts` is the ONLY thing History draws in WebGL, and it is one `Mesh` of soft SHADOW
-BANDS: a level floor of horizontal rungs, one per CARD the DOM chart stack is showing — five under a full window,
-one under a filtered stack's lone card (which also takes that card's screen shift into the rails'
-gap, `trendStack.loneShiftPx`), so the floor is always the footprint of what stands on it. The view's content is DOM
+`views/TrendsView.ts` is the ONLY thing History draws in WebGL, and it is one level plane: the LINE
+FLOOR under the deck (`LINE_FLOOR`; "The finish" below has its design). The view's content is DOM
 (`components/TrendStack.tsx`, placed per frame by the engine's `TrendStackSync`), so the canvas under
 it is empty by design — and empty is the problem. A composited DOM layer carries no depth cues of its
 own, so with nothing behind them five planes read as five unrelated cards rather than as one stack
-receding into history. Each rung is the plane's FOOTPRINT — same depth, same width, same stagger,
-derived from `domain/trendStack.ts`'s own arithmetic rather than eyeballed against a screenshot — so
-re-tuning the stagger re-tunes the ground with it.
-
-**A rung is a shadow, not a line** (user, 2026-09-26). It was an accent hairline, and an accent line
-is a MARK — it reads as a gridline or a reading, and there is nothing to read. Each rung is now a quad
-billboard hanging `SHADOW_H` below the floor line, its alpha rising over a short lip and decaying to
-nothing (`shadowTexture`, a luminance canvas — three reads an alphaMap's green channel, so a canvas
-that varies only in alpha uploads as a solid slab), feathered at both ends, in its card's identity hue (see "The finish"). Below the desktop tier the rungs stack straight up with
-the deck (`trendStack.stepX`, the `narrow` flag `face()` takes).
+receding into history. The floor is that depth axis made visible.
 
 Four decisions are recorded in the file's header and worth knowing before touching it:
 
-- **It is furniture.** Colours are baked on a theme flip and there is no `update(dt)`; per frame it
-  takes the transition's furniture alpha through the shared `FadeSet`, and `face()` — which lays
-  the rungs along the camera's right vector and returns early while its inputs hold still. Its root's
-  `visible` is the Engine's, from `viewPolicy.show.trendGround` (rule 6).
-- **THE RUNGS RECEDE ON THEIR OWN FALLOFF, SQUARED** (`RUNG_FALLOFF`). A chart plane composites in
-  front of the canvas whatever the depth buffer says, and the planes are opaque cards — so a rung is
-  only ever seen where no card covers it, beside and below the deck. There it is furniture
-  establishing the depth axis: the far rungs fade to a whisper and the near ones carry it. The
-  floor's drop is DERIVED from the plane's own height (`planeFormat(...).worldH` in `domain/trendStack.ts` — per tier since 2026-10-03, the phone card is squarer),
-  so enlarging a plane can never run the floor through its plot. Any new 3D mark in this view meets
-  the same compositing constraint.
-- **The floor is LEVEL and there are no side rails.** A ramp putting each rung under its own plane
-  cannot work (`PLANE_STEP_Y` is smaller than a plane's own height, so the planes overlap and every
-  rung lands inside the plot in front of it), and rails joining the rungs' ends drew one hard diagonal
-  across the front chart. Both were built and cut after a look; the rungs alone carry the recession.
+- **It is furniture.** Its colours are set on a theme flip or a change of deck and there is no
+  `update(dt)`; per frame it takes the transition's furniture alpha through the shared `FadeSet`,
+  and `face(count, dt, phone)` — which sets the floor's height under the deck's eased stagger
+  centre, hides it under a scope with no card, and returns early while its inputs hold still. Its
+  root's `visible` is the Engine's, from `viewPolicy.show.trendGround` (rule 6).
+- **It is not a shadow under each card.** One soft band per slot was the first ground, in several
+  colours and positions, and it read as a smudge under a crisp DOM card each time. A chart plane
+  composites in front of the canvas whatever the depth buffer says, and the planes are opaque
+  cards — so any 3D mark in this view is only ever seen beside and below the deck. The floor's
+  drop is a fraction of the card's own height (`planeFormat(...).worldH`, per tier), so enlarging
+  a card moves the floor with it.
+- **The floor is LEVEL and has no lines in depth.** The deck's up-stagger is smaller than a card's
+  own height, so a floor rising with the stack would run through the plot in front of it; lines
+  along the depth axis converge as hard diagonals across the front chart.
 - **The time cursor is NOT here.** One WebGL quad spanning the stack cannot line up with five
   differently placed, differently scaled recharts plot areas, so the mark would miss its bucket on
   four planes out of five — a cursor that misstates the data (rule 10). It is drawn per plane, in the
@@ -1007,9 +995,6 @@ visible in light mode?"): the cards' identity hues in the deck's order, front to
 card (`band` slot gaps deep — at the cards' true spacing a band was two or three rows), the
 structure ink beyond the last card; fed by `setSlotHues` from `Engine._syncTrendHues`. Paper draws
 the line wider (`paperWidth`) and at a gain above 1, because ink has no glow to carry a hairline.
-⚠️ The shadow BANDS described under "The History view's ground" above still exist in the file at
-presence 0 (`GROUND_PRESENCE`) and their mesh is hidden; only their per-slot hue plumbing is in use,
-by the lines.
 
 **The dark ground HOLDS A BRIGHT MARK'S HUE** (`SceneContext`, `HUE_HOLD`): one pass after the bloom
 mix and before the tone map scales a pixel's channels together so its brightest stays under a soft

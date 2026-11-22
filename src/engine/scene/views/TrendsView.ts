@@ -6,19 +6,19 @@
 // each plane is a flat rectangle that happens to be smaller and further right than the one in
 // front — so with nothing behind them the five planes read as five unrelated cards floating in a
 // void rather than as one stack receding into history. The ground is the depth axis made visible:
-// ONE RUNG PER SLOT, at exactly the depth, width and stagger `domain/trendStack.ts` places that
-// plane at — each plane's FOOTPRINT, the shadow it would cast — so the recession is something the
-// eye can follow back instead of something the scale differences have to imply.
+// a LINE FLOOR under the deck (`LINE_FLOOR`), level hairlines closing up toward the horizon, in the
+// identity hues of the cards standing over it.
 //
-// ⚠️ A RUNG IS A SHADOW, NOT A LINE (user, 2026-09-26: "make the line look more like a nice shadow
-// rather than cyan coloured; it's too distracting and does not present any useful information").
-// It was an accent hairline, and an accent line is a MARK — the eye reads it as a gridline or a
-// reading, and there is nothing to read. So each rung is a soft band hanging from the floor line:
-// a quad billboard `shadowH` tall whose alpha rises over the top `SHADOW_LIP` and decays to
-// nothing at the bottom (`shadowTexture`), in the identity hue of the card standing on
-// it (`setSlotHues`) rather than the
-// accent, with the ends feathered so nothing about it has an edge. Furniture that recedes into the
-// ground it sits on, on both grounds: additive haze on dark, ink on paper.
+// ⚠️ IT IS NOT A SHADOW UNDER EACH CARD, and that was built first. One soft band per slot — the
+// card's footprint, neutral, then in its identity hue, then hugging the card's foot — read as a
+// smudge under a crisp DOM card every time, and a DOM mirror of the front chart did no better
+// (user, 2026-11-22, four rounds: "drop mirror and wash and come with a completely different but
+// subtle scene background"). Git has the bands.
+//
+// ⚠️ THE FLOOR IS LEVEL AND THERE ARE NO LINES IN DEPTH. The deck's up-stagger is much smaller than
+// a card's own height, so the cards OVERLAP and a floor rising with the stack would run through
+// the plot in front of it; and lines along the depth axis converge on the vanishing point as hard
+// diagonals across the front chart (side rails were built and cut after one look, 2026-09-18).
 //
 // ⚠️ THE TIME CURSOR IS NOT HERE, and that is a decision rather than an omission
 // (2026-09-19). The plan gave this view a WebGL quad spanning the stack's depth at the cursor's
@@ -30,18 +30,15 @@
 // coordinate system, by the chart that owns the scale: `TrendChart`'s `cursorMs` prop over
 // `src/data/trendWindow.ts`'s `bucketAt`.
 //
-// ⚠️ ONE RUNG PER CARD THAT IS THERE (user, 2026-09-19). The floor first drew all five slots
-// whatever the roster held, on the argument that it states the stack's SHAPE — and under a
-// committed filter that left four lines receding behind a single card, footprints of planes that
-// do not exist. `face()` takes the window's count and lays exactly that many rungs, centred on the
-// same `staggerCentre(count)` the poses use, so the floor is the footprint of what stands on it.
-// A rung that has no card collapses AT ONCE (React unmounts its card at once); the centre and the
-// lone card's shift EASE, at the projector's own `STACK_EASE_K`, because the surviving cards ease
-// to their new places and a floor that arrived first would sit apart from them for the whole move.
+// ⚠️ NO FLOOR UNDER NOTHING (user, 2026-09-19). `face()` takes the window's count: a scope with no
+// card to draw draws no floor under the sentence that says so, and the floor's height follows the
+// same `staggerCentre(count)` the poses use, EASED at the projector's own `STACK_EASE_K` — the
+// surviving cards ease to their new places, and a floor that arrived first would sit apart from
+// them for the whole move.
 //
-// ⚠️ THERE IS NO `update(dt)`. The floor is furniture: colours are baked on a theme flip, the
-// transition's alpha arrives through the `FadeSet`, and `face()` — the one per-frame call —
-// returns before touching the buffer while its inputs hold still.
+// ⚠️ THERE IS NO `update(dt)`. The floor is furniture: its colours are set on a theme flip or a
+// change of deck, the transition's alpha arrives through the `FadeSet`, and `face()` — the one
+// per-frame call — returns before writing anything while its inputs hold still.
 //
 // ⚠️ AND IT NEVER WRITES ITS ROOT'S `visible` (rule 6). Root-group visibility is view LIFECYCLE
 // and the Engine owns it, from `viewPolicy.show.trendGround` — a row on the allow-list rather
@@ -49,102 +46,23 @@
 // contract) and because convention 7 wants a fifth view to answer the question for itself.
 
 import * as THREE from "three";
-import {
-  PLANE_GAP,
-  PLANE_WORLD_W,
-  PLANE_Y,
-  SCALE_FALLOFF,
-  STACK_EASE_K,
-  VISIBLE_PLANES,
-  planeFormat,
-  staggerCentre,
-  stepX,
-  type PlaneFormat,
-} from "../../domain/trendStack";
-import { glowBlend, inkMix, isLightGround, structureInk, type SceneColors } from "../../sceneColors";
+import { PLANE_GAP, PLANE_Y, STACK_EASE_K, VISIBLE_PLANES, planeFormat, staggerCentre, type PlaneFormat } from "../../domain/trendStack";
+import { glowBlend, isLightGround, structureInk, type SceneColors } from "../../sceneColors";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
 
+/** The deck's slots, front to back — one colour band of the floor each. */
+const SLOTS = Array.from({ length: VISIBLE_PLANES }, (_, i) => i);
 
-/** Slot indices the ground draws a rung for, front to back — one per slot. There was a sixth, in
- *  FRONT of slot 0, for a focused plane that stood ahead of the stack; a focus RE-DEALS the deck
- *  now (the focused card takes slot 0), so no card ever stands out there. */
-const RUNGS = Array.from({ length: VISIBLE_PLANES }, (_, i) => i);
-
-/** Settled-enough for the floor's ease (slot units / px): below it the value snaps to its target
- *  and `face()` can go back to skipping. */
+/** Settled-enough for the floor's ease (slot units): below it the value snaps to its target and
+ *  `face()` can go back to skipping. */
 const EASE_EPS = 0.0005;
 
-/** How much presence a rung loses per slot of depth — the FLOOR's own recession. It was the
- *  planes' `OPACITY_FALLOFF` while they faded with depth; the cards are opaque now (2026-09-19), so
- *  that coefficient is 0 and the floor states its own. */
-const RUNG_FALLOFF = 0.16;
-
-// ⚠️ THERE ARE NO SIDE RAILS, and the pair was built and cut after one look. Joining the rungs'
-// ends along the depth axis sounds like the thing that makes a ladder read as a ladder — but the
-// stagger moves the near rung's LEFT end far out to the left while the far one converges on the
-// vanishing point, so the left rail became a single hard diagonal slashing up across the front
-// chart's plot: the loudest line on the canvas, drawn over the one thing the reader is reading.
-// The rungs alone already carry the recession (five parallels, each narrowing and rising), and
-// this view's whole job is to stay out of the charts' way.
-
-/** How far below the NEAREST slot's centre the floor lies: half the plane's own height
- *  (`PlaneFormat.worldH` — the domain states it beside the width, so a re-tune of either moves the floor
- *  with it), plus the half step the FOCUS pose carries a plane further down, plus a small margin.
- *  Derived, not eyeballed: the first cut was a multiple of the slot step, which only cleared the
- *  plot while the plane happened to be shorter than a step — enlarging the plane (2026-09-19) would
- *  have run the floor through the front chart.
- *
- *  ⚠️ THE FLOOR IS LEVEL, AND A RAMP RISING WITH THE STACK WAS BUILT AND CUT (the second look).
- *  Putting each rung one step under its OWN plane is the obvious reading of "every plane stands on
- *  its own line", and it cannot work here: the up-stagger is much smaller than a plane's own
- *  height (`PlaneFormat.stepY` against `worldH`, on either format), so the planes OVERLAP — a rung tucked under
- *  plane i lands inside plane i−1's plot, and there is no drop that escapes it (clear your own
- *  plane's bottom and you are already past the top of the one in front). A hairline crossing a
- *  chart's plot area reads as a gridline or a zero line, which is a claim about the DATA that the
- *  furniture has no business making. Level, below everything, is the version that stays furniture.
- *  What the rungs say instead is each plane's FOOTPRINT on the floor: same depth, same width, same
- *  stagger — the shadow the stack would cast. */
-//
-// THE FLOOR HUGS THE CARD (user, 2026-11-22: "bring it closer to the card"). It lay a focus step
-// and a margin below the front card's foot, a band adrift under the deck. A card is DOM and
-// composites in front of the canvas, so the floor cannot cross its plot whatever the drop: it
-// starts a hair under the card's own bottom edge, the front band reads as light falling from under
-// the card, and a focused card (half a step lower) simply covers the lip.
-const groundDrop = (f: PlaneFormat): number => f.worldH / 2 + f.worldH * 0.012;
-
-/** The floor's world height for a stagger centred on `centre` (`staggerCentre(count)`, eased):
- *  `groundDrop` below the FRONT card's centre, which `stackPoses` places from the same number. */
-const groundY = (centre: number, f: PlaneFormat): number => PLANE_Y - centre * f.stepY - groundDrop(f);
-
-/** The nearest rung's PRESENCE, one number per ground — how much of the accent the floor carries
- *  at the front. Quiet by intent on both: this is furniture establishing an axis, and everything a
- *  reader is here to read is on the planes above it. `inkMix` then expresses that level for the
- *  ground it lands on — a multiply toward black where the mark is additive glow, a lerp toward the
- *  page where it is ink.
- *
- *  ⚠️ TWO NUMBERS, MEASURED, rather than one run through `inkPresence` — `Globe`'s `paperBase`
- *  escape, and for its reason. The gamma is tuned for the marks that carry DATA (it lifts a
- *  resting band off the page so emphasis can be spent downward from there), and on 0.3 it answers
- *  0.84, which on this ground paints very nearly full teal: a floor louder than the charts
- *  standing on it. A floor has no emphasis span to protect, so it states its own paper level, and
- *  the one it needs is higher than dark's — measured, because the two grounds are genuinely
- *  different instruments (dark adds light to nothing and bloom lifts it further; paper only has
- *  ink, and this ground is a 0.88-L page). */
-// Paper was 0.2 until 2026-10-03: at that level the bands under the deck read as two grey SMUDGES
-// on the page rather than as a floor (light-theme pass; user: "fix it"). 0.11 keeps the footprint
-// legible — still above dark's number, for the reason given above — without the dirt. 0.34 since
-// 2026-10-25 (user: "light mode should have a shadow too … for those cards"): at 0.11 the cards
-// stood on almost nothing on paper, while dark's bands read plainly under its deck.
-// Dark is 0.16 in the card's identity hue (was 0.07 in the foreground's white): a saturated hue
-// carries a fraction of white's luminance, and the level is what keeps the footprint legible.
-//
-// ⚠️ BOTH ARE 0 SINCE 2026-11-22: THE BANDS DRAW NOTHING. Grey, then hued, then hugging the card,
-// a soft band under a crisp DOM card read as a smudge every time, and a DOM mirror of the front
-// chart did no better (user, four rounds: "drop mirror and wash and come with a completely
-// different but subtle scene background"). The view's ground is the LINE FLOOR below. The bands,
-// their hues and their geometry are intact; raising these two numbers brings them back.
-const GROUND_PRESENCE = { dark: 0, paper: 0 } as const;
+/** The front card's FOOT, in world height, for a stagger centred on `centre`
+ *  (`staggerCentre(count)`, eased): half the card's own height (`PlaneFormat.worldH`) below the
+ *  front card's centre, which `stackPoses` places from the same number. Derived, so enlarging a
+ *  card moves the floor with it. */
+const footY = (centre: number, f: PlaneFormat): number => PLANE_Y - centre * f.stepY - f.worldH / 2;
 
 /** THE LINE FLOOR — History's scene background: level hairlines across a floor under the deck, one
  *  per row of an even lattice, receding to nothing. Perspective does the work: the rows are evenly
@@ -164,183 +82,34 @@ const GROUND_PRESENCE = { dark: 0, paper: 0 } as const;
  *  the card's height), and the two presences are the lines' level per ground (a gain on the pool's
  *  falloff, capped at a full line). */
 export const LINE_FLOOR: Readonly<{ spacing: number; width: number; paperWidth: number; band: number; reach: number; drop: number; dark: number; paper: number }> = {
-  spacing: 2.5, width: 1, paperWidth: 1.5, band: 2.5, reach: 85, drop: 0.16, dark: 0.16, paper: 0.6,
+  spacing: 2.5, width: 1, paperWidth: 1.5, band: 2.5, reach: 85, drop: 0.172, dark: 0.16, paper: 0.6,
 };
 /** The floor plane's side: comfortably past `reach`, so its edge is never on screen. */
 const FLOOR_FIELD = 320;
-
-/** The shadow band's height in world units — how far below the floor line the soft falloff runs.
- *  A little over a tenth of the card: enough to read as a shadow's spread, not a second card. */
-const shadowH = (f: PlaneFormat): number => f.worldH * 0.22;
-/** The band's alpha ramps UP over this fraction of its height before it decays, so the floor line
- *  itself has no hard edge — a shadow's darkest part is just under the object, not a crease. */
-const SHADOW_LIP = 0.04;
-/** How far in from each end the band feathers (fraction of its width). */
-const SHADOW_FEATHER = 0.08;
-
-/** The band's alpha, as a texture the material samples: a vertical rise-then-decay, feathered at
- *  both ends. Grayscale on purpose (rule 3 allows luminance) — the COLOUR is the vertex bake's.
- *  Event-time: built once per ground, at construction. */
-function shadowTexture(): THREE.Texture {
-  const w = 128, h = 64;
-  const c = document.createElement("canvas");
-  c.width = w; c.height = h;
-  const ctx = c.getContext("2d")!;
-  // ⚠️ LUMINANCE, NOT CANVAS ALPHA. Three reads an alphaMap's GREEN channel, and a canvas whose
-  // pixels vary only in alpha uploads as white everywhere — the band then draws as a solid slab
-  // (seen live, 2026-09-26). So the ramps are black→white→black, and the feather MULTIPLIES in.
-  const v = ctx.createLinearGradient(0, 0, 0, h);
-  v.addColorStop(0, "rgb(0,0,0)");
-  v.addColorStop(SHADOW_LIP, "rgb(255,255,255)");
-  v.addColorStop(1, "rgb(0,0,0)");
-  ctx.fillStyle = v;
-  ctx.fillRect(0, 0, w, h);
-  // Feather the ends: the horizontal ramp multiplies the vertical one.
-  ctx.globalCompositeOperation = "multiply";
-  const u = ctx.createLinearGradient(0, 0, w, 0);
-  u.addColorStop(0, "rgb(0,0,0)");
-  u.addColorStop(SHADOW_FEATHER, "rgb(255,255,255)");
-  u.addColorStop(1 - SHADOW_FEATHER, "rgb(255,255,255)");
-  u.addColorStop(1, "rgb(0,0,0)");
-  ctx.fillStyle = u;
-  ctx.fillRect(0, 0, w, h);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.NoColorSpace; // an alpha map, not a colour
-  return tex;
-}
-
-/** THE FLOOR RECEDES ON ITS OWN FALLOFF, SQUARED (`RUNG_FALLOFF`).
- *
- *  The planes are opaque cards composited in FRONT of the canvas whatever the depth buffer says,
- *  so a rung is only ever seen where no card covers it — beside and below the deck. There it is
- *  pure furniture establishing the depth axis, and the square keeps the far rungs to a whisper so
- *  the near ones carry it. (While the planes were transparent the square had a harder job: rear
- *  rungs showed THROUGH the front plot, where a horizontal hairline reads as a gridline — a claim
- *  about the data that furniture has no business making. Opaque cards ended that; the falloff is
- *  kept because a floor that does not recede reads as a set of loose lines.) */
-const slotPresence = (i: number, paper: boolean): number => {
-  // ON PAPER ONLY THE FRONT CARD CASTS. Inks overlap by covering, not by adding: with the floor
-  // hugging the deck, the rear cards' washes lay over the front one's and the hues mixed to a
-  // mauve grey (seen live, 2026-11-22). One wash, in the hue of the card being read.
-  if (paper) return i === 0 ? GROUND_PRESENCE.paper : 0;
-  const stack = Math.max(0, 1 - RUNG_FALLOFF * i);
-  return GROUND_PRESENCE.dark * stack * stack;
-};
-
-/** The slot stagger's X and Z, as `stackPoses` states them — the RISE is the one component the
- *  floor drops (see `groundDrop`). One home: re-tune the stagger in `domain/trendStack.ts` and
- *  the ground follows, because it is derived from the same arithmetic rather than eyeballed
- *  against a screenshot of it. */
-const slotX = (i: number, centre: number, narrow: boolean): number => (i - centre) * stepX(narrow);
-const slotZ = (i: number): number => -i * PLANE_GAP;
-
-/** Half the width of the card standing on rung `i` — the card's world width at ITS slot's scale
- *  (`stackPoses` shrinks each slot by `SCALE_FALLOFF`).
- *  A rung as wide as the unscaled plane overhung the rear cards by up to 12%. */
-const halfW = (i: number): number => (PLANE_WORLD_W / 2) * (1 - SCALE_FALLOFF * i);
 
 export class TrendsView implements SceneView {
   /** The view root. ⚠️ Its `visible` is the ENGINE's (rule 6) — never written here. */
   readonly group: THREE.Group;
 
-  private readonly _mat: THREE.MeshBasicMaterial;
-  private readonly _mesh: THREE.Mesh;
-  private readonly _alpha: THREE.Texture;
   private readonly _fades = new FadeSet();
   private readonly _floor: THREE.Mesh;
   private readonly _floorMat: THREE.ShaderMaterial;
   private _colors: SceneColors;
-  /** One entry per band VERTEX, in buffer order — the SLOT its colour is baked from. The slot,
-   *  not the resolved presence: the presence depends on the ground, so a theme flip re-bakes from
-   *  the same geometry rather than rebuilding it. */
-  private readonly _vertSlot: number[] = [];
-  /** The identity hue of the network on each slot's card (0 = none known → the muted ink), handed
-   *  in by the Engine whenever the deck or the theme changes (the hue lanes differ by ground). */
-  private readonly _slotHue: number[] = RUNGS.map(() => 0);
-  /** Scratch for the colour bake. Module-free and bound once; the bake is event-time either way. */
-  private readonly _col = new THREE.Color();
-  /** `face()`'s scratch, and the camera orientation it last laid the rungs for (NaN = never). */
-  private readonly _right = new THREE.Vector3();
-  private readonly _up = new THREE.Vector3();
-  private readonly _fwd = new THREE.Vector3();
-  private _qx = NaN;
-  private _qy = NaN;
-  private _qz = NaN;
-  private _qw = NaN;
+  /** The identity hue of the network on each slot's card (0 = none known → the structure ink),
+   *  handed in by the Engine whenever the deck or the theme changes (the hue lanes differ by
+   *  ground). */
+  private readonly _slotHue: number[] = SLOTS.map(() => 0);
   private _count = -1;
-  /** The stagger centre and the lone card's screen shift AS DRAWN — eased toward their targets. */
+  /** The stagger centre AS DRAWN — eased toward its target. */
   private _centre = 0;
-  private _shift = 0;
-  /** True until the first `face()` of a showing — the floor starts AT its targets, never slides in. */
+  /** True until the first `face()` of a showing — the floor starts AT its target, never slides in. */
   private _fresh = true;
-  private _viewH = 0;
-  private _px = NaN;
-  private _py = NaN;
-  private _pz = NaN;
-  private _narrow = false;
   private _fmt: PlaneFormat | null = null;
 
   constructor(scene: THREE.Scene, colors: SceneColors) {
     this._colors = colors;
     this.group = new THREE.Group();
-
-    const pos: number[] = [];
-    const uv: number[] = [];
-    const idx: number[] = [];
-    // A band per rung — four corners (top-left, top-right, bottom-right, bottom-left), each
-    // remembering its slot so the colour bake can follow. Laid along world X here; `face()`
-    // re-lays them along the camera's right and up vectors before the first frame draws, so this
-    // is only the buffer's shape. `v = 1` is the floor line (the texture's opaque lip sits just
-    // under it), `v = 0` the faded foot.
-    for (const i of RUNGS) {
-      const c = staggerCentre(VISIBLE_PLANES);
-      const x0 = slotX(i, c, false) - halfW(i), x1 = slotX(i, c, false) + halfW(i);
-      const wide = planeFormat(false);
-      const y = groundY(c, wide), z = slotZ(i);
-      const b = pos.length / 3;
-      pos.push(x0, y, z, x1, y, z, x1, y - shadowH(wide), z, x0, y - shadowH(wide), z);
-      uv.push(0, 1, 1, 1, 1, 0, 0, 0);
-      idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
-      this._vertSlot.push(i, i, i, i);
-    }
-
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
-    geo.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(this._vertSlot.length * 3), 3));
-    // FRONT RUNG LAST. On paper the bands are normal-blended ink, and a rear rung at zero presence
-    // is page colour: drawn after the front one it painted the page back over the middle of its
-    // wash (seen live, 2026-11-22). Far to near is also simply the right order for transparents.
-    const ordered: number[] = [];
-    for (let r = RUNGS.length - 1; r >= 0; r--) ordered.push(...idx.slice(r * 6, r * 6 + 6));
-    geo.setIndex(ordered);
-    this._alpha = shadowTexture();
-    this._mat = new THREE.MeshBasicMaterial({
-      vertexColors: true,
-      transparent: true,
-      alphaMap: this._alpha,
-      side: THREE.DoubleSide,
-      // A floor must never occlude — the chart planes composite in FRONT of the canvas whatever
-      // depth says, so a depth-writing floor would only ever hide something else.
-      depthWrite: false,
-      opacity: 1,
-    });
-    this._mesh = new THREE.Mesh(geo, this._mat);
-    // Never culled: the bands are re-laid every frame the camera moves and the sphere three would
-    // compute from the constructor's shape is stale the moment `face()` runs.
-    this._mesh.frustumCulled = false;
-    // The bands are switched off (see GROUND_PRESENCE) — and HIDDEN, not merely at presence 0: on
-    // paper a zero-presence band is page colour, normal-blended, and it painted a blank stripe
-    // across the floor's lines behind it (seen live).
-    this._mesh.visible = false;
-    this.group.add(this._mesh);
     scene.add(this.group);
-
-    // The one static material: opacity is exactly base × the view alpha, so the floor builds and
-    // tears down with the rest of the view's furniture. PRESENCE rides the vertex COLOUR instead
-    // (see `_restyle`) — which is what lets the theme change a mark's weight without touching the
-    // registration this contract asks to happen exactly once.
-    this._fades.register(this._mat, 1);
 
     // THE LINE FLOOR (see LINE_FLOOR). One level plane; the rows are a fragment term over the
     // world position, antialiased in screen space (`fwidth`) so a line is a hairline at any
@@ -363,7 +132,7 @@ export class TrendsView implements SceneView {
         // hue is known. A band is `LINE_FLOOR.band` slot gaps deep, not one: at the cards' true
         // spacing a band was two or three rows and the whole deck's colours a thin stripe (seen
         // live). The floor echoes the deck's order; it does not survey it.
-        uHue: { value: RUNGS.map(() => new THREE.Color()) },
+        uHue: { value: SLOTS.map(() => new THREE.Color()) },
         uGap: { value: PLANE_GAP * LINE_FLOOR.band },
       },
       vertexShader: /* glsl */ `
@@ -407,17 +176,19 @@ export class TrendsView implements SceneView {
     // The fade set drives `opacity`; a ShaderMaterial has no opacity uniform of its own.
     this._floor.onBeforeRender = () => { this._floorMat.uniforms.uOp.value = this._floorMat.opacity; };
     this.group.add(this._floor);
+    // Registered once: opacity is exactly base × the view alpha, so the floor builds and tears
+    // down with the rest of the view's furniture. Its LEVEL is a uniform (`_restyle`), which is
+    // what lets a theme flip change it without touching this registration.
     this._fades.register(this._floorMat, 1);
     this._restyle();
   }
 
-  /** WHOSE card stands on each rung: one identity hue per slot, nearest first (0 = no hue). The
-   *  floor under a card is that card's light on the ground — the chart's own line colour, pooled
-   *  under it — so the deck's floor reads front to back in the hues of the networks standing on
-   *  it. Event-time: the Engine calls it when the deck, the focus, the page or the theme changes. */
+  /** WHOSE card stands over each band of the floor: one identity hue per slot, nearest first
+   *  (0 = no hue). Event-time: the Engine calls it when the deck, the focus, the page or the theme
+   *  changes. */
   setSlotHues(hues: readonly number[]): void {
     let changed = false;
-    for (const i of RUNGS) {
+    for (const i of SLOTS) {
       const h = hues[i] ?? 0;
       if (this._slotHue[i] !== h) { this._slotHue[i] = h; changed = true; }
     }
@@ -431,100 +202,35 @@ export class TrendsView implements SceneView {
     if (a <= 0.001) this._fresh = true;
   }
 
-  /** Lay every rung along the CAMERA'S RIGHT vector, centred on its slot's floor point.
+  /** Set the floor under the deck. `count` is how many planes the window holds
+   *  (`trendStack.windowCount`): none draws no floor, and the floor's height follows the stagger
+   *  centred on that count, eased by `dt` (the projector's own clock). `phone` picks the card's
+   *  format (`trendStack.planeFormat`), whose height the drop is a fraction of. All plain data from
+   *  the Engine.
    *
-   *  ⚠️ THE CARDS ARE BILLBOARDS, SO THE RUNGS HAVE TO BE (user, 2026-09-19: "the lines under the
-   *  charts don't align with the cards anymore when I move the camera around"). The projector
-   *  writes a card as a translate and a uniform scale with NO rotation — that is what keeps its
-   *  text crisp — so a card always faces the screen. A rung fixed along world X is a real 3D
-   *  segment: orbit the camera and it turns in perspective while the card above it does not, and
-   *  the footprint slides out from under the thing it is the footprint of. A segment parallel to
-   *  the image plane at the card's depth projects to exactly the card's pixel width at every pose,
-   *  so that is what a rung is: its CENTRE is layout data (the slot's x and z on the level floor),
-   *  its DIRECTION is the camera's.
-   *
-   *  `count` is how many planes the window holds (`trendStack.windowCount`) — one rung each, and a
-   *  rung past the count collapses to a point, which draws nothing. `shiftPx` is the SCREEN shift
-   *  the projector gives a lone card (`trendStack.loneShiftPx`); the rung takes the same shift,
-   *  converted to world units at its own view depth and laid along the camera's right vector, so
-   *  the line stays under the card it belongs to. `viewH` is the canvas height that conversion
-   *  needs — the Engine passes 0 while no shift is asked for, and the last real one is kept for the
-   *  ease back. `dt` drives the ease of the centre and the shift. `narrow` is the canvas tier
-   *  (`trendStack.stepX`): below desktop the deck stacks straight up and so do its rungs. All
-   *  plain data from the Engine.
-   *
-   *  Per-frame, allocation-free (rule 5): two scratch vectors, writes straight into the position
-   *  buffer, and skips entirely while nothing it reads has changed — the camera's orientation and
-   *  the eased values always, the camera's position too while a shift stands (the px→world
-   *  conversion reads the view depth). */
-  face(camera: THREE.PerspectiveCamera, count: number, shiftPx: number, viewH: number, dt: number, narrow: boolean, phone = false): void {
-    // The card's format for this tier (`trendStack.planeFormat`) — two stable objects, so the
-    // reference is the change signal.
+   *  Per-frame, allocation-free (rule 5), and it returns before writing anything while the count,
+   *  the format and the eased centre all hold still. */
+  face(count: number, dt: number, phone = false): void {
+    // Two stable objects, so the reference is the change signal.
     const fmt = planeFormat(phone);
     const centreT = staggerCentre(count);
     let moved = false;
     if (this._fresh) {
       this._fresh = false;
       this._centre = centreT;
-      this._shift = shiftPx;
       moved = true;
-    } else if (this._centre !== centreT || this._shift !== shiftPx) {
-      const k = 1 - Math.exp(-STACK_EASE_K * dt);
-      this._centre += (centreT - this._centre) * k;
-      this._shift += (shiftPx - this._shift) * k;
+    } else if (this._centre !== centreT) {
+      this._centre += (centreT - this._centre) * (1 - Math.exp(-STACK_EASE_K * dt));
       if (Math.abs(centreT - this._centre) < EASE_EPS) this._centre = centreT;
-      if (Math.abs(shiftPx - this._shift) < EASE_EPS) this._shift = shiftPx;
       moved = true;
     }
-    if (viewH > 0 && viewH !== this._viewH) {
-      this._viewH = viewH;
-      moved = true;
-    }
-    const q = camera.quaternion;
-    const p = camera.position;
-    const still =
-      !moved && count === this._count && narrow === this._narrow && fmt === this._fmt &&
-      q.x === this._qx && q.y === this._qy && q.z === this._qz && q.w === this._qw &&
-      (this._shift === 0 || (p.x === this._px && p.y === this._py && p.z === this._pz));
-    if (still) return;
-    this._qx = q.x; this._qy = q.y; this._qz = q.z; this._qw = q.w;
-    this._px = p.x; this._py = p.y; this._pz = p.z;
+    if (!moved && count === this._count && fmt === this._fmt) return;
     this._count = count;
-    this._narrow = narrow;
     this._fmt = fmt;
-    this._right.set(1, 0, 0).applyQuaternion(q);
-    this._up.set(0, 1, 0).applyQuaternion(q);
-    this._fwd.set(0, 0, -1).applyQuaternion(q);
-    // px per world unit at one unit of depth — the projector's own expression.
-    const pxPerUnitAt1 = this._viewH / (2 * Math.tan((camera.fov * Math.PI) / 360));
-    const c = this._centre;
-    const y = groundY(c, fmt);
-    // The line floor lies a little under the front card's foot, and follows the deck's ease.
-    this._floor.position.y = y - fmt.worldH * LINE_FLOOR.drop;
-    const band = shadowH(fmt);
-    const shift = this._shift;
-    const attr = this._mesh.geometry.getAttribute("position") as THREE.BufferAttribute;
-    const R = this._right, U = this._up;
-    for (let r = 0; r < RUNGS.length; r++) {
-      const i = RUNGS[r];
-      // A rung past the count collapses to a point, which draws nothing.
-      const h = i < count ? halfW(i) : 0;
-      const drop = i < count ? band : 0;
-      let cx = slotX(i, c, narrow), cy = y, cz = slotZ(i);
-      if (shift !== 0 && pxPerUnitAt1 > 0) {
-        const d = (cx - p.x) * this._fwd.x + (cy - p.y) * this._fwd.y + (cz - p.z) * this._fwd.z;
-        const s = d > 0 ? (shift * d) / pxPerUnitAt1 : 0;
-        cx += R.x * s; cy += R.y * s; cz += R.z * s;
-      }
-      const v = r * 4;
-      // The floor line along the camera's right, the band hanging down the camera's up: a
-      // billboard, like the card whose footprint it is (see the header on why the rungs face).
-      attr.setXYZ(v, cx - R.x * h, cy - R.y * h, cz - R.z * h);
-      attr.setXYZ(v + 1, cx + R.x * h, cy + R.y * h, cz + R.z * h);
-      attr.setXYZ(v + 2, cx + R.x * h - U.x * drop, cy + R.y * h - U.y * drop, cz + R.z * h - U.z * drop);
-      attr.setXYZ(v + 3, cx - R.x * h - U.x * drop, cy - R.y * h - U.y * drop, cz - R.z * h - U.z * drop);
-    }
-    attr.needsUpdate = true;
+    this._floor.visible = count > 0;
+    // A little under the front card's foot. A card is DOM and composites in front of the canvas,
+    // so the floor can never cross its plot whatever the drop.
+    this._floor.position.y = footY(this._centre, fmt) - fmt.worldH * LINE_FLOOR.drop;
   }
 
   /** The theme flip. Joins the Engine's `_colorConsumers` fan-out like the other views. */
@@ -533,37 +239,17 @@ export class TrendsView implements SceneView {
     this._restyle();
   }
 
-  /** Bake the accent at each vertex's presence for the ground it is painted on, and pick the
-   *  blend mode that ground needs. Event-time — a theme flip, and construction.
-   *
-   *  Both halves are `sceneColors`' own questions, asked the one way the rest of the scene asks
-   *  them: `inkMix` multiplies toward black on the dark ground (where the mark is additive glow)
-   *  and lerps toward the page on paper (where it is ink, and a multiply would make the FAINTEST
-   *  line the DARKEST thing on the page), and `glowBlend` flips additive → normal to match. A
-   *  material whose blending changes after construction has to say `needsUpdate` — three caches
-   *  the program per blending mode. */
+  /** The lines' colours, level and blend for the ground they are drawn on. Event-time — a theme
+   *  flip, a change of deck, and construction. A material whose blending changes after
+   *  construction has to say `needsUpdate` — three caches the program per blending mode. */
   private _restyle(): void {
     const paper = isLightGround(this._colors);
-    const attr = this._mesh.geometry.getAttribute("color") as THREE.BufferAttribute;
-    for (let v = 0; v < this._vertSlot.length; v++) {
-      // NEVER NEUTRAL (user, 2026-11-22, of dark and then of paper: "still ugly gray"): the band
-      // takes the identity hue of the network whose card stands on it (`setSlotHues`) — added
-      // light on dark, a wash of that ink on paper (`inkMix` asks the ground) — and the muted ink
-      // only where no hue is known.
-      const slot = this._vertSlot[v];
-      this._col.setHex(this._slotHue[slot] || this._colors.muted);
-      inkMix(this._col, slotPresence(this._vertSlot[v], paper), this._colors);
-      attr.setXYZ(v, this._col.r, this._col.g, this._col.b);
-    }
-    attr.needsUpdate = true;
-    this._mat.blending = glowBlend(this._colors);
-    this._mat.needsUpdate = true;
-    // The line floor: the structure ink (what the hoops and the graticule are made of) at its
-    // ground's level, blended the way that ground needs.
+    // The structure ink (what the hoops and the graticule are made of) where no card's hue is
+    // known and beyond the last card.
     const ink = structureInk(this._colors);
     (this._floorMat.uniforms.uColor.value as THREE.Color).setHex(ink);
     const hues = this._floorMat.uniforms.uHue.value as THREE.Color[];
-    for (const i of RUNGS) hues[i].setHex(this._slotHue[i] || ink);
+    for (const i of SLOTS) hues[i].setHex(this._slotHue[i] || ink);
     this._floorMat.uniforms.uPresence.value = paper ? LINE_FLOOR.paper : LINE_FLOOR.dark;
     // Ink has no bloom and no glow to carry a hairline: on paper the line is drawn wider.
     (this._floorMat.uniforms.uLattice.value as THREE.Vector3).y = LINE_FLOOR.width * (paper ? LINE_FLOOR.paperWidth : 1);
@@ -574,9 +260,6 @@ export class TrendsView implements SceneView {
   dispose(): void {
     this._floor.geometry.dispose();
     this._floorMat.dispose();
-    this._mesh.geometry.dispose();
-    this._mat.dispose();
-    this._alpha.dispose();
     this.group.removeFromParent();
   }
 }
