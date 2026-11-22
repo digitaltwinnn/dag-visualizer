@@ -775,6 +775,10 @@ export default function TrendStack() {
                     : { word: "volume", text: `${formatDag(row.volume)} ${displayNetwork(pose.id)?.ticker ?? ""}`.trim() }
                 }
                 format={roster.format}
+                formatFine={roster.formatFine}
+                // The front card's gridlines state their values, the top one with the plot's unit at
+                // its cadence; a rear card shows its head alone.
+                yTicks={pose.interactive && (roster.unit || true)}
                 note={acquiring ? "acquiring…" : pending ? "reading the hourly samples…" : undefined}
                 buckets={axis}
                 // THE HELD PICTURE STAYS PUT, dimmed by the stack's `data-stale` rule, and the new

@@ -130,6 +130,10 @@ export interface TrendRosterView {
    *  already resolved, so a rail and a chart can never print the same number two ways. */
   unit: string;
   format: (v: number) => string;
+  /** The same reading one step finer, for a HOVER over a single bucket: still a magnitude, with
+   *  the digits a bucket needs beside a head on another basis ("2.07K" an hour under "49.7K" a
+   *  day). A metric with its own formatter keeps it. */
+  formatFine: (v: number) => string;
   /** A GAUGE metric whose hourly payload has not landed yet — say so, don't draw an empty plot. */
   pending: boolean;
   /** What the committed filter has done to the view (`src/data/trendScope.ts`). */
@@ -142,6 +146,15 @@ export interface TrendRosterView {
    *  measured hour into a day nobody measured (rule 10), so there the day is the honest reading. */
   headKind: "span" | "day";
 }
+
+/** `PLAIN` with two more digits from a thousand up ("2.07K", "123.4K"). */
+const FINE = (v: number): string => {
+  const abs = Math.abs(v);
+  if (abs < 1000) return compactNumber(v);
+  const [size, suffix] = abs >= 1e9 ? [1e9, "B"] : abs >= 1e6 ? [1e6, "M"] : [1e3, "K"];
+  const x = v / size;
+  return `${x.toLocaleString(undefined, { maximumFractionDigits: Math.abs(x) < 100 ? 2 : 1 })}${suffix}`;
+};
 
 const NO_SERIES: Readonly<Record<string, (number | null)[]>> = {};
 
@@ -317,6 +330,7 @@ export default function useTrendRoster(
   const dayPending = stepMs < 86_400_000 && !slice.daily && !slice.dailyError;
   const unit = metricUnit(metric, stepMs);
   const format = spec.format ?? PLAIN;
+  const formatFine = spec.format ?? FINE;
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `format` is TREND_METRICS[metric]'s
   return useMemo(
     () => ({
@@ -331,11 +345,12 @@ export default function useTrendRoster(
       stepMs,
       unit,
       format,
+      formatFine,
       pending,
       dayPending,
       scope,
       headKind,
     }),
-    [ranked, pass, rawAxis, stepMs, unit, format, pending, dayPending, scope, headKind],
+    [ranked, pass, rawAxis, stepMs, unit, format, formatFine, pending, dayPending, scope, headKind],
   );
 }
