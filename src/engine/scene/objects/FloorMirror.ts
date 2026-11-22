@@ -18,8 +18,9 @@
 //    did, in the same hue, and the two read as one shape (user, 2026-11-22: "it feels like the
 //    block doesn't really sit on the surface and kinda transitions into its mirror"). Mirrored
 //    about a plane a little under the surface, the image starts a clear gap below the block's
-//    base: the block stands ON the glass, its reflection lies IN it. The image is also read one
-//    mip down (`soft`), so the thing is crisp and its reflection is not.
+//    base: the block stands ON the glass, its reflection lies IN it. The image is read SHARP
+//    (`soft` 0 — a mip down was tried for "the thing is crisp, its reflection is not" and read as
+//    fuzzy blocks; the gap alone is what separates them). The spill is where the softness lives.
 //  · THE MIRROR SHOWS ITS MEMBERS AND NOTHING ELSE (`MIRROR_LAYER`, `joinMirror` — the bloom
 //    layers' idiom). A plain mirror reflects everything above it: the labels and dotted lines
 //    lying in the floor came back as ghost copies under their own text, and the metagraph planes
@@ -43,12 +44,17 @@ import { Reflector } from "three/addons/objects/Reflector.js";
  *  image is read at, `feather` the fraction of each side
  *  over which it fades out, `back` the same for the far end, where the floor itself dissolves. */
 export const MIRROR_LOOK: Readonly<{
-  strength: number; strengthPaper: number; spill: number; spillPaper: number;
+  strength: number; strengthPaper: number; spill: number; spillPaper: number; spillFloor: number;
   depth: number; soft: number; feather: number; back: number;
 }> = {
   strength: 0.2, strengthPaper: 0.2,
   spill: 1.1, spillPaper: 0.8, // the soft pool's level, per ground (it is spread thin, so it reads above the image's number)
-  depth: 0.3, soft: 1.2, feather: 0.08, back: 0.4,
+  // ONLY BRIGHT MARKS SPILL (dark). The spill is a blur, and a blur of every dim trail bar lay a
+  // teal haze over the whole trail that read as "fuzzy blocks" (user, 2026-11-22; toggled live:
+  // with the spill off the reflections were crisp). Light below this level lights no floor, so
+  // the pool belongs to the lead bar and the sheets, and the trail keeps its sharp image alone.
+  spillFloor: 0.3,
+  depth: 0.3, soft: 0, feather: 0.08, back: 0.4,
 };
 /** THE MIRROR LAYER — membership in the floor's reflection. `joinMirror` only ENABLES the layer,
  *  so a member still draws on layer 0 exactly as before; the mirror's camera sees this layer alone. */
@@ -57,7 +63,10 @@ export function joinMirror(o: THREE.Object3D): void {
   o.layers.enable(MIRROR_LAYER);
 }
 
-const MIRROR_RES = { w: 1024, h: 640 } as const;
+// 2048×1280 since the mirror draws its members alone (a cheap render): at 1024×640 the image was
+// stretched ~2.5× onto a 2× screen and a block's reflection came out soft whatever mip it was read
+// at (user, 2026-11-22: "the mirrored blocks look too fuzzy").
+const MIRROR_RES = { w: 2048, h: 1280 } as const;
 
 const MIRROR_SHADER = {
   name: "FloorMirror",
@@ -67,6 +76,7 @@ const MIRROR_SHADER = {
     textureMatrix: { value: null },
     uOp: { value: 0 },
     uSpill: { value: 0 },
+    uSpillFloor: { value: MIRROR_LOOK.spillFloor },
     uPaper: { value: 0 },
     uGround: { value: new THREE.Color() },
     uFeather: { value: new THREE.Vector2(MIRROR_LOOK.feather, MIRROR_LOOK.back) },
@@ -86,6 +96,7 @@ const MIRROR_SHADER = {
     uniform sampler2D tDiffuse;
     uniform float uOp;
     uniform float uSpill;
+    uniform float uSpillFloor;
     uniform float uPaper;
     uniform vec3 uGround;
     uniform vec2 uFeather;
@@ -103,7 +114,8 @@ const MIRROR_SHADER = {
       vec3 g = max(uGround, vec3(1e-3));
       vec3 ink = mix(vec3(1.0), clamp(r / g, 0.0, 1.0), uOp * f)
                * mix(vec3(1.0), clamp(soft / g, 0.0, 1.0), uSpill * f);
-      gl_FragColor = vec4(mix((r * uOp + soft * uSpill) * f, ink, uPaper), 1.0);
+      vec3 lit = max(soft - vec3(uSpillFloor), 0.0);
+      gl_FragColor = vec4(mix((r * uOp + lit * uSpill) * f, ink, uPaper), 1.0);
     }
   `,
 };

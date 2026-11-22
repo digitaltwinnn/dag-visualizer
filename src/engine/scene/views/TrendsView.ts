@@ -154,11 +154,12 @@ const GROUND_PRESENCE = { dark: 0, paper: 0 } as const;
  *  toward the horizon, which is the depth axis the stack recedes along.
  *
  *  `spacing` is the lattice pitch in world units (the card is 58 wide), `dot` a dot's radius as a
- *  fraction of the pitch (`paperDot` times that on paper), `reach` the radius of the pool the field fades out over, `drop` how far
+ *  fraction of the pitch (`paperDot` times that on paper), `band` the depth of one card's colour band in slot gaps, `reach` the radius of the pool the field fades out over, `drop` how far
  *  below the front card's foot the floor lies (a fraction of the card's height), and the two
- *  presences are the dots' level per ground — the structure ink, added light on dark, ink on paper. */
-export const DOT_FLOOR: Readonly<{ spacing: number; dot: number; paperDot: number; reach: number; drop: number; dark: number; paper: number }> = {
-  spacing: 2.0, dot: 0.055, paperDot: 1.7, reach: 85, drop: 0.16, dark: 0.3, paper: 1,
+ *  presences are the dots' level per ground (a gain on the pool's falloff, capped at a full dot —
+ *  paper's is above 1 so the ink holds its hue further out from the pool's centre) — the structure ink, added light on dark, ink on paper. */
+export const DOT_FLOOR: Readonly<{ spacing: number; dot: number; paperDot: number; band: number; reach: number; drop: number; dark: number; paper: number }> = {
+  spacing: 2.0, dot: 0.065, paperDot: 2.0, band: 2.5, reach: 85, drop: 0.16, dark: 0.75, paper: 3.2,
 };
 /** The floor plane's side: comfortably past `reach`, so its edge is never on screen. */
 const DOT_FIELD = 320;
@@ -323,6 +324,10 @@ export class TrendsView implements SceneView {
     // Never culled: the bands are re-laid every frame the camera moves and the sphere three would
     // compute from the constructor's shape is stale the moment `face()` runs.
     this._mesh.frustumCulled = false;
+    // The bands are switched off (see GROUND_PRESENCE) — and HIDDEN, not merely at presence 0: on
+    // paper a zero-presence band is page colour, normal-blended, and it painted a blank stripe
+    // across the dot floor behind it (seen live).
+    this._mesh.visible = false;
     this.group.add(this._mesh);
     scene.add(this.group);
 
@@ -346,6 +351,15 @@ export class TrendsView implements SceneView {
         // Centred well BEHIND the deck: the pool then thins toward the viewer, where a lattice
         // seen close up turns into large stretched dots (seen live at the first cut).
         uCentre: { value: new THREE.Vector2(0, -34) },
+        // THE DOTS WEAR THE DECK'S COLOURS (user, 2026-11-22: "can we give it metagraph colors"):
+        // the lattice takes the cards' identity hues IN THE DECK'S ORDER, front to back
+        // (`setSlotHues`) — the front card's from the viewer to its foot, then a band per card
+        // behind it, each easing into the next, and the structure ink beyond the last and where no
+        // hue is known. A band is `DOT_FLOOR.band` slot gaps deep, not one: at the cards' true
+        // spacing a band was three rows of dots and the whole deck's colours a thin stripe (seen
+        // live). The floor echoes the deck's order; it does not survey it.
+        uHue: { value: RUNGS.map(() => new THREE.Color()) },
+        uGap: { value: PLANE_GAP * DOT_FLOOR.band },
       },
       vertexShader: /* glsl */ `
         varying vec2 vXZ;
@@ -358,8 +372,16 @@ export class TrendsView implements SceneView {
       fragmentShader: /* glsl */ `
         uniform vec3 uColor; uniform float uOp; uniform float uPresence;
         uniform vec3 uLattice; uniform vec2 uCentre;
+        uniform vec3 uHue[${VISIBLE_PLANES}]; uniform float uGap;
         varying vec2 vXZ;
         void main() {
+          // Which card's depth this row lies at: slot 0 is the front card and everything nearer.
+          float t = clamp(-vXZ.y / uGap, 0.0, float(${VISIBLE_PLANES - 1}));
+          int i0 = int(floor(t));
+          int i1 = min(i0 + 1, ${VISIBLE_PLANES - 1});
+          vec3 hue = mix(uHue[i0], uHue[i1], smoothstep(0.3, 0.7, fract(t)));
+          // Past the last card the lattice returns to the structure ink.
+          hue = mix(hue, uColor, smoothstep(float(${VISIBLE_PLANES - 1}) + 0.5, float(${VISIBLE_PLANES}) + 1.5, -vXZ.y / uGap));
           vec2 g = vXZ / uLattice.x;
           vec2 fw = fwidth(g);
           float aa = max(fw.x, fw.y);
@@ -367,7 +389,7 @@ export class TrendsView implements SceneView {
           float dotA = 1.0 - smoothstep(uLattice.y - aa, uLattice.y + aa, d);
           float crowd = 1.0 - smoothstep(0.16, 0.4, aa);
           float far = 1.0 - smoothstep(0.0, uLattice.z, length(vXZ - uCentre));
-          gl_FragColor = vec4(uColor, dotA * crowd * far * far * uPresence * uOp);
+          gl_FragColor = vec4(hue, min(1.0, dotA * crowd * far * far * uPresence) * uOp);
         }
       `,
     });
@@ -531,7 +553,10 @@ export class TrendsView implements SceneView {
     this._mat.needsUpdate = true;
     // The dot floor: the structure ink (what the hoops and the graticule are made of) at its
     // ground's level, blended the way that ground needs.
-    (this._dotMat.uniforms.uColor.value as THREE.Color).setHex(structureInk(this._colors));
+    const ink = structureInk(this._colors);
+    (this._dotMat.uniforms.uColor.value as THREE.Color).setHex(ink);
+    const hues = this._dotMat.uniforms.uHue.value as THREE.Color[];
+    for (const i of RUNGS) hues[i].setHex(this._slotHue[i] || ink);
     this._dotMat.uniforms.uPresence.value = paper ? DOT_FLOOR.paper : DOT_FLOOR.dark;
     // Ink has no bloom and no glow to carry a two-pixel dot: on paper the dot is drawn larger
     // (measured live — at the dark radius the lattice was all but invisible on the plate).

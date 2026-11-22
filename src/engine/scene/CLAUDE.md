@@ -970,7 +970,7 @@ twice).
 over the pie's faint fill a ring-width gap was the darkest thing on the disc.
 
 **The global floor MIRRORS what stands on it** (`objects/FloorMirror.ts`, `MIRROR_LOOK`): three's
-planar `Reflector`, feathered at the floor's edges; one more scene render at 1024×640, only while
+planar `Reflector`, feathered at the floor's edges; one more render of the members at 2048×1280, only while
 the chamber is on screen. Four rules, each a user round the same day:
 - **Membership, like bloom** (`MIRROR_LAYER`, `joinMirror`): the mirror's camera sees only the bars,
   lane tiles, data marks, blocks, links and anchor sheets. A plain mirror also reflected the labels
@@ -979,11 +979,15 @@ the chamber is on screen. Four rules, each a user round the same day:
   the glass must join. ⚠️ `renderer.clippingPlanes` set around the Reflector's nested render LEAKS
   into the outer render (the tray chips under the floor vanished); do not clip that way.
 - **The plane sits `depth` BELOW the glass**, so a block's image starts a gap under its base and
-  the block reads as standing ON the surface ("it kinda transitions into its mirror"); the image is
-  also read one mip down (`soft`).
+  the block reads as standing ON the surface ("it kinda transitions into its mirror"). The image is
+  read SHARP, from a 2048×1280 target: a softer mip and the first 1024×640 target both read as
+  "fuzzy blocks" (user, same day). The gap separates block from image; the spill carries the softness.
 - **Dark adds it, paper MULTIPLIES it**: the reflection divided by the plate's colour is 1 where the
   mirror sees the page and the mark's ink where it sees a mark. Levels are the user's (image 0.2 on
   both grounds after "too strong" twice).
+- **Only bright marks spill on dark** (`spillFloor`): the spill is a blur, and blurring every dim
+  trail bar laid a haze over the trail that read as "fuzzy blocks"; below the floor a mark lights
+  nothing and keeps its sharp image alone.
 - **The floor takes LIGHT as well as an image** (`spill`, 1.1 dark / 0.8 paper after "too subtle"):
   the same reflection at two coarse mips is a soft pool of each mark's colour around its
   reflection, so the light is the marks' own and follows their emphasis with no lamp.
@@ -994,10 +998,13 @@ wash and come with a completely different but subtle scene background"). One lev
 deck draws a lattice of small dots in the structure ink, antialiased in screen space, fading out
 over a pool centred behind the deck and dissolving where the pitch falls under a few pixels. It is
 texture, not a mark: a dot states no line or row, so nothing in it reads as a gridline, and
-perspective closing the rows up toward the horizon is the depth cue. Paper draws the dot larger
-(`paperDot`) because ink has no glow to carry a two-pixel dot. ⚠️ The shadow BANDS described under
-"The History view's ground" above still exist in the file at presence 0 (`GROUND_PRESENCE`), with
-their per-slot hues (`setSlotHues`, `Engine._syncTrendHues`); they draw nothing.
+perspective closing the rows up toward the horizon is the depth cue. **The dots wear the deck's
+colours** (user: "I like the history effect, can we give it metagraph colors and make it more visible
+in light mode?"): the cards' identity hues in the deck's order, front to back, a band per card
+(`band` slot gaps deep — at the cards' true spacing a band was three rows), the structure ink beyond
+the last card; fed by `setSlotHues` from `Engine._syncTrendHues`. Paper draws the dot larger
+(`paperDot`) and at a gain above 1, because ink has no glow to carry a two-pixel dot. ⚠️ The shadow BANDS described under
+"The History view's ground" above still exist in the file at presence 0 (`GROUND_PRESENCE`) and their mesh is hidden; only their per-slot hue plumbing is in use, by the dots.
 
 **The chamber's boxes are FACE-SHADED** (`objects/faceShade.ts`): the bars, lane tiles, data marks and
 blocks stay unlit, and a per-vertex multiplier by face direction is baked into the geometry (the
