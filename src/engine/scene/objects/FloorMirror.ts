@@ -46,6 +46,7 @@ import { Reflector } from "three/addons/objects/Reflector.js";
 export const MIRROR_LOOK: Readonly<{
   strength: number; strengthPaper: number; spill: number; spillPaper: number; spillFloor: number;
   depth: number; soft: number; feather: number; back: number;
+  pool: number; poolPaper: number; poolAlong: number; poolAcross: number;
 }> = {
   strength: 0.2, strengthPaper: 0.13,
   spill: 1.1, spillPaper: 0.22, // the soft pool's level, per ground (it is spread thin, so it reads above the image's number)
@@ -58,6 +59,12 @@ export const MIRROR_LOOK: Readonly<{
   // the pool belongs to the lead bar and the sheets, and the trail keeps its sharp image alone.
   spillFloor: 0.3,
   depth: 0.17, soft: 0, feather: 0.08, back: 0.4,
+  // THE SELECTION'S POOL (user, 2026-11-22): a soft pool of light on the floor under the row the
+  // reader holds or points at, so the floor itself says where they are. `pool` is its level on
+  // dark, in the structure's own colour; on paper light cannot be added to a sheet, so the page
+  // is lifted a little toward white there instead (`poolPaper`, a gain over 1 on the multiply).
+  // `poolAlong` and `poolAcross` are its radii in world units, along the trail and across the lanes.
+  pool: 0.1, poolPaper: 0.035, poolAlong: 2.4, poolAcross: 7.5,
 };
 /** THE MIRROR LAYER — membership in the floor's reflection. `joinMirror` only ENABLES the layer,
  *  so a member still draws on layer 0 exactly as before; the mirror's camera sees this layer alone. */
@@ -84,6 +91,12 @@ const MIRROR_SHADER = {
     uGround: { value: new THREE.Color() },
     uFeather: { value: new THREE.Vector2(MIRROR_LOOK.feather, MIRROR_LOOK.back) },
     uSoft: { value: MIRROR_LOOK.soft },
+    // The selection's pool: its centre along the trail (uv.x), its level, the floor's size in
+    // world units (to measure the radii in), the radii, and its colour.
+    uPool: { value: new THREE.Vector2(0.5, 0) },
+    uSize: { value: new THREE.Vector2(1, 1) },
+    uPoolR: { value: new THREE.Vector2(MIRROR_LOOK.poolAlong, MIRROR_LOOK.poolAcross) },
+    uPoolCol: { value: new THREE.Color() },
   },
   vertexShader: /* glsl */ `
     uniform mat4 textureMatrix;
@@ -104,6 +117,10 @@ const MIRROR_SHADER = {
     uniform vec3 uGround;
     uniform vec2 uFeather;
     uniform float uSoft;
+    uniform vec2 uPool;
+    uniform vec2 uSize;
+    uniform vec2 uPoolR;
+    uniform vec3 uPoolCol;
     varying vec4 vUv;
     varying vec2 vP;
     void main() {
@@ -118,7 +135,10 @@ const MIRROR_SHADER = {
       vec3 ink = mix(vec3(1.0), clamp(r / g, 0.0, 1.0), uOp * f)
                * mix(vec3(1.0), clamp(soft / g, 0.0, 1.0), uSpill * f);
       vec3 lit = max(soft - vec3(uSpillFloor), 0.0);
-      gl_FragColor = vec4(mix((r * uOp + lit * uSpill) * f, ink, uPaper), 1.0);
+      // The selection's pool: a soft ellipse on the row, across the lanes.
+      vec2 pd = vec2((vP.x - uPool.x) * uSize.x, (vP.y - 0.5) * uSize.y) / uPoolR;
+      float pool = exp(-dot(pd, pd)) * uPool.y * f;
+      gl_FragColor = vec4(mix((r * uOp + lit * uSpill) * f + uPoolCol * pool, ink * (1.0 + pool), uPaper), 1.0);
     }
   `,
 };
@@ -126,11 +146,19 @@ const MIRROR_SHADER = {
 export class FloorMirror {
   readonly mesh: Reflector;
   private _paper: boolean;
+  private _alpha = 0;
+  /** The pool's eased state: its level (0 to 1) and where it stands along the trail (uv.x). */
+  private _pool = 0;
+  private _poolU = 0.5;
+  private readonly _w: number;
+  private readonly _cx: number;
 
   /** `w` along the trail, `d` across the lanes, centred on (`cx`, `y`, 0) in the parent's frame —
    *  the global floor's own extents. */
   constructor(parent: THREE.Group, w: number, d: number, cx: number, y: number, paper: boolean, ground: number) {
     this._paper = paper;
+    this._w = w;
+    this._cx = cx;
     this.mesh = new Reflector(new THREE.PlaneGeometry(w, d), {
       textureWidth: MIRROR_RES.w, textureHeight: MIRROR_RES.h, multisample: 2, shader: MIRROR_SHADER,
     });
@@ -156,12 +184,28 @@ export class FloorMirror {
       this.mesh.getReflectionCamera(camera).layers.set(MIRROR_LAYER);
       mirrorRender.call(this.mesh, renderer, scene, camera, geometry, material, group);
     };
+    (mat.uniforms.uSize.value as THREE.Vector2).set(w, d);
     parent.add(this.mesh);
-    this.setGround(paper, ground);
+    this.setGround(paper, ground, 0);
+  }
+
+  /** THE SELECTION'S POOL, per frame: `x` is the held or pointed-at row's place along the trail
+   *  (the parent's frame), null for none. The level eases in and out; the pool slides between rows
+   *  while it is lit and starts where it is asked for when it was dark. Allocation-free. */
+  pool(x: number | null, dt: number): void {
+    const k = 1 - Math.exp(-6 * dt);
+    if (x != null) {
+      const u = (x - this._cx) / this._w + 0.5;
+      this._poolU = this._pool < 0.02 ? u : this._poolU + (u - this._poolU) * k;
+    }
+    this._pool += ((x != null ? 1 : 0) - this._pool) * k;
+    const pu = (this.mesh.material as THREE.ShaderMaterial).uniforms.uPool.value as THREE.Vector2;
+    pu.set(this._poolU, this._pool * this._alpha * (this._paper ? MIRROR_LOOK.poolPaper : MIRROR_LOOK.pool));
   }
 
   /** The chamber's furniture alpha, per frame. At 0 the mesh hides, and its render with it. */
   setAlpha(a: number): void {
+    this._alpha = a;
     const u = (this.mesh.material as THREE.ShaderMaterial).uniforms;
     u.uOp.value = a * (this._paper ? MIRROR_LOOK.strengthPaper : MIRROR_LOOK.strength);
     u.uSpill.value = a * (this._paper ? MIRROR_LOOK.spillPaper : MIRROR_LOOK.spill);
@@ -170,12 +214,13 @@ export class FloorMirror {
 
   /** THEME FLIP (and construction): the blend the ground needs, and the plate's colour the paper
    *  term divides by. Event-time — three caches the program per blend mode, hence `needsUpdate`. */
-  setGround(paper: boolean, ground: number): void {
+  setGround(paper: boolean, ground: number, poolColor: number): void {
     this._paper = paper;
     const mat = this.mesh.material as THREE.ShaderMaterial;
     mat.blending = paper ? THREE.CustomBlending : THREE.AdditiveBlending;
     mat.uniforms.uPaper.value = paper ? 1 : 0;
     (mat.uniforms.uGround.value as THREE.Color).setHex(ground);
+    (mat.uniforms.uPoolCol.value as THREE.Color).setHex(poolColor);
     mat.needsUpdate = true;
   }
 
