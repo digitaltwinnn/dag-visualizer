@@ -209,7 +209,7 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
         </span>
       ) : (
         <>
-      {!live && <span className="self-center"><NoSignalDot /></span>}
+      {!live && <span className="self-center flex flex-none px-1"><NoSignalDot /></span>}
       {/* THE BAND'S WINDOW, ONCE (`viewPolicy.bandWindow`, user 2026-10-03): above the plate's right
           corner, where History's range pills stand — the band's time scope has one place in
           every view. The cards below no longer repeat it (`viewCells`: a card states a span
@@ -284,7 +284,7 @@ export function VitalsSheetBody() {
         !live && "saturate-[.45]",
       )}
     >
-      {!live && <span className="self-center flex-none mb-2"><NoSignalDot /></span>}
+      {!live && <span className="self-center flex flex-none mb-2"><NoSignalDot /></span>}
       {/* The band's shared window, once, at the sheet's top right — the desktop chip's phone home. */}
       {sheetWindow && (
         <span className="self-end flex-none mb-2"><QualifierChip>{spanPhrase(sheetWindow, null)}</QualifierChip></span>

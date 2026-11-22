@@ -16,6 +16,8 @@ import { type Band, type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, horizonAt, frontAt, rowOnChamber } from "../../domain/ledgerModel";
 import { snapBright, snapFocusOf, emphasisK } from "../../domain/dimModel";
 import { joinBloom, inMarkPass } from "../SceneContext";
+import { faceShade } from "./faceShade";
+import { joinMirror } from "./FloorMirror";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
 
@@ -110,7 +112,7 @@ export class ByteBar {
   group = new THREE.Group();
   pickables: THREE.Object3D[] = [];
   private _slots: Slot[] = [];
-  private _geo = new THREE.BoxGeometry(1, BAR_H, 1);
+  private _geo = faceShade(new THREE.BoxGeometry(1, BAR_H, 1));
   private _sceneColors: Record<string, number>;
   private _neutral: number;
   /** GROUND, hoisted at event time — the band loop reads a boolean, never re-derives luminance. */
@@ -139,11 +141,12 @@ export class ByteBar {
       const bands: THREE.Mesh[] = [];
       const mats: THREE.MeshBasicMaterial[] = [];
       for (let b = 0; b < BANDS_PER_SLOT; b++) {
-        const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+        const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, vertexColors: true });
         const mesh = new THREE.Mesh(this._geo, mat);
         mesh.scale.set(0, 0, 0);
         mesh.visible = false;
         joinBloom(mesh); // a band is the tick's own ink — see BLOOM_LAYER
+        joinMirror(mesh); // it stands on the floor
         // The paper halo's input lift (BarLook.halo): the material colour rides above its own
         // value only while the selective mark pass renders, un-multiplied inside the same pass —
         // the main frame always draws the band's true colour. ⚠️ MULTIPLY, never set: a band's

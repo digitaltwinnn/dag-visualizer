@@ -90,6 +90,32 @@ const AXIS_FADE_MS = 320;
 const PLOT_MARGIN = { top: 10, right: 2, bottom: 4, left: 2 } as const;
 /** The plot box's horizontal inset, both sides together — what a 100% width must give back. */
 const PLOT_INSET_X = PLOT_MARGIN.left + PLOT_MARGIN.right;
+/** THE GRIDLINES' VALUES — round numbers on the plot's own scale (1, 2 or 5 times a power of
+ *  ten, about four to the ceiling), so the figure beside a line reads "2K", never "2.1K" for a
+ *  quarter of an arbitrary ceiling. One home: the grid's generator and the gridline figures both
+ *  ask it, which is what keeps a figure on its line.
+ *
+ *  ⚠️ A LINE IS ONLY DRAWN WHERE ITS FIGURE IS TRUE. `format` is the head's short form, and for a
+ *  count it rounds to whole numbers: under a peak of 2 a step of 0.5 would label its lines
+ *  "1", "1", "2", "2" (rule 10). So the step widens along the same 1-2-5 ladder until every figure
+ *  is distinct from its neighbour's and from the value half a step above it — a figure that the
+ *  formatter cannot tell from a different height is not stated. */
+function yTickValues(ceiling: number, format: (v: number) => string): number[] {
+  if (!(ceiling > 0) || !Number.isFinite(ceiling)) return [];
+  const raw = ceiling / 4;
+  let mag = 10 ** Math.floor(Math.log10(raw));
+  const lead = raw / mag;
+  let rung = lead < 1.5 ? 0 : lead < 3.5 ? 1 : lead < 7.5 ? 2 : 3;
+  for (let tries = 0; tries < 12; tries++) {
+    const step = [1, 2, 5, 10][rung]! * mag;
+    const out: number[] = [];
+    for (let v = step; v < ceiling * 0.97 && out.length < 5; v += step) out.push(v);
+    const honest = out.every((v, i) => format(v) !== format(v + step / 2) && (i === 0 || format(v) !== format(out[i - 1]!)));
+    if (honest) return out;
+    if (rung >= 2) { rung = rung === 2 ? 0 : 1; mag *= 10; } else rung++;
+  }
+  return [];
+}
 /** The plot box's own height for a plot `plotH` tall, measured from the top margin: the axis strip
  *  sits below it. A function since the plot's height became a prop (`plotHeight`) — the cursor
  *  overlay and the chart still read the ONE margin. */
@@ -260,6 +286,8 @@ export default function TrendChart({
   peak,
   extra,
   lineWidth = 2,
+  yTicks = false,
+  formatFine,
   className,
   headClassName,
   headAction,
@@ -438,6 +466,16 @@ export default function TrendChart({
    *  at 2.6px and read as heavy (user, 2026-10-03: "the trend card lines are too thick") — the
    *  stack passes a finer one. */
   lineWidth?: number;
+  /** THE GRIDLINES STATE THEIR VALUES (2026-11-22): a small figure at the left end of each
+   *  gridline, on the plot's own ceiling (`plotCeiling`), so the height of the line can be
+   *  read without hovering. Drawn beside the memoised plot, like the cursor. The History stack's
+   *  front card passes it; a compact or held plot draws none. A STRING is the plot's unit at its
+   *  own cadence ("per hour"), said once on the top figure: the head's readings are per DAY, and a
+   *  scale of hourly buckets beside them needs its basis stated. */
+  yTicks?: boolean | string;
+  /** The HOVER's formatter, where a reading needs more precision than the head's short form: an
+   *  hourly bucket of 2,071 read "2K" beside a head saying 49.7K a day. Defaults to `format`. */
+  formatFine?: (v: number) => string;
   className?: string;
   /** Extra classes for the HEAD ROW alone (2026-09-18). The 3D trend stack's planes have no
    *  chrome of their own — the head IS each plane's header strip, the one part of a fully
@@ -529,16 +567,18 @@ export default function TrendChart({
   const cursorX = cursorFraction(buckets, cursorBucket);
   // The notable days' x, by the same scale (see `TrendMark`); a day the axis does not hold is skipped.
   // Memoised: this body runs on every cursor write, and placing a mark walks the series.
+  // The y axis's ceiling, the plot's own (`TrendPlot` asks the same): what a mark's hairline
+  // rises against and what the gridline figures are shares of.
+  const ceiling = useMemo(() => plotCeiling(lines.map((l) => l.points), scaleMax), [lines, scaleMax]);
   const markXs = useMemo(() => {
     if (!marks?.length) return [];
-    const ceiling = plotCeiling(lines.map((l) => l.points), scaleMax);
     return marks
       .map((m) => {
         const bucket = bucketAt(buckets, stepMs, stepMs >= DAY_MS_CHART ? m.dayMs : m.dayMs + DAY_MS_CHART / 2);
         return { ...m, key: `${m.dayMs}:${m.kind}`, x: cursorFraction(buckets, bucket), rise: lines[0] ? valueFraction(lines[0].points, buckets, bucket, ceiling) : null };
       })
       .filter((m): m is TrendMark & { key: string; x: number; rise: number | null } => m.x != null);
-  }, [marks, lines, buckets, stepMs, scaleMax]);
+  }, [marks, lines, buckets, stepMs, ceiling]);
 
   const hue0 = lines[0]?.hue ?? "var(--primary)";
   // The head's right-hand readout: the NEWEST MEASURED BUCKET, stamped with its own date —
@@ -780,7 +820,8 @@ export default function TrendChart({
                 lines={lines}
                 buckets={buckets}
                 stepMs={stepMs}
-                format={format}
+                format={formatFine ?? format}
+                tickFormat={format}
                 scaleMax={scaleMax}
                 sampled={sampled}
                 gaps={gaps}
@@ -847,6 +888,22 @@ export default function TrendChart({
                 />
               );
             })}
+          {/* THE GRIDLINES' VALUES (`yTicks`): the grid sits on round values (`yTickValues`) of a y
+              axis that runs zero to `plotCeiling`, so each figure is placed at its value's share
+              of the plot box, by the cursor's own box arithmetic. Each stands on a chip of the card's ground, so the series
+              passes behind the figure instead of through it (a plane takes no shadow). */}
+          {yTicks && !compact && !held &&
+            yTickValues(ceiling, format).map((v, i, all) => (
+              <span
+                key={v}
+                aria-hidden
+                className="absolute left-1 -translate-y-1/2 rounded-sm px-1 text-[10px] leading-[14px] tabular-nums text-muted-foreground pointer-events-none [background:color-mix(in_oklch,var(--panel-solid)_82%,transparent)]"
+                style={{ top: PLOT_MARGIN.top + plotInnerH(plotHeight) * (1 - v / ceiling) }}
+              >
+                {format(v)}
+                {i === all.length - 1 && typeof yTicks === "string" && yTicks && ` ${yTicks}`}
+              </span>
+            ))}
           {cursorX != null && !held && (
             <div
               aria-hidden
@@ -904,7 +961,11 @@ const TrendPlot = memo(function TrendPlot({
   plotH,
   compact = false,
   lineWidth = 2,
+  tickFormat,
 }: {
+  /** The HEAD's formatter, which the gridline figures are printed with: the grid asks
+   *  `yTickValues` with it so a line stands exactly where a figure does. A stable reference. */
+  tickFormat: (v: number) => string;
   /** See the outer component's prop — a STRING, so it holds the memo still. */
   syncId: string;
   lines: TrendLine[];
@@ -1170,7 +1231,7 @@ const TrendPlot = memo(function TrendPlot({
                 vertical={false}
                 stroke="var(--border)"
                 strokeOpacity={0.5}
-                horizontalCoordinatesGenerator={({ height }) => [height * 0.25, height * 0.5, height * 0.75]}
+                horizontalCoordinatesGenerator={({ offset }) => yTickValues(max, tickFormat).map((v) => (offset.top ?? 0) + (offset.height ?? 0) * (1 - v / max))}
               />
               <XAxis
                 dataKey="ts"
@@ -1178,7 +1239,8 @@ const TrendPlot = memo(function TrendPlot({
                 domain={["dataMin", "dataMax"]}
                 ticks={ticks}
                 tickFormatter={tickLabel}
-                axisLine={false}
+                // The plot's floor, drawn: the dates below it are a strip of their own.
+                axisLine={{ stroke: "var(--border)", strokeOpacity: 0.9 }}
                 tickLine={false}
                 height={AXIS_H}
                 tick={compact ? false : { fill: "var(--muted-foreground)", fontSize: 11 }}
@@ -1334,6 +1396,10 @@ const TrendPlot = memo(function TrendPlot({
                   // reads the total from its payload and the hover cursor snaps to it.
                   stroke={li === 0 && stack?.length ? "none" : (l.hue ?? hue0)}
                   strokeWidth={lineWidth}
+                  // Round joins: hundreds of buckets on a few hundred pixels turn every reversal
+                  // into a miter needle, taller than the reading it marks.
+                  strokeLinejoin="round"
+                  strokeLinecap={l.dash ? undefined : "round"}
                   strokeDasharray={typeof l.dash === "string" ? l.dash : l.dash ? "4 4" : undefined}
                   connectNulls={false}
                   isAnimationActive={false}
@@ -1353,6 +1419,8 @@ const TrendPlot = memo(function TrendPlot({
                   type="linear"
                   stroke={gapLine.hue ?? hue0}
                   strokeWidth={lineWidth}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
                   connectNulls={false}
                   isAnimationActive={false}
                   legendType="none"

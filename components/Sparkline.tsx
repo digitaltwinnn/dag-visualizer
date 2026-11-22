@@ -1,6 +1,7 @@
 "use client";
 
-import { LineChart, Line, YAxis, ResponsiveContainer } from "recharts";
+import { useId } from "react";
+import { Area, ComposedChart, Line, YAxis, ResponsiveContainer } from "recharts";
 
 import { cn } from "@/lib/utils";
 
@@ -57,6 +58,9 @@ export default function Sparkline({
   /** Cap the plotted points, bucketing by mean over the SAME window (see bucketMean). */
   maxPoints?: number;
 }) {
+  // The area gradient's id (a paint server is referenced by document id, so each chart needs its
+  // own), sanitised because `url(#…)` dislikes the ':' a React id carries.
+  const fadeId = `spark-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   // ⚠️ AN EMPTY CHART SAYS SO, IT DOES NOT RENDER NOTHING (user, 2026-09-01: "what to show for
   // vitals that show charts but don't have any data to show?"). `return null` left a card with a
   // label, a number and a silent gap where the trend belongs, which reads as a broken chart rather
@@ -94,36 +98,48 @@ export default function Sparkline({
    *  DRAWN series: bucketMean can merge the only measured neighbours into isolation. */
   const isolated = (i: number): boolean =>
     series[i] != null && (i === 0 || series[i - 1] == null) && (i === series.length - 1 || series[i + 1] == null);
+  // THE NEWEST MEASURED POINT WEARS A DOT (2026-11-22): the line's right end is the reading the
+  // numeral beside it states, and the dot says which end that is.
+  let lastIdx = -1;
+  for (let i = series.length - 1; i >= 0; i--) {
+    if (series[i] != null) { lastIdx = i; break; }
+  }
   const dot = (props: { key?: React.Key | null; index?: number; cx?: number; cy?: number }) => {
     const { key, index, cx, cy } = props;
-    if (index == null || cx == null || cy == null || !isolated(index)) return <g key={key ?? undefined} />;
-    return <circle key={key ?? undefined} cx={cx} cy={cy} r={1.75} fill={color} />;
+    if (index == null || cx == null || cy == null || !(isolated(index) || index === lastIdx)) return <g key={key ?? undefined} />;
+    return <circle key={key ?? undefined} cx={cx} cy={cy} r={index === lastIdx ? 2 : 1.75} fill={color} />;
   };
+  // ONE DRAWING FOR BOTH SIZES. Straight segments with round joins, History's own line (a
+  // smoothed curve swings past the buckets it joins and draws levels nobody measured), over a
+  // faint fade of the same hue. The fade runs to the box's floor, which is the window's own
+  // minimum (the hidden axis is scaled to the data), so it carries SHAPE and no magnitude — the
+  // numeral beside the chart is the reading. A gap in the series is a gap in both.
+  const body = (
+    <>
+      <defs>
+        <linearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity={0.16} />
+          <stop offset="100%" stopColor={color} stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      {/* hidden axis, scaled to the data so the line uses the full height */}
+      <YAxis hide domain={["dataMin", "dataMax"]} />
+      <Area type="linear" dataKey="v" stroke="none" fill={`url(#${fadeId})`} fillOpacity={1} connectNulls={false} isAnimationActive={false} dot={false} activeDot={false} />
+      {/* connectNulls false stated, not defaulted: the break IS the reading (a gap is
+          "not measured", and bridging it would draw a level nobody measured). */}
+      <Line type="linear" dataKey="v" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" dot={dot} isAnimationActive={false} connectNulls={false} />
+    </>
+  );
+  // The right margin leaves the end dot its radius.
+  const margin = { top: 3, right: 3, bottom: 3, left: 1 };
   if (stretch) {
     return (
       <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={points} margin={{ top: 3, right: 1, bottom: 3, left: 1 }}>
-          <YAxis hide domain={["dataMin", "dataMax"]} />
-          {/* connectNulls false stated, not defaulted: the break IS the reading (a gap is
-              "not measured", and bridging it would draw a level nobody measured). */}
-          <Line type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} dot={false} isAnimationActive={false} connectNulls={false} />
-        </LineChart>
+        <ComposedChart data={points} margin={margin}>{body}</ComposedChart>
       </ResponsiveContainer>
     );
   }
   return (
-    <LineChart width={width} height={height} data={points} margin={{ top: 3, right: 1, bottom: 3, left: 1 }}>
-      {/* hidden axis, scaled to the data so the line uses the full height */}
-      <YAxis hide domain={["dataMin", "dataMax"]} />
-      <Line
-        type="monotone"
-        dataKey="v"
-        stroke={color}
-        strokeWidth={1.5}
-        dot={dot}
-        connectNulls={false}
-        isAnimationActive={false}
-      />
-    </LineChart>
+    <ComposedChart width={width} height={height} data={points} margin={margin}>{body}</ComposedChart>
   );
 }

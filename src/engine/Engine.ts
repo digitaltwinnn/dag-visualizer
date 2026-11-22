@@ -57,7 +57,7 @@ import { auditInstances, findingKey, type InstanceFinding } from "./scene/instan
 import { CalloutSync, type CalloutState } from "./CalloutSync";
 import { Picking } from "./Picking";
 import { TrendStackSync, type TrendStackState } from "./TrendStackSync";
-import { fitDistance, focusDepth, loneShiftPx, windowCount } from "./domain/trendStack";
+import { fitDistance, focusDepth, stackPoses, windowCount } from "./domain/trendStack";
 import { stackRoster } from "@/src/data/trendScope";
 import { DevTunePanel } from "./DevTunePanel";
 import { CameraDirector } from "./CameraDirector";
@@ -74,6 +74,9 @@ import { breakpointOf } from "@/src/data/breakpoint";
 /** How often the dev instance audit sweeps — every Nth frame, one mesh per sweep. ~1s of coverage
  *  per mesh at 60fps, which finds a corrupt buffer promptly while costing nothing measurable. */
 const AUDIT_EVERY = 15;
+/** The blur the out-of-focus structure saturates to in Hypergraph while a metagraph is the subject
+ *  (see the frame's depth-of-field block for the number's history). */
+const DOF_MAX = 0.14;
 /** Dev, or `?audit` in any build — the `?stats` idiom, so a deployed instance can be checked
  *  without shipping the pass to every visitor. */
 const AUDIT_ON =
@@ -216,6 +219,11 @@ export class Engine {
   // The focused metagraph's hub record, cached on filter/mode change — kills the per-frame
   // `metas.find` the DoF read used to do every frame (Task 15 allocation fix).
   private _dofMeta: MetaHubRec | null = null;
+  /** The blur's eased level, and the subject it last stood on — whether it was the DAG, and its
+   *  identity hue — kept through the fade after the subject is released. */
+  private _dofMix = 0;
+  private _dofDag = false;
+  private _dofHue = 0;
   private _warnedUnbaked = false;
 
   // Land-sphere hit scratch for the scene country hover/click (ray→sphere analytically —
@@ -552,18 +560,11 @@ export class Engine {
     setColors(c: SceneColors): void;
     setSceneColors(m: Record<string, number>): void;
   }[] = [];
-  // Per-view bloom level, themed (spec §5). ON PAPER THE PASS IS OFF, and the reason is the
-  // HIGHPASS: bloom keeps what is brighter than `threshold` (0.13, low so every identity hue
-  // clears it), blurs it and adds it back. A ~0.94-L page clears that by itself, so on light the
-  // pass returns a blurred copy of the PAGE and adds it over everything — equal RGB everywhere,
-  // which lifts every dark mark toward white and crushes its saturation. That veil, not any
-  // material value, is what made the day look read as washed-out pastel (measured 2026-08-21:
-  // turning it off dropped the scene's dark marks from 140 to 65 luminance and multiplied its
-  // strongly-coloured pixels 17×). The shipped `LIGHT_LOOK.bloomMul` is 0, so on paper the
-  // whole-frame pass is SKIPPED outright (`bloom.enabled = _bloomMul > 0`; `bloomFloor` is inert
-  // while it is 0) and the identity marks halo through their own selective layer instead
-  // (SceneContext's BLOOM_LAYER sub-pipeline). The knob stays: any value > 0 re-enables the
-  // whole-frame pass at that calm level with the threshold floored high.
+  // The dark mark pass's gain on the view policy's bloom strength: 1 on dark. On paper it is
+  // `LIGHT_LOOK.bloomMul`, which is 0 — a highpass keeps what is brighter than its threshold, and
+  // a ~0.94-L page clears any threshold by itself, so a highpassed bloom returns a blurred copy of
+  // the PAGE and lifts every dark mark toward white (measured 2026-08-21). Paper's marks halo
+  // through `renderFrame`'s own paper branch instead (`LIGHT_LOOK.sel*`), which reads none of this.
   private _bloomMul = 1;
 
   constructor(canvas: HTMLCanvasElement, onReady?: () => void, onSceneReady?: () => void) {
@@ -2219,9 +2220,9 @@ export class Engine {
 
     // Per-view bloom (ViewPolicy.bloom): hyper/geo run calmer than ledger — their dense, bright
     // emitters (core, node field, additive coastal walls) piled up an additive bleed + a
-    // strength-driven "black halo" ring + fuzzy walls, worst on OLED/HDR. UnrealBloomPass reads
-    // strength/radius/threshold live each render, so a per-frame set is enough (and it tracks a
-    // mode switch immediately).
+    // strength-driven "black halo" ring + fuzzy walls, worst on OLED/HDR. The mark pass's blur reads
+    // strength/radius/threshold from these knobs each render (SceneContext.renderFrame), so a
+    // per-frame set is enough (and it tracks a mode switch immediately).
     const pb = policy.bloom;
     // × the theme's level (spec §5). Strength alone: radius and threshold say WHAT blooms and how
     // wide the halo is — the pass's shape — while strength is how much of it lands, which is the
@@ -2468,9 +2469,8 @@ export class Engine {
     // the room like hyper's hoops and the chamber's labels.
     const trendAlpha = this.transition.furnitureAlpha("trend");
     this.trends.setViewAlpha(trendAlpha);
-    // The rungs are billboards like the cards above them — re-laid along the camera's right vector
-    // (a no-op while the camera's orientation holds still, and skipped while the view is dark).
-    // One rung per card that is there, and a lone card's rung takes the card's own screen shift.
+    // The floor follows the deck: its height rides the stagger of the cards that are there (a
+    // no-op while that holds still, and skipped while the view is dark).
     if (trendAlpha > 0.001) {
       // The published window when there is one; until React publishes (boot, a refetch) the count
       // the SCOPE will hold — so the room is built around the floor it is about to have, and a
@@ -2482,12 +2482,9 @@ export class Engine {
         this._scopeCount = stackRoster(this.filter).length; // event-time: once per filter, never per frame — the SCENE's roster (the DAG has a plane here)
       }
       const count = windowCount(n > 0 ? n : this._scopeCount);
-      const shift = loneShiftPx(count, railGapShiftPx(window.innerWidth, this.railsHidden));
-      // The canvas height is only read while a shift needs converting — it is a layout read.
-      const viewH = shift !== 0 ? this.ctx.renderer.domElement.clientHeight || window.innerHeight : 0;
       // `_frameDt`, the projector's own clock (`?slowmo` included), so floor and cards ease as one.
-      const tier = breakpointOf(window.innerWidth);
-      this.trends.face(this.ctx.camera, count, shift, viewH, this._frameDt, tier !== "desktop", tier === "phone");
+      this.trends.face(count, this._frameDt, breakpointOf(window.innerWidth) === "phone");
+      this._syncTrendHues();
     }
     // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim
     // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
@@ -2579,13 +2576,31 @@ export class Engine {
     // Depth of field: only a single focused metagraph WITH A HUB to focus on, and only where the
     // policy allows it (hyper). Without a hub (the unlisted set, a network with no live nodes) the
     // blur had nothing in focus and smeared the whole scene (the Unlisted audit, 2026-10-07).
+    // ⚠️ THE DAG TAKES THE BACKDROP'S COLOUR AND NO BLUR (tried 2026-11-22): its shells run 12.5
+    // either side of the core, far outside the pass's sharp zone at any level that still blurs
+    // the hubs, so its own nodes came out soft — the "fuzz on the selected atom" the blur was
+    // once dropped for.
     const metaSel = this.filter !== "all" && this.filter !== "dag" && this._dofMeta != null;
+    const dagSel = this.filter === "dag";
     // …AND ONLY ONCE THE SUBJECT HAS ARRIVED (user, 2026-10-25): the morph is written to 0 at the
     // boundary, so the blur used to cover the fleet while it still stood on the staging grids.
     // The mix rides hyper's subject-arrival beat (`entryProgress` — held through the choreography,
     // the tethers' sweep after it), the same stage the hubs' tethers reach their hubs on.
-    const dofMix = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1) * this.layers.entryProgress();
-    this.ctx.dof.enabled = policy.dofEligible && metaSel && dofMix > 0.001;
+    const dofGate = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1) * this.layers.entryProgress();
+    // EASED (2026-11-22). The gate above is 0 or 1 at rest, so committing a network used to snap
+    // the blur on. `_dofMix` follows it, and the backdrop's tint rides the same number, so the
+    // background falls out of focus and takes the subject's colour as one move.
+    const dofTarget = policy.dofEligible && (metaSel || dagSel) ? dofGate : 0;
+    this._dofMix += (dofTarget - this._dofMix) * (1 - Math.exp(-4 * dt));
+    if (Math.abs(dofTarget - this._dofMix) < 0.002) this._dofMix = dofTarget;
+    const dofMix = this._dofMix;
+    // The subject outlives its own release by the fade: the last one committed is what the blur
+    // and the tint ease away from.
+    if (metaSel || dagSel) {
+      this._dofDag = dagSel;
+      this._dofHue = this._sceneColorMap[this.filter] ?? 0;
+    }
+    this.ctx.dof.enabled = dofMix > 0.001 && !this._dofDag;
     if (this.ctx.dof.enabled) {
       const meta = this._dofMeta;
       // The bokeh focal-plane distance is a RENDER property — it needs the hub's actual
@@ -2601,8 +2616,11 @@ export class Engine {
       // 0.14 with the closer hub framing (`HUB_CLOSE` 0.75; user 2026-10-04: "a bit more fuzzy, but
       // keep the selected metagraph clear"): nearer, the selection holds the sharp zone, so the
       // background can take more blur without the subject paying for it. Still under 0.16.
-      this.ctx.dof.uniforms["maxblur"].value = 0.14 * dofMix;
+      this.ctx.dof.uniforms["maxblur"].value = DOF_MAX * dofMix;
     }
+    // THE SUBJECT'S AIR (`BACKDROP_LOOK.subject`): the backdrop takes the subject's colour on the
+    // same mix, so the two read as one change of focus.
+    this.ctx.setBackdropTint(this._dofHue, dofMix);
 
     this._syncCallout();
     // The chart planes ride the SETTLED camera, so they are placed here in the scene-write phase —
@@ -2734,6 +2752,26 @@ export class Engine {
    *  published a roster (see `_writeScene`). */
   private _scopeFor: string | null = null;
   private _scopeCount = 0;
+  // The floor's hues: which network's card stands on each rung, as its identity colour. The deck
+  // is `stackPoses`' own (the projector's arithmetic, so floor and cards can never disagree about
+  // who is in front); it is asked only when one of its inputs, or the theme, has changed — the
+  // per-frame cost is five comparisons.
+  private _hueIds: readonly string[] | null = null;
+  private _hueFocus: string | null = null;
+  private _hueScroll = -1;
+  private _hueTheme = "";
+  private readonly _hueOut: number[] = [];
+  private _syncTrendHues(): void {
+    const st = useStore.getState();
+    if (st.trendIds === this._hueIds && st.trendFocus === this._hueFocus &&
+        st.trendScroll === this._hueScroll && this._theme === this._hueTheme) return;
+    this._hueIds = st.trendIds; this._hueFocus = st.trendFocus;
+    this._hueScroll = st.trendScroll; this._hueTheme = this._theme;
+    const poses = stackPoses(st.trendIds, { scroll: st.trendScroll, focus: st.trendFocus }); // nearest first
+    this._hueOut.length = 0;
+    for (const p of poses) this._hueOut.push(this._sceneColorMap[p.id] ?? 0);
+    this.trends.setSlotHues(this._hueOut);
+  }
   private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [], gapShiftPx: 0, narrow: false, phone: false };
   private _syncTrendStack(): void {
     const st = useStore.getState();

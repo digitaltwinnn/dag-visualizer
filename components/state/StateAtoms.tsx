@@ -46,9 +46,13 @@ export function Resolving({ count = 3, className }: { count?: number; className?
   );
 }
 
+/** `inline-block`: the dot is sized by width and height, which an inline box ignores. As a flex
+ *  item it was blockified and drew whole; wrapped in a plain span (the vitals band's "feed
+ *  dropped" mark) it collapsed to 0×0 and only its 3px halo painted — a small dim-red SQUARE at
+ *  the band's left edge whenever a feed lagged (found 2026-11-22). */
 export function NoSignalDot() {
   return (
-    <span className="w-[7px] h-[7px] rounded-full flex-none bg-destructive shadow-[0_0_0_3px_color-mix(in_oklch,var(--destructive)_22%,transparent)] animate-breathe motion-reduce:animate-none" />
+    <span className="inline-block w-[7px] h-[7px] rounded-full flex-none bg-destructive shadow-[0_0_0_3px_color-mix(in_oklch,var(--destructive)_22%,transparent)] animate-breathe motion-reduce:animate-none" />
   );
 }
 

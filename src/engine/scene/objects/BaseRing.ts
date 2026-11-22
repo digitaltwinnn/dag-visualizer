@@ -127,6 +127,11 @@ const SEGMENTS_PER_RAD = 10;
  *  half this width AT EACH RADIUS (an angle of (w/2)/r), so the gap's two edges run parallel through
  *  the three rings and the pie, and a pie slice closes at the radius where the gap is all of it. */
 export const RING_GAP_W = 0.18; // 0.55 → 0.28 → 0.18 (user, 2026-10-24: "smaller, like 1/2", then "even thinner")
+/** The same stripe INSIDE THE PIE, where it is a hairline: over the pie's faint fill a ring-width
+ *  gap is the darkest thing on the disc, and beside a narrow slice two or three of them read as
+ *  black cracks running to the centre (2026-11-22). The rings keep their full gap; the pie's edges
+ *  stay parallel and centred on the ring's, only closer. */
+export const WEDGE_GAP_W = 0.07;
 
 /** An annular sector [r0, r1] × [from, to] in the XY plane, inset by `gapW/2` at every radius —
  *  `rows` radial subdivisions follow the 1/r inset (two suffice for a band, a pie slice takes
@@ -356,7 +361,7 @@ export class BaseRing {
     const wedgeFade: FadeEntry = { mat: wedgeMat, base: 0, paperBase: 0 };
     this.host.geoFades.push(wedgeFade);
     // The slice closes where the stripe is all of it: r = gapW / span, never the centre.
-    const wedge = new THREE.Mesh(arcGeometry(Math.min(radius - width, Math.max(0.01, RING_GAP_W / span)), radius - width, seg.from, seg.to, RING_GAP_W, 12), wedgeMat);
+    const wedge = new THREE.Mesh(arcGeometry(Math.min(radius - width, Math.max(0.01, WEDGE_GAP_W / span)), radius - width, seg.from, seg.to, WEDGE_GAP_W, 12), wedgeMat);
     wedge.position.z = -0.01 * (level + 1); // under the arcs, the outer wedge lowest so the three stack
     // THE DISC PICKS AS ITS SLICE (user, 2026-10-24: "when we hover the section within the circle
     // it should hover the pie chart section and the related sections on the circle"): the

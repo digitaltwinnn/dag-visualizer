@@ -62,9 +62,23 @@ export function joinBloom(o: THREE.Object3D): void {
 }
 
 /**
+ * THE GLOW LAYER — the marks that bloom on the DARK ground only.
+ *
+ * Dark blooms by membership too (see `renderFrame`): the mark pass draws the bloom layer AND this
+ * one. It holds the light that is not an identity mark but is the dark look's own glow — the coast
+ * walls, the packets' trails, the anchor sheets — which paper's ink halo must never take (a wide
+ * sheet in that target is a smear across the page; see `joinBloom`). Everything else the scene
+ * draws — the text, the glass, the graticule, the land fill, the atmosphere — is in neither set and
+ * stays as crisp as it was drawn.
+ */
+export const GLOW_LAYER = 3;
+export function joinGlow(o: THREE.Object3D): void {
+  o.layers.enable(GLOW_LAYER);
+}
+
+/**
  * THE OVERLAY LAYER — scene text that must NOT bloom (2026-09-28, user: "I don't want the text to
- * bloom", on the gather legend). On the dark ground the bloom is a whole-frame pass, so anything
- * the main chain draws above the threshold halos, text included. A member of this layer is left
+ * bloom", on the gather legend). A member of this layer is left
  * out of every composer pass (`layers.set`, so it leaves layer 0) and drawn by `renderFrame` in one
  * plain render AFTER the composer, straight onto the finished frame: crisp on both grounds, still
  * a scene object that rides group transforms and material opacity. It draws over everything —
@@ -92,7 +106,8 @@ function overlayShowing(): boolean {
   return false;
 }
 
-// True only while the selective MARK pass is rendering (paper frames; see renderFrame). A member
+// True only while the PAPER mark pass is rendering (see renderFrame; dark's mark pass leaves it
+// false — its members go in at their true light). A member
 // whose main-pass ink is too dark to halo — the chamber's bands and tiles are ink on paper, where
 // geo's chips get free sub-pass brightness from their env sheen — checks this in onBeforeRender
 // and raises its own contribution for that render alone (restored in onAfterRender), so the
@@ -135,6 +150,7 @@ const SEL_MIX_SHADER = {
     bloomTexture: { value: null as THREE.Texture | null },
     bleed: { value: 1 },
     glow: { value: 0.25 },
+    cap: { value: 1 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -145,6 +161,7 @@ const SEL_MIX_SHADER = {
     uniform sampler2D bloomTexture;
     uniform float bleed;
     uniform float glow;
+    uniform float cap;
     varying vec2 vUv;
     void main() {
       vec4 base = texture2D(tDiffuse, vUv);
@@ -155,8 +172,113 @@ const SEL_MIX_SHADER = {
       // The glow input is CAPPED like the bleed's: the mark-pass input lifts (BarLook/TileLook
       // .halo) push b past 1 at a boosted lead, and an uncapped add there climbs to white — the
       // one thing paper emphasis must never do. Below 1 the term is byte-identical to before.
-      vec3 rgb = base.rgb * mix(vec3(1.0), ink, a) + glow * min(b, vec3(1.0));
+      // (cap is 1 on paper; dark lifts it out of the way — there the term is plain added light,
+      // and the tone map that follows is what rolls it off.)
+      vec3 rgb = base.rgb * mix(vec3(1.0), ink, a) + glow * min(b, vec3(cap));
       gl_FragColor = vec4(rgb, base.a);
+    }
+  `,
+};
+
+/**
+ * THE FINISH — two things every frame gets last, after the tone map and the sRGB encode.
+ *
+ * THE POOL. The dark ground is one flat near-black, so the subject hung in a void with nothing
+ * behind it to say where the stage is. The pool is a soft radial lift toward the HUD's own panel
+ * navy (`SceneColors.panel`), centred on the canvas, SCREEN-blended: it lifts the ground most and a
+ * lit mark least, which over a scene made of additive light is the same picture as a lit backdrop
+ * behind it. It is screen-space, so it never changes with the camera's distance — the fault the
+ * old scene fog was removed for (see createScene).
+ *
+ * THE DITHER. Soft halos over near-black quantise into visible rings at 8 bits. One LSB of
+ * triangular noise (two interleaved-gradient samples) trades the rings for grain below the
+ * threshold of sight. It has to come after the encode, which is why this is its own pass and not
+ * a term in the composite.
+ */
+/**
+ * THE HUE HOLD — the dark ground's last step before the tone map.
+ *
+ * The filmic curve rolls a bright colour's channels off one by one, so a mark driven past 1 loses
+ * its hue on the way: a boosted orange bar came out peach, a hub's core near-white (the trade the
+ * tone-mapping note above accepted). The hold scales a pixel's three channels TOGETHER so its
+ * brightest one never exceeds `ceil` — soft from `knee` up — which keeps the hue and the
+ * saturation exactly and gives up only the peak the curve was about to bleach. Below the knee a
+ * pixel is untouched, so the resting scene is byte-identical. Khronos Neutral, which holds hue by
+ * design, was tried again in its place (2026-11-22) and still casts dark halos around the globe's
+ * coloured nodes. Paper runs no tone map and no hold.
+ */
+export const HUE_HOLD: Readonly<{ knee: number; ceil: number }> = { knee: 0.6, ceil: 1.05 };
+const HOLD_SHADER = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    uHold: { value: new THREE.Vector2(HUE_HOLD.knee, HUE_HOLD.ceil) },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform vec2 uHold;
+    varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      float m = max(c.r, max(c.g, c.b));
+      float span = uHold.y - uHold.x;
+      float held = m <= uHold.x ? m : uHold.x + span * (1.0 - exp(-(m - uHold.x) / span));
+      gl_FragColor = vec4(c.rgb * (held / max(m, 1e-5)), c.a);
+    }
+  `,
+};
+
+export const BACKDROP_LOOK: Readonly<{ pool: number; reach: number; subject: number; subjectPaper: number }> = {
+  pool: 0.7, // the pool's peak, as a fraction of the panel token's own display value
+  reach: 0.95, // its radius, in canvas heights
+  // THE SUBJECT'S AIR (user, 2026-11-22: use the Hypergraph's blur more, "maybe combine it with a
+  // subtle background color change"). While one network is the subject and the rest of the
+  // structure falls out of focus, the backdrop takes a breath of that network's own colour, so
+  // the reader is standing in it rather than looking at it. The pool BECOMES the hue rather than
+  // taking it on top (added over the pool's blue, an orange landed as a grey-brown): `subject` is
+  // the hue's level at the pool's peak, as a fraction of its display value.
+  // THE HUE IS DARK'S ALONE. Paper had a tint of the page toward the hue for an afternoon, and a
+  // page that is warm under one network and cool under the next reads as paper of two colours,
+  // not as a subject (user: the background "sometimes looks a bit warm/brown and sometimes
+  // cold/blue"). On paper the subject gets the SAME effect whichever network it is (user: "a
+  // uniform color effect for each selected metagraph that makes it stand out … not warm/cold"):
+  // the page falls off evenly toward its edges, a neutral shade that keeps the sheet's own colour
+  // and leaves the middle, where the subject stands, as it was. `subjectPaper` is how much of its
+  // light the page gives up at the far corners.
+  subject: 0.1, subjectPaper: 0.08,
+};
+const FINISH_SHADER = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    uPool: { value: new THREE.Vector3() },
+    uShade: { value: 0 }, // paper's subject shade: the share of light given up at the far edge
+    uReach: { value: 0.95 },
+    uAspect: { value: 1 },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform vec3 uPool;
+    uniform float uShade;
+    uniform float uReach;
+    uniform float uAspect;
+    varying vec2 vUv;
+    float ign(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+    void main() {
+      vec4 base = texture2D(tDiffuse, vUv);
+      vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0);
+      float f = 1.0 - smoothstep(0.0, uReach, length(p));
+      vec3 rgb = 1.0 - (1.0 - base.rgb) * (1.0 - uPool * f * f);
+      // Paper's subject shade: every channel by the same factor, so the page keeps its colour.
+      rgb *= 1.0 - uShade * (1.0 - f) * (1.0 - f);
+      float n = ign(gl_FragCoord.xy) + ign(gl_FragCoord.xy + vec2(47.0, 17.0)) - 1.0;
+      gl_FragColor = vec4(rgb + n / 255.0, base.a);
     }
   `,
 };
@@ -167,6 +289,8 @@ type DofPass = BokehPass & {
   uniforms: Record<"focus" | "maxblur", { value: number }>;
 };
 
+export interface BloomKnobs { strength: number; radius: number; threshold: number; enabled: boolean }
+
 // js/scene.js createScene() return.
 export interface SceneCtx {
   scene: THREE.Scene;
@@ -175,10 +299,13 @@ export interface SceneCtx {
   controls: OrbitControls;
   composer: EffectComposer;
   dof: DofPass;
-  bloom: UnrealBloomPass; // per-view strength/radius/threshold, driven by the Engine from ViewPolicy
+  /** The bloom's knobs — per-view strength/radius/threshold, driven by the Engine from ViewPolicy
+   *  each frame. Plain numbers: `renderFrame` hands them to the mark pass's blur (dark). */
+  bloom: BloomKnobs;
   /**
-   * Draw one frame. The ONE home for the ground question in the render chain: dark runs the
-   * original composer alone, paper runs the selective-bloom sub-pipeline first (see BLOOM_LAYER).
+   * Draw one frame. The ONE home for the ground question in the render chain: both grounds
+   * run the mark pass first (see BLOOM_LAYER) and the composer mixes its result in the way that
+   * ground needs.
    * The Engine calls this instead of `composer.render()` so it never has to know which.
    */
   renderFrame(): void;
@@ -190,6 +317,11 @@ export interface SceneCtx {
    */
   setClearColor(bg: number): void;
   setGround(light: boolean): void;
+  /** THE SUBJECT'S AIR (`BACKDROP_LOOK.subject`): the dark backdrop's pool turns to one network's
+   *  colour; on paper the page shades evenly toward its edges, the same for every network.
+   *  `hue` is the network's identity colour; `mix` 0 to 1 how far the change is in.
+   *  Plain data in, per frame; allocation-free. */
+  setBackdropTint(hue: number, mix: number): void;
   /**
    * The shared chip environment texture (built lazily on first ask — PMREM needs the renderer).
    * The Engine hands it to NodeFabric.setNodeEnv once at construction; see the note at the
@@ -241,9 +373,9 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   const renderer = new THREE.WebGLRenderer({
     // antialias:false ON PURPOSE — an EffectComposer renders the scene into offscreen targets and
     // only the final full-screen OutputPass quad reaches the default framebuffer (no geometry edges
-    // there to multisample), so renderer MSAA was pure wasted allocation. Composer-target MSAA was
-    // tried and reverted (a real perf hit for little gain on this bloom-heavy scene — user). stencil
-    // is never used, so drop it too.
+    // there to multisample), so renderer MSAA is pure wasted allocation. The antialiasing lives on
+    // the composer's own scene target instead (see `msaa` below). stencil is never used, so drop
+    // it too.
     canvas, antialias: false, stencil: false, powerPreference: "high-performance",
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -294,7 +426,24 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // stays the render pipeline's home and nothing else) — see the note above the imports.
 
   // Postprocessing — depth of field then bloom.
-  const composer = new EffectComposer(renderer);
+  //
+  // THE SCENE TARGET IS MULTISAMPLED (2026-11-22, user: "make it look more refined", lifting the
+  // earlier no-MSAA decision). Measured live at 2540×1628: the coast walls, the chips' and tiles'
+  // edges and every 1px GL line (hyper's tethers and hoops, the graticule, the borders) stair-step
+  // without it, and the bloom haloes each step into a fringe. The composer's own targets carry the
+  // samples — renderer `antialias` stays false, since only the final quad reaches the default
+  // framebuffer. FOUR samples at a low pixel ratio, where a step is a whole CSS pixel; TWO at 2×,
+  // where the buffer already holds four device pixels per CSS pixel. `clone()` (the composer's
+  // second target) and `setSize` both keep the count.
+  const msaa = renderer.getPixelRatio() <= 1.5 ? 4 : 2;
+  const pr0 = renderer.getPixelRatio();
+  const sceneTarget = new THREE.WebGLRenderTarget(box0.w * pr0, box0.h * pr0, {
+    type: THREE.HalfFloatType, samples: msaa,
+  });
+  const composer = new EffectComposer(renderer, sceneTarget);
+  // Handed a target, the composer reads its logical size off the target's DEVICE size; say the
+  // CSS size, as `resize` does, so every pass added below is sized once and correctly.
+  composer.setSize(box0.w, box0.h);
   composer.addPass(new RenderPass(scene, camera));
 
   // Depth of field: keeps whatever the camera is looking at (the selection) crisp
@@ -318,33 +467,46 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   dof.enabled = false;
   composer.addPass(dof);
 
-  const bloom = new UnrealBloomPass(
-    new THREE.Vector2(box0.w, box0.h),
-    0.30,  // strength — the dominant "overpowering" lever; well down from the r0.161 default. The
-           // whole-scene glow, the geo node "dark halo" (a bloom mip/tonemap ring, not a radius
-           // artifact — it survives radius cuts but vanishes with strength), and the fuzzy selected
-           // hub all trace back to over-strong bloom.
-    0.35,  // radius — tight halos: keeps hubs/core crisp discs (not overpowering washes) and
-           // shrinks the bloom-mip "dark ring" that saturated hues cast on the dimmed globe
-    0.13   // threshold — low so every identity HUE clears it (bloom thresholds on luminance, and
-           // low-luma hues like the blue/green metagraphs would be cut out at a higher value; the
-           // node/structure separation comes from the emissive gap, not the threshold)
-  );
-  composer.addPass(bloom);
+  // BLOOM IS BY MEMBERSHIP ON BOTH GROUNDS (dark since 2026-11-22; see `renderFrame`), so no
+  // whole-frame pass sits in this chain. These are its knobs, written per frame by the Engine
+  // from ViewPolicy: strength is the dominant lever (the halo vanishes with it), radius the
+  // spread, and threshold stays low so every identity HUE clears it — it reads luminance, and a
+  // low-luma blue or green would be cut out at a higher value.
+  const bloom: BloomKnobs = { strength: 0.3, radius: 0.35, threshold: 0.13, enabled: true };
 
   // Terminal pass: applies the renderer's toneMapping + exposure and the sRGB output
   // conversion to the composited result. Without it an EffectComposer bypasses the renderer's
   // output step, so `toneMapping` above was effectively a no-op (three r150+ standardised on
   // OutputPass as the correct chain end).
+  // The hue hold (see HUE_HOLD): after everything that adds light, before the tone map.
+  const hold = new ShaderPass(HOLD_SHADER);
+  composer.addPass(hold);
   const outputPass = new OutputPass();
   composer.addPass(outputPass);
 
+  // The FINISH — the frame's last pass, in display space (see FINISH_SHADER).
+  const finish = new ShaderPass(FINISH_SHADER);
+  composer.addPass(finish);
+  /** The pool at rest (the panel token at its level); `setBackdropTint` blends away from it. */
+  const poolRest = new THREE.Vector3();
+  function applyFinish(light: boolean) {
+    // The pool is the dark ground's alone: the Print plate is one flat colour by design, and a
+    // screen blend over a near-white page would do nothing but bleach it.
+    // The token's own BYTES, not a THREE.Color: the pass runs after the sRGB encode, and a Color
+    // would hand back the linear value — a third of the level, measured.
+    const k = (light ? 0 : BACKDROP_LOOK.pool) / 255;
+    const hex = colors.panel;
+    poolRest.set(((hex >> 16) & 255) * k, ((hex >> 8) & 255) * k, (hex & 255) * k);
+    finish.uniforms.uPool.value.copy(poolRest);
+    finish.uniforms.uReach.value = BACKDROP_LOOK.reach;
+  }
+
   // ── The selective-bloom sub-pipeline (see BLOOM_LAYER above) ────────────────────────────────
   //
-  // Built LAZILY on the first paper frame, so the dark ground allocates no second composer and no
-  // extra render targets — it pays literally nothing for a feature it does not use. The mix pass
-  // sits BEFORE the OutputPass so the composite happens in linear space, on the same numbers the
-  // tone map and the sRGB encode are about to read.
+  // Built on the first frame that blooms. The mix pass sits BEFORE the OutputPass so the composite
+  // happens in linear space, on the same numbers the tone map and the sRGB encode are about to
+  // read. Its target is multisampled: the marks are drawn at half resolution, and an aliased edge
+  // going into a blur comes out as a halo that crawls.
   let sel: {
     composer: EffectComposer;
     render: RenderPass;
@@ -357,7 +519,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     const box = boxOf();
     const w = Math.max(1, Math.round(box.w * SEL_SCALE));
     const h = Math.max(1, Math.round(box.h * SEL_SCALE));
-    const c = new EffectComposer(renderer);
+    const c = new EffectComposer(renderer, new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: 4 }));
     c.renderToScreen = false;
     const rp = new RenderPass(scene, camera);
     rp.clearColor = new THREE.Color(0x000000);
@@ -368,31 +530,35 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     const bp = new UnrealBloomPass(new THREE.Vector2(w, h), 1, LIGHT_LOOK.selRadius, 0);
     c.addPass(bp);
     c.setSize(w, h);
-    const mx = new ShaderPass(SEL_MIX_SHADER);
-    mx.uniforms.bloomTexture.value = c.renderTarget2.texture;
-    composer.insertPass(mx, composer.passes.indexOf(outputPass));
+    const mx = new ShaderPass(SEL_MIX_SHADER); // its texture is pointed per frame, by ground
+    composer.insertPass(mx, composer.passes.indexOf(hold));
     sel = { composer: c, render: rp, bloom: bp, mix: mx };
   }
 
   /**
    * ONE render call for the frame, so the ground question is asked in exactly one place.
    *
-   * On dark this is `composer.render()` and nothing else — the mix pass does not exist, so the
-   * chain is the same four passes it has always been and the output is byte-identical.
+   * Both grounds bloom by MEMBERSHIP: the members are rendered first into their own black target
+   * at half resolution, blurred, and mixed in before the OutputPass. Paper reads the result as a
+   * bleed (the ink halo, BLOOM_LAYER's note); dark reads the blur as added light, thresholded and
+   * weighted by the view's own knobs. Dark came off the whole-frame highpass on 2026-11-22: that
+   * pass haloed whatever was bright — the text, the glass rims, the globe's atmosphere — and ran
+   * its five blurs at full resolution. Selected, the halo belongs to the marks alone.
    *
-   * On paper the members are rendered first into their own black target. Three saves make that
-   * safe, and each is load-bearing: the BACKGROUND is nulled (the studio backdrop would otherwise
-   * fill the target and every pixel would clear the threshold — the layer would select nothing);
-   * the camera LAYER MASK is narrowed to the bloom layer alone (`layers.set`, not `enable`, so
-   * layer 0 is excluded and the target holds the marks and only the marks); and the AUTOCLEAR is
-   * left to the RenderPass's own black clear. All three are restored before the main chain runs,
-   * so the visible frame is drawn from exactly the state the rest of the engine set up.
+   * Three saves make the mark pass safe, and each is load-bearing: the BACKGROUND is nulled (it
+   * would otherwise fill the target and, on paper, every pixel would clear the threshold); the
+   * camera LAYER MASK is narrowed to the member layers (`layers.set`, not `enable`, so layer 0
+   * is excluded and the target holds the marks and only the marks); and the AUTOCLEAR is left
+   * to the RenderPass's own black clear. All three are restored before the main chain runs, so
+   * the visible frame is drawn from exactly the state the rest of the engine set up.
    */
   function renderFrame() {
-    // Both knobs at zero IS off, and off must cost nothing — the mark pass is a whole extra scene
-    // render plus a blur, so disabling only the mix pass would leave the expensive half running to
-    // feed a texture nobody samples. Same shape as the dark path below: skip, don't neutralise.
-    const on = isPaper && (LIGHT_LOOK.selBleed > 0 || LIGHT_LOOK.selGlow > 0);
+    // Off must cost nothing — the mark pass is a whole extra scene render plus a blur, so
+    // disabling only the mix pass would leave the expensive half running to feed a texture
+    // nobody samples. Skip, don't neutralise.
+    const on = isPaper
+      ? LIGHT_LOOK.selBleed > 0 || LIGHT_LOOK.selGlow > 0
+      : bloom.enabled && bloom.strength > 0;
     if (!on) {
       if (sel) sel.mix.enabled = false;
       composer.render();
@@ -401,16 +567,38 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     }
     ensureSel();
     const s = sel!;
-    s.bloom.radius = LIGHT_LOOK.selRadius;
-    s.mix.uniforms.bleed.value = LIGHT_LOOK.selBleed;
-    s.mix.uniforms.glow.value = LIGHT_LOOK.selGlow;
+    const u = s.mix.uniforms;
+    if (isPaper) {
+      // PAPER: every member is above the floor by construction (threshold 0), and the composite
+      // is the bleed with a whisper of glow, reading the marks WITH their blur.
+      s.bloom.strength = 1;
+      s.bloom.threshold = 0;
+      s.bloom.radius = LIGHT_LOOK.selRadius;
+      u.bloomTexture.value = s.composer.renderTarget2.texture;
+      u.bleed.value = LIGHT_LOOK.selBleed;
+      u.glow.value = LIGHT_LOOK.selGlow;
+      u.cap.value = 1;
+    } else {
+      // DARK: the view's own knobs, and the composite is plain added light. It reads the blur
+      // ALONE (the pass's own composite target, strength already in it) — the marks themselves
+      // are in the main frame at full resolution, and adding their half-res copy would double
+      // them.
+      s.bloom.strength = bloom.strength;
+      s.bloom.threshold = bloom.threshold;
+      s.bloom.radius = bloom.radius;
+      u.bloomTexture.value = s.bloom.renderTargetsHorizontal[0].texture;
+      u.bleed.value = 0;
+      u.glow.value = 1;
+      u.cap.value = 1e4;
+    }
     s.mix.enabled = true;
 
     const bg = scene.background;
     const mask = camera.layers.mask;
     scene.background = null;
     camera.layers.set(BLOOM_LAYER);
-    markPass = true;
+    if (!isPaper) camera.layers.enable(GLOW_LAYER);
+    markPass = isPaper;
     s.composer.render();
     markPass = false;
     camera.layers.mask = mask;
@@ -448,13 +636,12 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     // updateStyle=false — same reason as construction: CSS owns the canvas box.
     renderer.setSize(box.w, box.h, false);
     composer.setSize(box.w, box.h);
+    finish.uniforms.uAspect.value = box.w / box.h;
     if (sel) {
       sel.composer.setSize(
         Math.max(1, Math.round(box.w * SEL_SCALE)),
         Math.max(1, Math.round(box.h * SEL_SCALE)),
       );
-      // setSize rebuilds the composer's targets, so the mix pass's captured texture is stale.
-      sel.mix.uniforms.bloomTexture.value = sel.composer.renderTarget2.texture;
     }
   }
 
@@ -462,6 +649,11 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     sel?.composer.dispose();
     sel?.bloom.dispose();
     composer.dispose();
+    sel?.mix.dispose();
+    dof.dispose();
+    outputPass.dispose();
+    hold.dispose();
+    finish.dispose();
     nodeEnvTex?.dispose(); // the chips' PMREM studio env (null if no chip material ever built)
   }
 
@@ -478,11 +670,26 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     bgColor.setHex(bg);
     applyBackground();
   }
+  function setBackdropTint(hue: number, mix: number) {
+    // The pool turns from its resting colour INTO the hue. Display values, like the pool: this
+    // pass runs after the sRGB encode. Paper has no pool (`poolRest` is zero there) and takes its
+    // own neutral shade instead.
+    finish.uniforms.uShade.value = isPaper ? BACKDROP_LOOK.subjectPaper * mix : 0;
+    const m = isPaper ? 0 : mix;
+    const k = (BACKDROP_LOOK.subject * m) / 255;
+    finish.uniforms.uPool.value.set(
+      poolRest.x * (1 - m) + ((hue >> 16) & 255) * k,
+      poolRest.y * (1 - m) + ((hue >> 8) & 255) * k,
+      poolRest.z * (1 - m) + (hue & 255) * k,
+    );
+  }
   function setGround(light: boolean) {
     renderer.toneMapping = light ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = light ? 1 : 0.82;
     isPaper = light;
+    hold.enabled = !light;
     applyBackground();
+    applyFinish(light);
   }
 
   // THE NODE ENVIRONMENT — the stock three.js studio (RoomEnvironment) the chip materials mirror
@@ -521,9 +728,12 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   }
 
   applyBackground(); // construction honours the current ground (a light boot starts on the backdrop)
+  finish.uniforms.uAspect.value = box0.w / box0.h;
+  hold.enabled = !isPaper;
+  applyFinish(isPaper);
 
   return {
     scene, camera, renderer, controls, composer, dof, bloom,
-    renderFrame, resize, setClearColor, setGround, nodeEnv, dispose,
+    renderFrame, resize, setClearColor, setGround, setBackdropTint, nodeEnv, dispose,
   };
 }

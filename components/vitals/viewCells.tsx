@@ -20,7 +20,7 @@ import { displayNetwork, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
 import { cap, metaType, rolesOf, Empty, IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { machineKey } from "@/src/data/composition";
 import { identityHudCss } from "@/src/palette/identity";
-import { statusItems } from "@/src/data/nodeStatus";
+import { BUCKET_COLOR, statusItems } from "@/src/data/nodeStatus";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { NodeStars } from "@/components/state/StateAtoms";
@@ -88,6 +88,9 @@ export function HyperCells({ accent }: { accent: string }) {
     }
     return { counts, types, layers, statusRows: statusItems(states) };
   }, [metaList, filter, cfg]);
+
+  const statusTotal = statusRows.reduce((n, it) => n + it.count, 0);
+  const statusReady = statusRows.find((it) => it.color === BUCKET_COLOR.ready)?.count ?? 0;
 
   // A COMMITTED SCOPE flips the card from a DISTRIBUTION to a CHARACTERISTIC (user, 2026-08-30:
   // "'currency 1' and a bar ... is more a single characteristic than a count"): one network has a
@@ -201,8 +204,24 @@ export function HyperCells({ accent }: { accent: string }) {
           under a commit it mirrors the dossier's own "by node status" schedule by design (two
           scopes, one derivation — statusItems). Detail-only like the layers card: its total
           is the fleet, which the composition donut beside it already leads with. Colour is
-          the status lane's own bucket tokens; every row is named (never colour-alone). */}
-      <BandCard label="Node status">
+          the status lane's own bucket tokens; every row is named (never colour-alone).
+          IT LEADS WITH THE SHARE READY (2026-11-22): a healthy network is one row, "Ready", and
+          one row in a full cell read as an empty card. The lead is those rows' own ready count
+          over their sum, so it can never disagree with them; with no node in scope there is no
+          share to state and the card stays detail-only. */}
+      <BandCard
+        label="Node status"
+        lead={
+          statusTotal > 0 ? (
+            <span className="flex flex-col items-start">
+              <span className="font-mono font-bold text-figure text-foreground tabular-nums whitespace-nowrap">
+                <Odometer value={Math.floor((statusReady / statusTotal) * 100)} />%
+              </span>
+              <span className="text-label text-muted-foreground leading-none">ready</span>
+            </span>
+          ) : undefined
+        }
+      >
         <MicroBars accent={accent} labelW={52}
           rows={statusRows.map((it) => ({ key: it.label, label: cap(it.label), count: it.count, hue: it.color }))} />
       </BandCard>
@@ -384,20 +403,24 @@ interface StackSeg { key: string; n: number; color: string }
 function StackColumns({ bars, accent, zeroWords }: { bars: { key: string; v: number | null; segs: StackSeg[] | null }[]; accent: string; zeroWords: string | null }) {
   const max = Math.max(1, ...bars.map((b) => b.v ?? 0));
   return (
-    <div className="flex items-end justify-center gap-[2px] flex-1 min-h-0 pb-0.5">
+    <div className="flex items-end justify-center gap-[4px] flex-1 min-h-0 pb-0.5">
       {zeroWords && <span className="text-label text-muted-foreground self-center">{zeroWords}</span>}
       {bars.map((b) => {
         if (b.v == null) {
           // Unmeasured — the neutral stub (see the header). It keeps its flex slot so the
           // window's rhythm (position = time) survives the hole.
-          return <span key={b.key} className="flex-1 max-w-[22px] h-[2px] rounded-t-[2px]" style={{ background: "var(--border)", opacity: 0.6 }} />;
+          return <span key={b.key} className="flex-1 max-w-[7px] h-[2px] rounded-t-[2px]" style={{ background: "var(--border)", opacity: 0.6 }} />;
         }
         return (
           <span
             key={b.key}
             // `flex-col-reverse`: segments are written in catalog order and stack UP from the
             // baseline, so the first listed network is the foot of every bar in the window.
-            className="flex-1 max-w-[22px] rounded-t-[2px] overflow-hidden flex flex-col-reverse"
+            // SLIM COLUMNS WITH AIR BETWEEN THEM (2026-11-22): wide and near-touching, the window
+            // read as one saturated slab, louder than every reading beside it. No gap between a
+            // column's own parts: the small networks are a pixel or two each, and a hair between
+            // them drew stripes.
+            className="flex-1 max-w-[7px] rounded-t-[2px] overflow-hidden flex flex-col-reverse"
             style={{
               height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "0",
               // A stacked bar's colour comes from its segments; a scoped one paints whole.
@@ -405,7 +428,7 @@ function StackColumns({ bars, accent, zeroWords }: { bars: { key: string; v: num
               // ONE weight for every bar (user, 2026-09-08): the tick chart's glowing head
               // meant "the newest live tick"; here the last bar is just the newest COMPLETE
               // bucket — nothing an emphasis would be ABOUT.
-              opacity: b.v > 0 ? 0.7 : 0,
+              opacity: b.v > 0 ? 0.6 : 0,
             }}
           >
             {b.segs?.map((sg) => (

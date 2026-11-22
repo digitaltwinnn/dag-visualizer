@@ -25,6 +25,8 @@ import { inkMix, inkPresence, isLightGround, type SceneColors } from "../../scen
 import type { PickDescriptor } from "@/src/data/types";
 import { joinBloom } from "../SceneContext";
 import { SoftLines } from "./SoftLines";
+import { faceShade } from "./faceShade";
+import { joinMirror } from "./FloorMirror";
 
 /** One block, placed by the view (chamber-local, before the rewind offset). */
 export interface BlockItem {
@@ -101,8 +103,8 @@ export class BlockTier {
 
   // ── links: SOFT LINES (antialiased strips, `SoftLines`), positions written at event time, alpha per
   // frame (the threads' idiom). They were a LineSegments until 2026-11-09 (user: "color/jagged
-  // artifacts for the lines from certain angles … more with the bloom"): a 1px GL line is a stair-step
-  // without MSAA, and the whole-frame bloom haloed each step.
+  // artifacts for the lines from certain angles … more with the bloom"): a 1px GL line is a beaded
+  // stair-step even under the scene target's MSAA, and the whole-frame bloom haloes each step.
   private readonly _maxLinks: number;
   private readonly _links: SoftLines;
   private _linkChain: string[] = [];
@@ -126,9 +128,9 @@ export class BlockTier {
     this._bright = new Float32Array(maxBlocks);
 
     this._mat = this._glass
-      ? new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: this._glassOp() })
-      : new THREE.MeshBasicMaterial({});
-    this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), this._mat, maxBlocks);
+      ? new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: this._glassOp(), vertexColors: true })
+      : new THREE.MeshBasicMaterial({ vertexColors: true });
+    this.mesh = new THREE.InstancedMesh(faceShade(new THREE.BoxGeometry(1, 1, 1)), this._mat, maxBlocks);
     // Bounds three cannot reject with: the blocks ride the rewind and are pickable (NodeFabric.openBounds).
     this.mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
     this.mesh.frustumCulled = false;
@@ -137,6 +139,7 @@ export class BlockTier {
     this.mesh.count = 0;
     this.mesh.userData.picks = this._picks;
     joinBloom(this.mesh); // identity marks, like the lane tiles they stand on
+    joinMirror(this.mesh);
     this.group.add(this.mesh);
 
     // Two parents per block: a link budget of twice the blocks.
@@ -147,6 +150,7 @@ export class BlockTier {
     // read thin beside the blocks it ties); its alpha (`BLOCK_LOOK.link`) is what meters the glow.
     this._links = new SoftLines(this._maxLinks * LINK_SAMPLES, colors);
     joinBloom(this._links.mesh);
+    joinMirror(this._links.mesh);
     this.group.add(this._links.mesh);
   }
 

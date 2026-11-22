@@ -284,7 +284,7 @@ level and peaking at 0.6 + `stripeLine` (1.6) = 2.2× it — items in a stream o
 one continuous state. It takes no lining: the stripes already draw its shape, and the two registers stay
 apart. Both are **one fragment term over a per-vertex across-sheet coordinate** (0 → n), antialiased
 in screen space with `fwidth` — the triangular 1-device-pixel profile of `SoftLines` — because the
-renderer has no MSAA and the half-res bloom haloes a hard step into a crawling fringe. The lining sits
+scene target's few MSAA samples do not resolve a 1px stripe and the half-res bloom haloes a hard step into a crawling fringe. The lining sits
 one pixel INSIDE each edge, never on the polygon's own stepped edge; stripes closer than ~3 px hand
 over to their average and linings on a sheet under ~6 px wide hand over to the plain sheet, so nothing
 aliases as the camera moves. Both ride the sheet's alpha, so `inkPresence` on paper and the dims and
@@ -698,7 +698,7 @@ endpoints from the same `referenceSegments` walk), dissolve by zero-scale, and d
 their slot's entry beat. Links are SOFT LINES (`objects/SoftLines.ts`, 2026-11-09 — user: "color/jagged artifacts for the lines
 from certain angles … more with the bloom"): each segment a screen-space strip whose alpha falls off
 linearly to 0 one DEVICE pixel from its centre, so a link carries a 1px line's light without the
-stair-step the MSAA-less renderer gave a GL line — the step the whole-frame bloom haloed into a
+beaded stair-step a GL line keeps even under the scene target's MSAA — the step a bloom haloes into a
 crawling fringe. FXAA over the whole frame was tried and dropped the same day: it smeared every 1px
 mark (the floor's ordinals, the dotted anchor lines). Positions at event time, alpha per segment end
 per frame, ranged uploads, `glowBlend` on each ground. The silent stretch is one dashed `LineSegments` flush in the floor
@@ -830,42 +830,29 @@ a naive regex counted the prose, which let the test pass with the fix deliberate
 
 ## The History view's ground
 
-`views/TrendsView.ts` is the ONLY thing History draws in WebGL, and it is one `Mesh` of soft SHADOW
-BANDS: a level floor of horizontal rungs, one per CARD the DOM chart stack is showing — five under a full window,
-one under a filtered stack's lone card (which also takes that card's screen shift into the rails'
-gap, `trendStack.loneShiftPx`), so the floor is always the footprint of what stands on it. The view's content is DOM
+`views/TrendsView.ts` is the ONLY thing History draws in WebGL, and it is one level plane: the LINE
+FLOOR under the deck (`LINE_FLOOR`; "The finish" below has its design). The view's content is DOM
 (`components/TrendStack.tsx`, placed per frame by the engine's `TrendStackSync`), so the canvas under
 it is empty by design — and empty is the problem. A composited DOM layer carries no depth cues of its
 own, so with nothing behind them five planes read as five unrelated cards rather than as one stack
-receding into history. Each rung is the plane's FOOTPRINT — same depth, same width, same stagger,
-derived from `domain/trendStack.ts`'s own arithmetic rather than eyeballed against a screenshot — so
-re-tuning the stagger re-tunes the ground with it.
-
-**A rung is a shadow, not a line** (user, 2026-09-26). It was an accent hairline, and an accent line
-is a MARK — it reads as a gridline or a reading, and there is nothing to read. Each rung is now a quad
-billboard hanging `SHADOW_H` below the floor line, its alpha rising over a short lip and decaying to
-nothing (`shadowTexture`, a luminance canvas — three reads an alphaMap's green channel, so a canvas
-that varies only in alpha uploads as a solid slab), feathered at both ends, in the NEUTRAL ink
-(`SceneColors.fg`) rather than the accent. Below the desktop tier the rungs stack straight up with
-the deck (`trendStack.stepX`, the `narrow` flag `face()` takes).
+receding into history. The floor is that depth axis made visible.
 
 Four decisions are recorded in the file's header and worth knowing before touching it:
 
-- **It is furniture.** Colours are baked on a theme flip and there is no `update(dt)`; per frame it
-  takes the transition's furniture alpha through the shared `FadeSet`, and `face()` — which lays
-  the rungs along the camera's right vector and returns early while its inputs hold still. Its root's
-  `visible` is the Engine's, from `viewPolicy.show.trendGround` (rule 6).
-- **THE RUNGS RECEDE ON THEIR OWN FALLOFF, SQUARED** (`RUNG_FALLOFF`). A chart plane composites in
-  front of the canvas whatever the depth buffer says, and the planes are opaque cards — so a rung is
-  only ever seen where no card covers it, beside and below the deck. There it is furniture
-  establishing the depth axis: the far rungs fade to a whisper and the near ones carry it. The
-  floor's drop is DERIVED from the plane's own height (`planeFormat(...).worldH` in `domain/trendStack.ts` — per tier since 2026-10-03, the phone card is squarer),
-  so enlarging a plane can never run the floor through its plot. Any new 3D mark in this view meets
-  the same compositing constraint.
-- **The floor is LEVEL and there are no side rails.** A ramp putting each rung under its own plane
-  cannot work (`PLANE_STEP_Y` is smaller than a plane's own height, so the planes overlap and every
-  rung lands inside the plot in front of it), and rails joining the rungs' ends drew one hard diagonal
-  across the front chart. Both were built and cut after a look; the rungs alone carry the recession.
+- **It is furniture.** Its colours are set on a theme flip or a change of deck and there is no
+  `update(dt)`; per frame it takes the transition's furniture alpha through the shared `FadeSet`,
+  and `face(count, dt, phone)` — which sets the floor's height under the deck's eased stagger
+  centre, hides it under a scope with no card, and returns early while its inputs hold still. Its
+  root's `visible` is the Engine's, from `viewPolicy.show.trendGround` (rule 6).
+- **It is not a shadow under each card.** One soft band per slot was the first ground, in several
+  colours and positions, and it read as a smudge under a crisp DOM card each time. A chart plane
+  composites in front of the canvas whatever the depth buffer says, and the planes are opaque
+  cards — so any 3D mark in this view is only ever seen beside and below the deck. The floor's
+  drop is a fraction of the card's own height (`planeFormat(...).worldH`, per tier), so enlarging
+  a card moves the floor with it.
+- **The floor is LEVEL and has no lines in depth.** The deck's up-stagger is smaller than a card's
+  own height, so a floor rising with the stack would run through the plot in front of it; lines
+  along the depth axis converge as hard diagonals across the front chart.
 - **The time cursor is NOT here.** One WebGL quad spanning the stack cannot line up with five
   differently placed, differently scaled recharts plot areas, so the mark would miss its bucket on
   four planes out of five — a cursor that misstates the data (rule 10). It is drawn per plane, in the
@@ -926,8 +913,155 @@ the paper selective-bloom mark pass (`BLOOM_LAYER`). A member joins with `joinOv
 with `leaveOverlay` when disposed): `layers.set` takes it off layer 0, so NO composer pass sees it,
 and `renderFrame` draws the layer in one plain render onto the finished frame — no clear, depth
 cleared, background nulled, every field restored — and skips the render when no member is showing.
-It exists because the dark ground's bloom is a whole-frame pass that halos any bright mark, text
-included (user: "I don't want the text to bloom", on the gather legend). Two costs make membership
+It exists so scene text can sit outside the composer altogether (user: "I don't want the text to
+bloom", on the gather legend; the dark bloom was a whole-frame pass then). Two costs make membership
 opt-in, one mark at a time: a member draws OVER everything (right for a legend above the staging
 grids, wrong for most marks), and it goes around the OutputPass's tone map, so it sets
 `toneMapped = false`. Its one member today is the gather legend (`Globe._rebuildGatherLabels`).
+
+## The finish — antialiasing, bloom by membership, the backdrop pool, the dither, face shading, the floor mirror
+
+What belongs to the frame rather than to a view (2026-11-22, user: "ignore what I decided
+in the past, make it looks more refined" — which lifted the earlier no-MSAA and flat-void decisions).
+
+**The scene target is multisampled** (`SceneContext`, `msaa`): the composer's own targets carry the
+samples — 4 at a pixel ratio ≤ 1.5, 2 above — and the renderer's `antialias` stays false, because only
+the final quad reaches the default framebuffer. It smooths geometry edges (coast walls, chips, tiles)
+and softens GL lines; the analytic strips (`SoftLines`, the ribbon linings) stay, since a few samples
+do not resolve a 1px mark. ⚠️ Measured on a desktop GPU only, where the whole frame is under 1 ms
+either way; a phone or tablet's cost is unmeasured.
+
+⚠️ **The mark pass sees no LAMP.** three applies a camera's layer mask to lights as well as
+meshes, and neither the rig nor the stage light is on `BLOOM_LAYER`/`GLOW_LAYER`, so a member is
+blurred as its emissive and environment alone. The lit frame still shows the stage light's wash on
+a node; the halo around it no longer grows with the lamp. Putting the lights on the layers is the
+lever if a claim should bloom.
+
+**Dark blooms by MEMBERSHIP, like paper** (`SceneContext.renderFrame`): no whole-frame highpass sits
+in the chain. The mark pass draws `BLOOM_LAYER` plus, on dark only, `GLOW_LAYER` (`joinGlow` — the
+coast walls, the comet trails, the anchor sheets, hyper's anchor packets), blurs it at half
+resolution with the view's own `viewPolicy.bloom` knobs, and the mix adds the blur ALONE (the pass's
+own composite target; the marks themselves are in the main frame). So text, glass, the graticule and
+the atmosphere never halo. `ctx.bloom` is a plain knobs object the Engine writes per frame. A new
+mark that should glow on dark must join one of the two layers, or it draws crisp and unbloomed —
+the failure is silent. `inMarkPass()` is true for PAPER's mark pass only (the halo input lifts).
+
+**The last pass is the FINISH** (`FINISH_SHADER`, after the OutputPass, so in display space): the
+backdrop POOL — a radial lift toward `SceneColors.panel`, screen-blended, dark ground only
+(`BACKDROP_LOOK`) — and one LSB of triangular DITHER on both grounds. The pool takes the token's own
+bytes: a `THREE.Color` hands back the linear value, a third of the level. It is screen-space, so it
+never changes with the camera's distance. The overlay layer draws after it and is untouched.
+
+**The globe has an ATMOSPHERE on dark** (`GeoView.buildAtmosphere`, `ATMO_LOOK`): one back-faced
+additive shell shaded by how close each line of sight passes to the centre — a halo outside the limb,
+a rim light inside — leaning on the rig's sun. The limb carries the roundness, so the far side's walls
+and graticule rest at `FAR_SIDE` (0.14). Paper never draws it and keeps its ocean plate. It is in
+neither bloom layer on purpose, and its inner term is a HAIRLINE (exponent 120): bloomed, and then
+as a band a tenth of the disc wide, it read as fuzz over the limb's coast walls (user, same day,
+twice).
+
+**The base ring's pie takes a hairline gap** (`WEDGE_GAP_W`, 0.07, against the rings' `RING_GAP_W`):
+over the pie's faint fill a ring-width gap was the darkest thing on the disc.
+
+**The global floor MIRRORS what stands on it** (`objects/FloorMirror.ts`, `MIRROR_LOOK`): three's
+planar `Reflector`, feathered at the floor's edges; one more render of the members at 2048×1280, only while
+the chamber is on screen. Five rules, each a user round the same day:
+- **Membership, like bloom** (`MIRROR_LAYER`, `joinMirror`): the mirror's camera sees only the bars,
+  lane tiles, data marks, blocks, links and anchor sheets. A plain mirror also reflected the labels
+  and dotted lines lying in the floor (ghost copies under their own text) and the metagraph planes a
+  storey up ("too much of the top metagraph plane in the mirror"). A new mark that should appear in
+  the glass must join. ⚠️ `renderer.clippingPlanes` set around the Reflector's nested render LEAKS
+  into the outer render (the tray chips under the floor vanished); do not clip that way.
+- **The plane sits `depth` BELOW the glass**, so a block's image starts a gap under its base and
+  the block reads as standing ON the surface ("it kinda transitions into its mirror"). The image is
+  read SHARP, from a 2048×1280 target: a softer mip and the first 1024×640 target both read as
+  "fuzzy blocks" (user, same day). The gap separates block from image; the spill carries the softness.
+- **Dark adds it, paper MULTIPLIES it**: the reflection divided by the plate's colour is 1 where the
+  mirror sees the page and the mark's ink where it sees a mark. Levels are the user's (image 0.2
+  dark; paper 0.13 with its spill at 0.22, after the multiply of the trail's grey-teal bars read as
+  "dirty gray/green"). `depth` is 0.17 ("a bit closer to the plane again", from 0.3).
+- **Only bright marks spill on dark** (`spillFloor`): the spill is a blur, and blurring every dim
+  trail bar laid a haze over the trail that read as "fuzzy blocks"; below the floor a mark lights
+  nothing and keeps its sharp image alone.
+- **The floor takes LIGHT as well as an image** (`spill`, 1.1 dark / 0.22 paper):
+  the same reflection at two coarse mips is a soft pool of each mark's colour around its
+  reflection, so the light is the marks' own and follows their emphasis with no lamp.
+
+**History's ground is a LINE FLOOR** (`TrendsView`, `LINE_FLOOR`; user, 2026-11-22, after four rounds
+on the bands — grey, hued, hugging the card, then a DOM mirror of the front chart: "drop mirror and
+wash and come with a completely different but subtle scene background"). One level plane under the
+deck draws level hairlines ACROSS the floor, one per row of an even lattice, a constant width in
+screen pixels (`fwidth`), fading out over a pool centred behind the deck and dissolving where the
+pitch falls under a few pixels. Perspective closing the rows up toward the horizon is the depth cue.
+It was a lattice of DOTS first, which the user liked as an effect and rejected as a mark: "we use
+dots also for nodes, can we use something else (lines?)" — a dot is a node everywhere else. Lines
+in depth are not drawn: they converge on the vanishing point, the hard diagonals the side rails were
+cut for. **The lines wear the deck's colours** ("can we give it metagraph colors and make it more
+visible in light mode?"): the cards' identity hues in the deck's order, front to back, a band per
+card (`band` slot gaps deep — at the cards' true spacing a band was two or three rows), the
+structure ink beyond the last card; fed by `setSlotHues` from `Engine._syncTrendHues`. Paper draws
+the line wider (`paperWidth`) and at a gain above 1, because ink has no glow to carry a hairline.
+
+**Light that means something** (user, 2026-11-22: "can we use it for some nice effects?"). Five
+were agreed; four are built, each tied to something real, each a plain `Readonly` look constant:
+
+- **The focus rim** (`NodeFabric`, `RIM_LOOK`): a thin edge of white light on the hovered or
+  committed node, riding the record's eased focus weight through a per-instance `aRim`. An edge
+  separates a node from a crowded shell where brightness has no room left. Dark only.
+- **The core lights its metagraphs** (`HyperView`, `CORE_LIGHT`): a hub's glow is brighter on the
+  side facing the core and darker on the far side — a shading term on the hub's own emissive, from
+  one shared view-space uniform, not a light (a point light in the field flattens the population).
+  Dark only.
+- **The selection's pool** (`FloorMirror.pool`, `MIRROR_LOOK.pool*`): a soft pool on the global
+  floor under the row the reader points at, else the one they hold. Structure colour added on
+  dark; on paper the page is lifted a little toward white, a gain over 1 on the mirror's multiply.
+- **The arrival glint** (`objects/Glint.ts`, `GLINT_LOOK`): one highlight that runs once along a
+  global snapshot's bar when its exact read lands. An event, not a state; one mesh for the chamber.
+
+**The subject's air** (`SceneContext.setBackdropTint`, `BACKDROP_LOOK.subject`; user, 2026-11-22:
+use Hypergraph's blur more, "maybe combine it with a subtle background color change"). While one
+network is the subject in Hypergraph, the dark backdrop's pool TURNS to its identity colour (it
+replaces the pool's blue; added on top, an orange landed as grey-brown). The hue is dark's alone:
+a tint of the page was tried on paper and read as paper of two colours, warm under one network
+and cool under the next. Paper gets one effect for every network instead (`subjectPaper`): the
+page shades evenly toward its edges, every channel by the same factor, and the middle stays as it
+was. Both ride the SAME eased number as the
+depth-of-field blur (`Engine._dofMix`), so the structure falling out of focus and the air changing
+colour are one move — and the blur, which used to snap on, eases with it. The DAG as subject takes
+the colour and no blur: its shells are far wider than the blur's sharp zone, and its own nodes
+came out soft.
+
+Not built: **contact pools under the lane tiles.** A shared-buffer skirt was written and removed
+the same day — the metagraph planes are seen edge-on or from below at the chamber's one pose, so
+nothing it drew reached the reader. The global floor already anchors what stands on it (the
+mirror, its spill, and on paper its ink pool). **A visible beam** from the stage light to its
+subject was built and removed (user: "it doesn't fit the design") — a grey-white cone in the air
+is a stage prop, and nothing else here draws the light itself. A sun glint on the globe was declined: the globe is
+drawn as a diagram, and a photographic highlight would be the one realistic thing on it.
+
+**The dark ground HOLDS A BRIGHT MARK'S HUE** (`SceneContext`, `HUE_HOLD`): one pass after the bloom
+mix and before the tone map scales a pixel's channels together so its brightest stays under a soft
+ceiling. The filmic curve rolls channels off one by one, so a boosted bar came out peach and a hub's
+core near-white. Below the knee nothing changes; paper runs neither. Khronos Neutral, which holds
+hue by design, was tried again (2026-11-22) and still casts dark halos around the globe's nodes.
+
+**The chamber's tray chips rest quieter** (`dimModel.FOCUS_ROWS[view].rest`, a per-view gain on the
+nodes' resting glow: 1 where nodes are the subject, 0.45 in Snapshots, where the row of chips was the
+brightest thing in a view about snapshots).
+
+**Hypergraph's tethers are SOFT LINES** (`objects/SoftLines.ts`, the block links' strips): an even
+hairline at every zoom, the tip-fade profile on the strips' alpha, so the ground question is the
+blend mode's and nothing is baked toward black or the page. The hoops stay GL lines (dashed
+`LineLoop`s); under the multisampled target they render clean.
+
+**The Snapshots floor states no row figures** (`LedgerView`'s `ROW_TEXT`, false; user: "remove
+texts", then "keep the dotted lines as texture"): the ordinal and size texts were specks at the
+resting pose, so they are off, and the dotted lines that tied them to their rows stay as the floor's
+texture — each still ends at its row's bar edge, the size side only for a measured row.
+⚠️ The "Labels" paragraph above describes the texts as they were; their code is still in
+`_syncOrdLabels`, behind `ROW_TEXT`.
+
+**The chamber's boxes are FACE-SHADED** (`objects/faceShade.ts`): the bars, lane tiles, data marks and
+blocks stay unlit, and a per-vertex multiplier by face direction is baked into the geometry (the
+material sets `vertexColors`). It multiplies the instance colour, so every emphasis tier keeps its
+order and the top face keeps its level.

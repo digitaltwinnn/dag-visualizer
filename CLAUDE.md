@@ -450,8 +450,8 @@ The anchor is layout data: `Globe`'s one `_hyperAnchorOf`, shared with the callo
 subjects at three scales from one row, so a node carries its own `heightNode`/`angleNode` — the finer
 the subject, the lower and tighter its stage.
 
-⚠️ **A LAMP IS NOT THE SAME INSTRUMENT ON BOTH GROUNDS.** Dark blooms the wash a claim lays on an
-emissive node; paper does not bloom it at all (the whole-frame pass is skipped there — see `src/theme/CLAUDE.md`),
+⚠️ **A LAMP IS NOT THE SAME INSTRUMENT ON BOTH GROUNDS.** On dark a claim's wash lands on
+an emissive node against a black ground; paper is a bright field that competes with it (see `src/theme/CLAUDE.md`),
 so the identical claim reads as nothing there —
 and pushed far enough it desaturates the ink toward white, which is the ink lane failing rather than
 emphasis working. Rows state `intensityPaper` between those two measured ends, and the test pins the

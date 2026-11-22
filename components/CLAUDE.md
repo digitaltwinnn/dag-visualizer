@@ -517,6 +517,15 @@ policy row, `viewPolicy.metagraphCard`** (PR review, 2026-10-19 — it had becom
 `mode === "geo"` compares): `railCards.metagraphCardNetwork` resolves it, and the card's × and
 the slot's hint read the same row.
 
+**The front card's plot states its scale** (`TrendChart yTicks`, 2026-11-22): the gridlines sit on
+round values (`yTickValues` — one home for the recharts grid and the figures beside it) and each
+carries a small figure at its left end, the top one with the plot's unit at its cadence ("2.5K per
+hour"). That unit is what separates the plot's buckets from the head's per-day readings. The figures
+are DOM beside the memoised plot, placed by the cursor's own box arithmetic, each on a chip of the
+card's ground (a plane takes no shadow). A hover reads its bucket two digits finer than the head
+(`useTrendRoster.formatFine`: "2.03K"). The series line takes round joins, the plot has a floor
+line, and the tether's axis mark under it is a hairline.
+
 **The plane's head is NETWORK · MEASURE · READINGS — on the FRONT card; a rear card's head is the
 NETWORK ALONE** (user, 2026-10-19, later the same day: the title and values "repeated on each
 background card" were "quite duplicate" — `TrendChart nameOnly`, passed for every non-interactive
@@ -653,9 +662,12 @@ also landing as a pick. Rear cards keep their bodies inert. This is also why the
 swipe gesture: a vertical touch swipe stepped the measure for a few hours, until one gesture had
 to mean two things.
 
-**Hovering pairs over `hoverFilter`, the app's own network channel** (convention 9). A Networks row, a
-plane's header strip and a cursor-card row are three ends of one pairing, with no channel of their
-own: hovering any of them turns that card's hairline to its network's hue and washes the rows. The
+**Hovering pairs over `hoverFilter`, the app's own network channel** (convention 9). A Networks row
+and a cursor-card row WRITE it; a plane READS it and writes nothing (user, 2026-11-22: hovering a
+card's head lit its row and the rail's Metagraph card, and the card's face took a 12% wash of its
+hue that tinted the head, the plot box and the area fill as separate pieces — "shows different
+elements"). So hovering a row turns that card's hairline to its network's hue, and hovering a card
+moves nothing but the head's own wash. The
 hairline is the ONLY thing that changes — a preview that re-staggered the stack would read as a
 commit, the cards are opaque so there is no opacity to lift, and `.subject-paired`'s glow is a
 box-shadow, which a transformed plane may not carry.
@@ -1506,6 +1518,15 @@ detail-only). Three rules keep the row from going ragged, and all three answer t
   window and lowers the frequency; slicing would silently shorten the window the rim states. A
   null bucket breaks the line (hole ≠ zero) and an isolated measured point draws a DOT
   (TrendChart's device — under connectNulls=false a dotless isolated point paints nothing).
+  It draws History's line — straight segments, round joins — over a faint fade of the same hue,
+  with a dot on the newest measured point (2026-11-22; a smoothed curve swings past its buckets).
+  The fade runs to the window's own minimum, so it carries shape, never magnitude.
+- **Bar rows keep ONE pitch** (`MicroBars`, a fixed gap, centred): spread evenly, a three-row card
+  had a looser rhythm than the four-row card beside it. **A stacked column is slim** (`StackColumns`,
+  7px at most with 4px between): wide and near-touching, a window of them read as one saturated
+  slab. **Node status leads with the share ready**, derived from its own rows.
+- **The dropped-feed dot is `inline-block`** (`NoSignalDot`): as a plain inline box it ignored its
+  width and height and only its halo painted, a dim red square at the band's left edge.
 - **The band's height is FIXED** (`--vitals-h`), not content height. Left to its content it measured
   81 / 72 / 62px across hyper / geo / ledger, and since the band is anchored at the BOTTOM that
   showed up as its top edge jumping on every view switch.

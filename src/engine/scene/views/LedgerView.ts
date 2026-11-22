@@ -50,6 +50,7 @@ import {
   LEAD_X,
   TILE_LIFT,
   BAR_H,
+  BAR_D,
   BAR_LIFT,
   laneSpan,
   type RailGroup,
@@ -105,6 +106,9 @@ import { BlockTier, type BlockItem } from "../objects/BlockTier";
 import { SilentStretch, type StretchItem } from "../objects/SilentStretch";
 import type { SceneView } from "./SceneView";
 import { joinBloom, inMarkPass } from "../SceneContext";
+import { faceShade } from "../objects/faceShade";
+import { FloorMirror, joinMirror } from "../objects/FloorMirror";
+import { Glint } from "../objects/Glint";
 
 /** The lane-tile instance budget.
  *
@@ -145,6 +149,10 @@ const ORD_OP = 0.55;
  *  the chamber on both sides, which is a lot of ink for a joining mark. ONE constant, because both
  *  columns tie their rows with the same recipe and must not drift. */
 const ORD_LINE_MUL = 0.26;
+/** Whether the floor states each row's ordinal and size in TEXT at the ends of its dotted lines.
+ *  Off (user, 2026-11-22: "remove texts", then "keep the dotted lines as texture") — the lines
+ *  stay, the figures are the explorer's rows and the Global snapshot card. See `_syncOrdLabels`. */
+const ROW_TEXT: boolean = false;
 /** The committed lane's plane edge-fill multiplier (its plane leads with its snapshots). */
 const LANE_FILL_BOOST = 3;
 /** The floor's edge-readout text height (user, 2026-09-01: "make the texts with the snapshot #
@@ -355,6 +363,12 @@ export class LedgerView implements SceneView {
   private _floorBlockers: THREE.Object3D[] = [];
   /** The plane blueprint instances: the global floor (main + gutter) and one per metagraph lane. */
   private _globalPlanes: SnapshotPlane[] = [];
+  private _mirror: FloorMirror | null = null; // the global floor's reflection
+  /** The arrival glint (objects/Glint.ts), the bar it is running on, and the newest measured
+   *  ordinal already answered (-1 until the first frame with one, so a boot draws none). */
+  private _glint: Glint | null = null;
+  private _glintOrd: number | null = null;
+  private _glintSeen = -1;
   /** THE BRAID PANE (2026-11-08): a soft sheet in the DAG braid's plane, just behind the blocks,
    *  drawn in Transaction blocks while DAG blocks stand (`objects/BraidPane.ts`). */
   private _braidPane!: BraidPane;
@@ -585,11 +599,12 @@ export class LedgerView implements SceneView {
     // BRIGHTNESS (instance colour) carries the recency fade — the bloom pass still lights the
     // hot row, so the lead keeps its glow while the trail reads matte.
     this._metaTrailMesh = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(1, 1, TILE_D),
-      new THREE.MeshBasicMaterial({}),
+      faceShade(new THREE.BoxGeometry(1, 1, TILE_D), "z"), // spun −90° about X per instance: local z is up
+      new THREE.MeshBasicMaterial({ vertexColors: true }),
       META_TRAIL_MAX,
     );
     joinBloom(this._metaTrailMesh); // the lane tiles are the trail's identity marks — see BLOOM_LAYER
+    joinMirror(this._metaTrailMesh);
     // The paper halo's input lift (TileLook.halo, the bar's twin): multiplied up only while the
     // selective mark pass renders, un-multiplied inside the same pass — the main frame always
     // draws the tiles at their true colour (multiply, never set — the bar's rule).
@@ -617,8 +632,9 @@ export class LedgerView implements SceneView {
     // The Data blocks register's marks: the tiles' own species (solid, normal-blended, depth-writing,
     // in the bloom set), one unit box scaled per instance onto its tile's top. Not pickable — a mark
     // is part of its tile, and the tile under it answers the click.
-    this._dataMarkMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({}), META_TRAIL_MAX);
+    this._dataMarkMesh = new THREE.InstancedMesh(faceShade(new THREE.BoxGeometry(1, 1, 1)), new THREE.MeshBasicMaterial({ vertexColors: true }), META_TRAIL_MAX);
     joinBloom(this._dataMarkMesh);
+    joinMirror(this._dataMarkMesh);
     this._dataMarkMesh.frustumCulled = false;
     this._dataMarkMesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
     this._dataMarkMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -663,6 +679,9 @@ export class LedgerView implements SceneView {
         label: { text: gl?.name ?? "gl0", x: lx, z: 0, align: "center" },
       }),
     );
+    this._mirror = new FloorMirror(this.group, W, 2 * PLANE_FIELD_HALF, cx, FLOOR_Y.gl0, this._paper, this._colors.bg);
+    this._mirror.setGround(this._paper, this._colors.bg, this._colors.core);
+    this._glint = new Glint(this.group, this._paper);
     const n = this._laneOrder.length;
     const hz = lanePlaneHalf(n);
     for (let i = 0; i < n; i++) {
@@ -733,6 +752,7 @@ export class LedgerView implements SceneView {
       this._spot.claim("ledger", this._stageSubject, this._stageNormal, STAGE_LIGHTS.ledger.height, a);
     }
     for (const p of this._globalPlanes) p.applyAlpha(GLOBAL_PLANE_LOOK, a, FLOOR_D / 2);
+    this._mirror?.setAlpha(a);
     // The braid pane stands while DAG blocks do (the register's, and not under a token filter,
     // whose window holds no DAG block) — and, EMPTY, while they are on their way (`_braidWaiting`,
     // user 2026-11-19: "show its panel directly"); it fades with the furniture.
@@ -764,7 +784,7 @@ export class LedgerView implements SceneView {
       // The size column rides the same two boundaries. Its line goes with its number: with no
       // measurement to state there is nothing for the line to tie to.
       if (o.kb) (o.kb.material as THREE.MeshBasicMaterial).opacity = ordOp * front * a;
-      (o.kbLine.material as THREE.LineDashedMaterial).opacity = o.kb ? ordOp * ORD_LINE_MUL * front * a : 0;
+      (o.kbLine.material as THREE.LineDashedMaterial).opacity = o.kbText ? ordOp * ORD_LINE_MUL * front * a : 0;
     }
   }
 
@@ -790,6 +810,8 @@ export class LedgerView implements SceneView {
     this._core = c.core;
     this._coreCol.setHex(c.core);
     for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.setColors(c);
+    this._mirror?.setGround(this._paper, c.bg, c.core);
+    this._glint?.setGround(this._paper);
     this._braidPane.setColors(c);
     for (const p of this._tokenPanes.values()) p.setColors(c);
     this._bar.setColors(c);
@@ -1780,6 +1802,11 @@ export class LedgerView implements SceneView {
    *  label rides its row down the trail; one new canvas per tick (event-time — recycled labels
    *  only move, and the line end tracks the bar's live width as the exact read lands). */
   private _syncOrdLabels(): void {
+    // ⚠️ THE ROW TEXT IS OFF (`ROW_TEXT`, user, 2026-11-22: "remove texts"). At the resting pose
+    // the ordinal and size columns were specks, and the exact figures they stated are the
+    // explorer's rows and the Global snapshot card. The dotted lines STAY as the floor's texture
+    // (user, same day), running where they ran: each still ends at its row's bar edge, and the
+    // size side still draws only for a measured row. The ordinal's mesh is built hidden.
     const seen = _ordSeen;
     seen.clear();
     const y = FLOOR_Y.gl0 + 0.06;
@@ -1798,6 +1825,7 @@ export class LedgerView implements SceneView {
         // event-time: one canvas + two 2-point dashed lines per new tick
         const mesh = makeEdgeLabel(this._colors, snap.ordinal.toLocaleString(), 0, FLOOR_Y.gl0, ORD_Z, ORD_H, "left", "readout");
         (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
+        mesh.visible = ROW_TEXT;
         const line = this._makeDashLine(y, ORD_LINE_Z0);
         const kbLine = this._makeDashLine(y, KB_Z0);
         o = { mesh, line, slot: s, kb: null, kbLine, kbText: "" };
@@ -1825,7 +1853,7 @@ export class LedgerView implements SceneView {
           km.dispose();
           o.kb = null;
         }
-        if (kbText) {
+        if (kbText && ROW_TEXT) {
           // event-time: one canvas when a row's measurement arrives or changes
           o.kb = makeEdgeLabel(this._colors, kbText, 0, FLOOR_Y.gl0, KB_Z0, ORD_H, "left", "readout");
           (o.kb.material as THREE.MeshBasicMaterial).opacity = 0;
@@ -2009,6 +2037,32 @@ export class LedgerView implements SceneView {
     // boost and the identity hue would sit on the row NEWER than the pin while the rewind parks
     // the pinned row at the lead, drawing the one row you asked for neutral and unboosted.
     this._bar.setSelected(pinSlot);
+    // The floor's pool of light stands under the row the reader points at, else the one they hold
+    // (hover previews at emphasis strength, like the dim); a row past the trail's end has none.
+    const poolSlot = this._hoverSlot >= 0 ? this._hoverSlot : pinSlot;
+    this._mirror?.pool(poolSlot >= 0 && poolSlot < SLOT_N ? LEAD_X - poolSlot * SLOT_SP + this._trailOff : null, dt);
+    // THE ARRIVAL GLINT: the newest row whose exact read has landed is one of the front two (the
+    // forming tick draws no bar). The first time a newer one is measured, its bar takes one sweep.
+    if (this._glint) {
+      for (let s = 0; s < 2; s++) {
+        const snap = this._slotSnap[s];
+        if (!snap || !this._specs[s]?.measured) continue;
+        if (this._glintSeen >= 0 && snap.ordinal > this._glintSeen) {
+          this._glintOrd = snap.ordinal;
+          this._glint.fire();
+        }
+        if (snap.ordinal > this._glintSeen) this._glintSeen = snap.ordinal;
+        break;
+      }
+      if (this._glint.running) {
+        const gs = this._glintOrd != null ? this.model.slotOf(this._glintOrd) : -1;
+        const spec = gs >= 0 ? this._specs[gs] : undefined;
+        this._glint.update(
+          dt, spec ? LEAD_X - gs * SLOT_SP + this._trailOff : null, FLOOR_Y.gl0 + BAR_LIFT + BAR_H + 0.02,
+          spec ? spec.z0 + spec.width / 2 : 0, BAR_D, spec ? spec.width : 0, this._fades.alpha,
+        );
+      }
+    }
     this._ribbons.group.position.x = this._trailOff;
     this._ordGroup.position.x = this._trailOff;
     // The live lead's ribbon sheet fades out as it crosses the front (row 1 — the selected
@@ -2314,6 +2368,10 @@ export class LedgerView implements SceneView {
     for (const p of this._tokenPanes.values()) p.dispose();
     this._globalPlanes.length = 0;
     this._metaPlanes.clear();
+    this._mirror?.dispose();
+    this._glint?.dispose();
+    this._glint = null;
+    this._mirror = null;
     this._bar.dispose();
     this._live.dispose();
     this._ribbons.dispose();

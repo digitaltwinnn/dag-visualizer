@@ -17,9 +17,10 @@ import { FadeSet } from "../objects/FadeSet";
 import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
 import { offNetMul } from "../../domain/dimModel";
 import { makeRadialGradientTexture } from "../objects/gradientTexture";
-import { glowBlend, inkMix, inkPresence, isLightGround, structureInk, type SceneColors } from "../../sceneColors";
+import { glowBlend, inkPresence, isLightGround, structureInk, type SceneColors } from "../../sceneColors";
 import type { SceneView } from "./SceneView";
-import { joinBloom } from "../SceneContext";
+import { joinBloom, joinGlow } from "../SceneContext";
+import { SoftLines } from "../objects/SoftLines";
 
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 const _tcol = new THREE.Color(); // scratch for the tether colour bake (event-time, reused)
@@ -38,9 +39,8 @@ const _tcol = new THREE.Color(); // scratch for the tether colour bake (event-ti
 // is one structural blue for every tether, which is what the line is actually about: the core.
 //
 // Positions stay pure lerps of the hub position, so the per-frame write is `hubPos × f` with `f`
-// precomputed below: one multiply per vertex, no allocation (rule 5). The COLOURS are baked once
-// (and again on a theme flip), because nothing about them moves. Every
-// tether's profile is identical, so the ten geometries SHARE one colour attribute.
+// precomputed below: one multiply per vertex, no allocation (rule 5). The PROFILE is baked once
+// (and again on a theme flip), because nothing about it moves, and every tether shares it.
 const TETHER_SEG = 24;
 /** `j / TETHER_SEG` for every vertex — the lerp fraction along core → hub, precomputed once. */
 const TETHER_F = new Float32Array(TETHER_SEG + 1).map((_, j) => j / TETHER_SEG);
@@ -142,16 +142,42 @@ const RIPPLE_FOLLOW = { delay: 0.26, strength: 0.5 }; // the second, fainter rin
 // hub read as lit 3D orbs, not flat faceted suns (user). The nodes are instanced (per-instance
 // aBase/aEmissive) so their material can't be reused directly; this replays the same shader tail
 // against the material's own emissive. Smooth-shade the mesh (drop flatShading) so the rim is even.
-function applyOrbFresnel(mat: THREE.MeshStandardMaterial): void {
+function applyOrbFresnel(mat: THREE.MeshStandardMaterial, coreLit = false): void {
   mat.onBeforeCompile = (shader) => {
+    if (coreLit) {
+      shader.uniforms.uCoreView = CORE_LIGHT_U.view;
+      shader.uniforms.uCoreAmt = CORE_LIGHT_U.amt;
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <common>",
+        "#include <common>\nuniform vec3 uCoreView;\nuniform vec2 uCoreAmt;",
+      );
+    }
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <emissivemap_fragment>",
       // The SHARED orb rim chunk (NodeFabric.ORB_FRESNEL_*) — one curve for instanced nodes
       // and these single orbs, so tuning it can never diverge the two materials.
-      `#include <emissivemap_fragment>\n${ORB_FRESNEL_GLSL}totalEmissiveRadiance *= ${ORB_FRESNEL_MIX};`,
+      `#include <emissivemap_fragment>\n${ORB_FRESNEL_GLSL}totalEmissiveRadiance *= ${ORB_FRESNEL_MIX};` +
+        // THE CORE'S LIGHT (see CORE_LIGHT): how squarely this fragment faces the core, in view
+        // space (`-vViewPosition` is the fragment), from fully away (0) to fully toward (1).
+        (coreLit
+          ? "\nfloat coreFace = 0.5 + 0.5 * dot(normal, normalize(uCoreView + vViewPosition));" +
+            "\ntotalEmissiveRadiance *= mix(1.0 - uCoreAmt.x, 1.0 + uCoreAmt.y, coreFace);"
+          : ""),
     );
   };
 }
+
+/** THE CORE LIGHTS ITS METAGRAPHS (user, 2026-11-22): a hub is brighter on the side that faces
+ *  the core and darker on the side that faces away, so the structure reads as one system lit from
+ *  its centre and each hub shows where the core is as the camera orbits. It is a shading term on
+ *  the hub's own glow, not a light: a point light inside the field lights every node from a
+ *  different direction and flattens the population (the rig's header). `shade` is how much glow
+ *  the far side gives up, `lift` how much the near side gains. Dark only — on paper the hub is
+ *  ink, and a lit face would have to carry less of it. */
+export const CORE_LIGHT: Readonly<{ shade: number; lift: number }> = { shade: 0.42, lift: 0.22 };
+/** One uniform pair under every hub's material: the core's position in VIEW space, written once a
+ *  frame, and the two amounts, written on a theme flip. */
+const CORE_LIGHT_U = { view: { value: new THREE.Vector3() }, amt: { value: new THREE.Vector2(CORE_LIGHT.shade, CORE_LIGHT.lift) } };
 
 // One orbiting metagraph hub record in HyperView.metas (the exact shape the constructor
 // builds — scene/Globe.ts (via `layers.metas.find`, keying off `.cfg.id`/`.group`) and
@@ -183,7 +209,7 @@ export interface MetaHubRec {
    *  DAG core alone, exactly as the HUD does. */
   present: boolean;
   state: null;
-  tether: THREE.Line;
+  tether: SoftLines;
   // Anchor "packets": one travels hub→core per snapshot the metagraph anchored into a tick (same
   // count the Snapshots view shows). `pending` snapshots launch staggered, reusing the `pool`.
   packets: { t: number; mesh: THREE.Mesh }[];
@@ -258,8 +284,9 @@ export class HyperView implements SceneView {
   // of the alpha; every site here is a DYNAMIC per-frame expression (verified — zero static
   // registrations in this view today), so they all just read `_fades.alpha`.
   private _fades = new FadeSet();
-  /** The one baked tip-fade profile every tether's geometry references (see the block up top). */
-  private _tetherCol = new THREE.Float32BufferAttribute(new Float32Array((TETHER_SEG + 1) * 3), 3);
+  /** The one baked tip-fade profile every tether reads (see the block up top): the line's presence
+   *  at each of its vertices, core → hub. */
+  private _tetherProfile = new Float32Array(TETHER_SEG + 1);
 
   // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
   // the Engine at construction — HyperView builds all its hubs synchronously from
@@ -271,6 +298,7 @@ export class HyperView implements SceneView {
     this._ink = structureInk(colors);
     this._colors = colors;
     this._paper = isLightGround(colors);
+    CORE_LIGHT_U.amt.value.set(this._paper ? 0 : CORE_LIGHT.shade, this._paper ? 0 : CORE_LIGHT.lift);
     this.stage = stage;
     this.root = new THREE.Group();
     // Tilt the hub/tether/hoop structure to read top-down from the shared overview camera (Globe
@@ -344,7 +372,7 @@ export class HyperView implements SceneView {
       for (const h of m.hoops) h.visible = !on;
       for (const f of m.fills) f.visible = !on && f.userData.populated !== false; // restore populated fills on exit
       if (on) {
-        (m.tether.material as THREE.LineBasicMaterial).opacity = 0;
+        m.tether.commit(0, false, false); // draws nothing until update() writes it again
         // Retire any in-flight anchor packets + clear the pending queue.
         for (const pk of m.packets) { pk.mesh.visible = false; (pk.mesh.material as THREE.MeshBasicMaterial).opacity = 0; m.pool.push(pk.mesh); }
         m.packets.length = 0;
@@ -446,7 +474,7 @@ export class HyperView implements SceneView {
         color: col, emissive: col, emissiveIntensity: 1.1,
         roughness: 0.5, metalness: 0.2, transparent: true, // match the node orbs (smooth + fresnel)
       });
-      applyOrbFresnel(hubMat);
+      applyOrbFresnel(hubMat, true);
       const hub = new THREE.Mesh(HUB_ORB, hubMat);
       joinBloom(hub);
       hub.userData.pick = { kind: "meta", cfg, title: cfg.name, sub: `Metagraph · ${cfg.ticker}` };
@@ -474,22 +502,13 @@ export class HyperView implements SceneView {
       // blending the line's own faded-to-black tips DARKEN the bloomed core they lie over (the
       // "black objects" bug the packets already hit). Additive makes a black vertex simply absent,
       // which is exactly what an alpha profile baked into the colour needs.
-      const tGeo = new THREE.BufferGeometry();
-      const tPos = new THREE.Float32BufferAttribute(new Float32Array((TETHER_SEG + 1) * 3), 3);
-      tPos.setUsage(THREE.DynamicDrawUsage); // rewritten every frame as the hub orbits
-      tGeo.setAttribute("position", tPos);
-      tGeo.setAttribute("color", this._tetherCol);
-      const tether = new THREE.Line(
-        tGeo,
-        new THREE.LineBasicMaterial({
-          vertexColors: true, transparent: true, opacity: 0, depthWrite: false,
-          blending: glowBlend(this._colors),
-        }),
-      );
-      // The positions are rewritten per frame without recomputing bounds, so the bounding sphere
-      // baked from this all-zero buffer would cull the line the moment its hub swings away.
-      tether.frustumCulled = false;
-      this.root.add(tether);
+      // A SOFT LINE (2026-11-22; a GL `Line` until then): TETHER_SEG screen-space strips with an
+      // antialiased edge, so the longest lines in the view keep one even hairline at every zoom
+      // instead of a 1px GL line's beading. Positions and alphas are written per frame in
+      // update(); the colour is the structure ink (`_inkTether`).
+      const tether = new SoftLines(TETHER_SEG, this._colors);
+      this._inkTether(tether);
+      this.root.add(tether.mesh);
 
       // A pool of anchor "packets" (reused) — one launches per anchored snapshot (see pulseMeta).
       const pool: THREE.Mesh[] = [];
@@ -502,6 +521,7 @@ export class HyperView implements SceneView {
         );
         pk.renderOrder = 4;
         pk.visible = false;
+        joinGlow(pk); // dark only: an anchor in flight is a spark, and it blooms like one
         this.root.add(pk);
         pool.push(pk);
       }
@@ -521,10 +541,11 @@ export class HyperView implements SceneView {
     this._ink = structureInk(c);
     this._colors = c;
     this._paper = isLightGround(c);
+    CORE_LIGHT_U.amt.value.set(this._paper ? 0 : CORE_LIGHT.shade, this._paper ? 0 : CORE_LIGHT.lift);
     // The GROUND changed, so hyper's furniture switches between additive glow and normal-blended
     // ink (see glowBlend) — additive on paper draws nothing. Every material that carries a fade in
-    // its own `opacity` needs only this; the tether, whose fade is baked into vertex COLOUR, is
-    // re-baked below through inkMix.
+    // its own `opacity` needs only this; the tethers re-blend through their own `setColors` and
+    // take the new ink below.
     const bl = glowBlend(c);
     const reblend = (m: THREE.Material) => { m.blending = bl; m.needsUpdate = true; };
     for (const f of this._coreFills) reblend(f.material as THREE.Material);
@@ -533,7 +554,7 @@ export class HyperView implements SceneView {
       r.mesh.geometry = this._paper ? RIPPLE_GEO_PAPER : RIPPLE_GEO;
     }
     for (const m of this.metas) {
-      reblend(m.tether.material as THREE.Material);
+      m.tether.setColors(c);
       for (const pk of m.pool) reblend(pk.material as THREE.Material);
       for (const f of m.fills) reblend(f.material as THREE.Material);
     }
@@ -547,7 +568,7 @@ export class HyperView implements SceneView {
       for (const h of m.hoops) (h.material as THREE.LineDashedMaterial).color.setHex(this._ink);
       for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).color.setHex(this._ink);
     }
-    this._bakeTethers(); // the tether profile is baked from _ink into vertex colours
+    this._bakeTethers(); // the tethers take the new ink
   }
 
   /**
@@ -566,29 +587,27 @@ export class HyperView implements SceneView {
     }
   }
 
-  // The tether colour attribute — the core's structural blue at the tip-fade profile, ONE buffer
-  // shared by all ten lines (identical profiles; only the endpoints differ). The ALPHA lives in the
-  // colour rather than in a per-vertex alpha because the material blends ADDITIVELY — black IS
-  // invisible there — which keeps the whole profile in one attribute and the material's own
-  // `opacity` free to carry the per-frame fades. Baked, not per-frame: nothing here moves. (Not a
-  // `_write*`/`_apply*` name on purpose — event-time work, outside the render loop rule 5 polices.)
+  // The tether's look, resolved once (and again on a theme flip): the tip-fade PROFILE every
+  // tether shares, and each line's colour, the structure ink. The profile is presence, and it
+  // rides the strips' ALPHA: under additive blending a faded vertex is simply absent, under
+  // paper's normal blending it is less ink — the ground question answered by the blend mode
+  // (`SoftLines.setColors`), with no bake toward black or the page. (Not a `_write*`/`_apply*`
+  // name on purpose — event-time work, outside the render loop rule 5 polices.)
   private _bakeTethers() {
     const { coreFade, hubFade, brightness } = TETHER_LOOK;
-    _tcol.setHex(this._ink);
-    const col = this._tetherCol;
     for (let j = 0; j <= TETHER_SEG; j++) {
       const t = TETHER_F[j];
       // Fade UP out of the core (dissolves the knot where ten tethers meet), fade DOWN
       // into the hub (the line lands in the orb instead of stabbing it).
-      const a = smoothstep(0, coreFade, t) * smoothstep(0, hubFade, 1 - t) * brightness;
-      // The profile is PRESENCE, so it resolves toward the ground: black under additive (where
-      // black is absent), the paper colour under normal blending (where black is the loudest ink
-      // there is, and the tips would land as two dark blobs). See inkMix.
-      _tcol.setHex(this._ink);
-      inkMix(_tcol, a, this._colors);
-      col.setXYZ(j, _tcol.r, _tcol.g, _tcol.b);
+      this._tetherProfile[j] = smoothstep(0, coreFade, t) * smoothstep(0, hubFade, 1 - t) * brightness;
     }
-    col.needsUpdate = true;
+    for (const m of this.metas) this._inkTether(m.tether);
+  }
+
+  /** One tether's colour: the structure ink on every strip. Event-time. */
+  private _inkTether(t: SoftLines) {
+    _tcol.setHex(this._ink);
+    for (let j = 0; j < TETHER_SEG; j++) t.setColor(j, _tcol.r, _tcol.g, _tcol.b);
   }
 
   // Mark which metagraph hubs are "active" (have locatable nodes). Inactive ones — registered
@@ -747,9 +766,12 @@ export class HyperView implements SceneView {
   // out to the map (Globe) instead.
   // `spinFrozen` (set when the camera is zoomed in to inspect) stops the overall SPHERE spin — the
   // core + hub meshes — so a close-up reads still; the per-node axis spin (Globe) keeps going.
-  update(dt: number, morph = 0, coreDimTarget = 0, spinFrozen = false, _cam?: THREE.Camera, dagFocused = false) {
+  update(dt: number, morph = 0, coreDimTarget = 0, spinFrozen = false, cam?: THREE.Camera, dagFocused = false) {
     this.clock += dt;
     const t = this.clock;
+    // The core in view space, for the hubs' core-facing shade (CORE_LIGHT). The core sits at the
+    // view root's origin.
+    if (cam) CORE_LIGHT_U.view.value.copy(this.root.position).applyMatrix4(cam.matrixWorldInverse);
 
     // Snapshots view: the hubs/tethers are hidden (set once in setLedger) and ledger.js owns the
     // metagraph blocks, so there's nothing to orbit here. A ripple started meanwhile is DROPPED, not
@@ -911,20 +933,20 @@ export class HyperView implements SceneView {
       const hubMat = m.hub.material as THREE.MeshStandardMaterial;
       hubMat.opacity = metaOpacity * (m.active ? 1 : 0.8) * (focusOther ? hubBodyMul : 1) * this._fades.alpha;
 
-      // The tether is a subdivided line from the origin out to the hub, so write every vertex as a
-      // lerp of the live hub position (vertex 0 stays at the core). Straight into the existing
-      // buffer rather than setFromPoints, which would rebuild the attribute (and drop its GPU
-      // buffer) every frame. The look — the two tip fades — is BAKED into the shared vertex-colour
-      // attribute (_bakeTethers); this only moves the line.
-      const tetherPos = m.tether.geometry.attributes.position;
-      for (let j = 1; j <= TETHER_SEG; j++) {
-        const f = TETHER_F[j] * tSweep; // the arrival sweep: the line grows core→hub
-        tetherPos.setXYZ(j, _pos.x * f, _pos.y * f, _pos.z * f);
-      }
-      tetherPos.needsUpdate = true;
-      (m.tether.material as THREE.LineBasicMaterial).opacity = m.present
+      // The tether is a subdivided line from the origin out to the hub, so every strip's two ends
+      // are lerps of the live hub position (the first starts at the core), written straight into
+      // the strips' buffers. Its alpha is the shared tip-fade profile (_bakeTethers) times the
+      // line's level this frame.
+      const tOp = m.present
         ? inkPresence(tetherOp * (m.active ? 1 : 0.6) * fdim, paper) * metaF * this._fades.alpha
         : 0;
+      const prof = this._tetherProfile;
+      for (let j = 0; j < TETHER_SEG; j++) {
+        const f0 = TETHER_F[j] * tSweep, f1 = TETHER_F[j + 1] * tSweep; // the arrival sweep: the line grows core→hub
+        m.tether.setSegment(j, _pos.x * f0, _pos.y * f0, _pos.z * f0, _pos.x * f1, _pos.y * f1, _pos.z * f1);
+        m.tether.setAlpha(j, prof[j] * tOp, prof[j + 1] * tOp);
+      }
+      m.tether.commit(TETHER_SEG, true, true);
       // The cyan layer hoops fade with the hubs on the morph, dim on inactive / out-of-focus hubs.
       const hoopOp = inkPresence(HOOP_OP * (m.active ? 1 : 0.7) * fdim, paper) * metaF;
       for (const h of m.hoops) (h.material as THREE.LineBasicMaterial).opacity = hoopOp * this._fades.alpha;

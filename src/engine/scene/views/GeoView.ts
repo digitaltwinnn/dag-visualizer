@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { joinGlow } from "../SceneContext";
 import { feature } from "topojson-client";
 import { R, LAND_H, latLonToVec3 } from "../../domain/geoLayout";
 import { ringsToSegments, type Ring } from "../../domain/countryShape";
@@ -104,6 +105,8 @@ export interface GeoViewHost {
   onCountriesReady?: () => void;
   /** The OCEAN PLATE (Print, 2026-10-09) — paper only; see buildOcean. */
   oceanMesh?: THREE.Mesh;
+  /** The ATMOSPHERE — dark only; see buildAtmosphere. */
+  atmosphereMesh?: THREE.Mesh;
 }
 
 /** THE SUN's look. Read per frame by Globe and pushed into `sunMixUniform`, so the shader carries
@@ -121,17 +124,102 @@ export const SUN_LOOK = {
   nightInk: 1.34, dayInk: 0.9,
 } as const;
 
-// HOLOGRAPHIC GLOBE: there is deliberately NO opaque body sphere and NO atmosphere halo.
-// The coastal wall rim is the defining stroke, the land glass + micro-grid carry the surface,
-// and the ocean is simply the void between coastlines — the far side shows through dimly
-// (far-side node discs still vanish via discFall; the far graticule/walls reading through IS
-// the hologram). All surface colours come from config.COLORS' geo family (scene structural
-// lane — never identity-tinted).
+// HOLOGRAPHIC GLOBE: there is deliberately NO opaque body sphere. The coastal wall rim is the
+// defining stroke, the land glass + micro-grid carry the surface, and the ocean is the void
+// between coastlines. What makes the void a BODY on the dark ground is the atmosphere (below): a
+// lit limb says where the sphere ends, so the far side can drop to a whisper (`FAR_SIDE`) instead
+// of being the only thing that says the globe is round (far-side node discs still vanish via
+// discFall). All surface colours come from config.COLORS' geo family (scene structural lane —
+// never identity-tinted).
 export function buildGeoView(globe: GeoViewHost): void {
+  buildAtmosphere(globe);
   buildOcean(globe);
   buildGraticule(globe);
   buildCompassRose(globe);
   buildLand(globe);
+}
+
+/** How much of the far hemisphere's graticule and coast walls reads through the globe at the
+ *  overview (their near-range floor, 0.04, is unchanged). Low on purpose: at the resting pose the
+ *  far continents drew a second, mirrored coastline across the near ocean, and the atmosphere's
+ *  limb now carries the roundness they used to. */
+const FAR_SIDE = 0.14;
+
+// A LINE, NOT A HAZE (user, 2026-11-22, twice: "a bit too fuzzy", then "still too fuzzy"). Toggled
+// off one at a time in the live scene, the fuzz was neither the land fill nor the walls' bloom: it
+// was this shell's inner term at exponent 14, a teal band a tenth of the disc wide lying over the
+// coast walls where they stack up edge-on at the limb. At 120 it is a hairline of light on the
+// limb itself, and the halo outside it is a few pixels.
+/** THE ATMOSPHERE's look: `rim` the level at the limb, `reach` the halo's e-folding height above
+ *  sea level in world units, `inner` the exponent of the limb light's falloff toward the disc's
+ *  centre (higher = a thinner rim), `night`/`day` the sun's multipliers across the limb. */
+export const ATMO_LOOK = {
+  rim: 0.14, reach: 0.12, inner: 120, night: 0.35, day: 1.3,
+} as const;
+/** The shell the halo is drawn on: far enough out that the falloff has reached nothing. */
+const ATMO_SHELL = R + 5;
+
+// THE ATMOSPHERE — dark only. One back-faced shell around the globe, additive, shaded by ONE
+// number per fragment: how close the line of sight from the eye passes to the globe's centre (the
+// arcs' and the base rings' own occlusion arithmetic). Outside the limb that distance falls off
+// as a halo; inside it, as a rim light that brightens toward the limb — so the same expression is
+// the glow around the sphere and the shading that makes its disc a ball. It leans on THE SUN
+// (`sunUniform`, the rig's key): the lit limb is the side the chips are lit from. Paper never
+// draws it — light added to a printed sheet is a bleach — and `retintGeoView` hides the mesh.
+function buildAtmosphere(globe: GeoViewHost) {
+  // Created here because the atmosphere is built first; buildLand re-uses it for the land's sun.
+  globe.sunUniform = { value: new THREE.Vector3(0, 1, 0) };
+  const color = new THREE.Color(globe.geoColor);
+  globe.geoTints.push(color);
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, side: THREE.BackSide, blending: THREE.AdditiveBlending,
+    uniforms: {
+      uColor: { value: color },
+      uSun: globe.sunUniform,
+      uOp: { value: 0 },
+      uLook: { value: new THREE.Vector4(ATMO_LOOK.rim, ATMO_LOOK.reach, ATMO_LOOK.inner, 0) },
+      uSunMix: { value: new THREE.Vector2(ATMO_LOOK.night, ATMO_LOOK.day) },
+      uR: { value: R },
+      uShell: { value: ATMO_SHELL },
+    },
+    vertexShader: /* glsl */ `
+      varying vec3 vW;
+      varying vec3 vC;
+      varying float vS;
+      void main() {
+        vec4 w = modelMatrix * vec4(position, 1.0);
+        vW = w.xyz;
+        vC = modelMatrix[3].xyz;
+        vS = length(modelMatrix[0].xyz); // the root is morph-scaled: radii are local, the ray is world
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColor; uniform vec3 uSun; uniform float uOp; uniform vec4 uLook;
+      uniform vec2 uSunMix; uniform float uR; uniform float uShell;
+      varying vec3 vW; varying vec3 vC; varying float vS;
+      void main() {
+        vec3 ro = cameraPosition - vC;
+        vec3 rd = normalize(vW - cameraPosition);
+        vec3 q = ro - rd * dot(ro, rd);          // the ray's closest point to the centre
+        float b = length(q) / max(vS, 1e-4);     // ...as a local radius
+        float halo = exp(-max(b - uR, 0.0) / uLook.y) * (1.0 - smoothstep(uR, uShell, b));
+        float rim = pow(clamp(b / uR, 0.0, 1.0), uLook.z);
+        float sun = mix(uSunMix.x, uSunMix.y, smoothstep(-0.6, 0.7, dot(normalize(q), uSun)));
+        float a = (b > uR ? halo : rim) * uLook.x * sun * uOp;
+        gl_FragColor = vec4(uColor * a, 1.0);
+      }
+    `,
+  });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(ATMO_SHELL, 64, 40), mat);
+  mesh.renderOrder = -3; // first: every other piece of the hologram adds over it
+  mesh.visible = !globe.geoPaper;
+  // The surface fade loop drives `opacity` like every other piece of furniture; a ShaderMaterial
+  // has no opacity uniform of its own, so the mesh hands the number on as it is drawn.
+  mesh.onBeforeRender = () => { mat.uniforms.uOp.value = mat.opacity; };
+  globe.atmosphereMesh = mesh;
+  globe.geoFades.push({ mat, base: 1, paperBase: 0 });
+  globe.surface.add(mesh);
 }
 
 // THE OCEAN PLATE — paper only (Print, 2026-10-09). The hologram's ocean is the void between
@@ -181,6 +269,7 @@ export function retintGeoView(globe: GeoViewHost): void {
   const bl = geoBlend(globe);
   if (globe.landPaperUniform) globe.landPaperUniform.value = globe.geoPaper ? 1 : 0;
   if (globe.oceanMesh) globe.oceanMesh.visible = globe.geoPaper; // the plate is paper-only
+  if (globe.atmosphereMesh) globe.atmosphereMesh.visible = !globe.geoPaper; // the halo dark-only
   for (const m of globe.geoBlends) {
     m.blending = bl;
     m.needsUpdate = true;
@@ -206,7 +295,7 @@ function buildGraticule(globe: GeoViewHost) {
   // lined globe silhouette (user, 2026-08-07).
   const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0, depthWrite: false });
   globe.geoTints.push(mat.color);
-  // FACING dim: far-hemisphere fragments fade to ~30% so the backside reads as behind the globe
+  // FACING dim: far-hemisphere fragments fade to FAR_SIDE so the backside reads as behind the globe
   // instead of blending with the front (the hologram keeps its see-through presence, quieter).
   // The floor drops to near-zero as the camera closes in (uClose) — at country/node range the
   // far side showing through read as visual noise (user).
@@ -222,7 +311,7 @@ function buildGraticule(globe: GeoViewHost) {
       .replace("#include <common>", "#include <common>\nuniform vec3 uCamN;\nuniform float uClose;\nvarying vec3 vDir;")
       .replace(
         "#include <color_fragment>",
-        "#include <color_fragment>\ndiffuseColor.a *= mix(mix(0.3, 0.04, uClose), 1.0, smoothstep(-0.35, 0.2, dot(vDir, uCamN)));",
+        `#include <color_fragment>\ndiffuseColor.a *= mix(mix(${FAR_SIDE}, 0.04, uClose), 1.0, smoothstep(-0.35, 0.2, dot(vDir, uCamN)));`,
       );
   };
   globe.geoFades.push({ mat, base: 0.045 });
@@ -326,8 +415,8 @@ function buildCompassRose(globe: GeoViewHost) {
 // CanvasTexture: alpha-encoded canvas uploads proved PATH-DEPENDENT in Chrome (premultiplied
 // GPU-canvas fast paths vs readback produce different texels than getImageData reports, and
 // the result flipped between mipmapped and direct uploads). Luminance survives every path.
-// Mipmaps then do the minification anti-aliasing that analytic per-fragment lines can't get
-// under the postprocessing composer (no MSAA there) — no shimmer as the globe turns.
+// Mipmaps then do the minification anti-aliasing that analytic per-fragment lines can't get —
+// MSAA samples geometry edges, never a texture's interior — so nothing shimmers as the globe turns.
 type LandFeature = { geometry: { type: string; coordinates: unknown } };
 function makeLandTexture(features: LandFeature[]): THREE.DataTexture {
   // 4096×2048: POWER-OF-TWO on purpose — NPOT dimensions combined with the wrong wrap/filter
@@ -513,7 +602,7 @@ async function buildLand(globe: GeoViewHost) {
     globe.landPaperUniform = { value: globe.geoPaper ? 1 : 0 };
     // The sun starts straight up: a real direction arrives on the first frame Globe.setSun runs,
     // and "overhead" is the one default that can never look like a bug in the meantime.
-    globe.sunUniform = { value: new THREE.Vector3(0, 1, 0) };
+    globe.sunUniform ??= { value: new THREE.Vector3(0, 1, 0) };
     globe.sunMixUniform = { value: new THREE.Vector3(SUN_LOOK.term, 1, 1) };
     globe.landWallUniforms = {
       uColor: { value: globe._edgeColor.clone() },
@@ -566,7 +655,7 @@ async function buildLand(globe: GeoViewHost) {
           // FACING dim: far-hemisphere cliffs stay visible (the hologram's see-through
           // presence) but clearly BEHIND — and near-invisible at close range (uClose), where
           // seeing through the globe distracted (user). See GeoViewHost.facingUniform/closeUniform.
-          float facing = mix(mix(0.35, 0.04, uClose), 1.0, smoothstep(-0.35, 0.15, dot(vDir, uCamN)));
+          float facing = mix(mix(${FAR_SIDE}, 0.04, uClose), 1.0, smoothstep(-0.35, 0.15, dot(vDir, uCamN)));
           vec3 rgb = uColor * (body + edge);
           float a = min(1.0, e * mix(0.72, 0.6, uClose)) * uOpacity * facing;
           // ON PAPER THE RIDGE RAMP IS PRESENCE, SO IT RIDES ALPHA, NOT THE COLOUR. body + edge
@@ -586,7 +675,9 @@ async function buildLand(globe: GeoViewHost) {
       transparent: true, depthWrite: false, side: THREE.BackSide,
     });
     blendReg(globe, wallMat);
-    globe.surface.add(new THREE.Mesh(wallGeo, wallMat));
+    const walls = new THREE.Mesh(wallGeo, wallMat);
+    joinGlow(walls); // the lit coastline is the dark globe's signature stroke
+    globe.surface.add(walls);
 
     // HOLOGRAPHIC LAND. The surface is the geo view's "ledger pane": a faint, CALM structural skin
     // in the SAME accent hue as the ledger tiles (globe.geoColor = --primary), so the two views match

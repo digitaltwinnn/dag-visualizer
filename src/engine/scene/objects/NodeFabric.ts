@@ -33,6 +33,15 @@ const Y_AXIS = new THREE.Vector3(0, 1, 0); // hex-prism axis (radial after _qRad
 export const ORB_FRESNEL_GLSL =
   "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.5);\n";
 export const ORB_FRESNEL_MIX = "(0.72 + 0.9 * fres)";
+/** THE FOCUS RIM — a thin edge of white light on the hovered or committed node, on the dark ground
+ *  (user, 2026-11-22). Brightness has no room left to say "this one" in a crowded shell, where
+ *  every core already clips; an edge does, because it separates the node from its neighbours
+ *  without making its face brighter. It rides the node's eased focus weight (`aRim`, the record's
+ *  `fw`), so a group member takes its share and the rim arrives with the swell. White, like every
+ *  light here: a rim is a lamp, not a palette hue. Paper draws none — light added to ink reads as
+ *  a paler mark, the opposite of emphasis. `sphere` and `chip` are the rim's strength on each
+ *  body, over the body's own fresnel term. */
+export const RIM_LOOK: Readonly<{ sphere: number; chip: number }> = { sphere: 0.7, chip: 0.55 };
 // The geo hex prisms' resting opacity — slightly glassy (user: replaces the wireframe overlay,
 // which never read as clean edges). Depth-write stays ON so stacks occlude normally.
 const HEX_ALPHA = 0.92;
@@ -217,6 +226,11 @@ export class NodeFabric {
   private emiArr: Float32Array = new Float32Array(0);
   private aEmiSphere: THREE.InstancedBufferAttribute | null = null;
   private aEmiHex: THREE.InstancedBufferAttribute | null = null;
+  /** The focus rim's per-instance weight (`RIM_LOOK`): each record's eased `fw`, one buffer under
+   *  both bodies, like the emissive. */
+  private rimArr: Float32Array = new Float32Array(0);
+  private aRimSphere: THREE.InstancedBufferAttribute | null = null;
+  private aRimHex: THREE.InstancedBufferAttribute | null = null;
   private _sphereGeo: THREE.SphereGeometry | null = null;
   private _hexGeo: THREE.CylinderGeometry | null = null; // hex prism (6-seg cylinder)
   private _appliedDim = -1; // last validator dim baked into the colour buffer
@@ -228,6 +242,9 @@ export class NodeFabric {
   private metaEmi: Float32Array = new Float32Array(0);
   private metaAESphere: THREE.InstancedBufferAttribute | null = null;
   private metaAEHex: THREE.InstancedBufferAttribute | null = null;
+  private metaRim: Float32Array = new Float32Array(0);
+  private metaARimSphere: THREE.InstancedBufferAttribute | null = null;
+  private metaARimHex: THREE.InstancedBufferAttribute | null = null;
 
   // Reused pickables array (never re-allocated — the plan's allocation fix).
   readonly pickables: THREE.Object3D[] = [];
@@ -280,10 +297,10 @@ export class NodeFabric {
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uPaper = mat.userData.uPaper;
       shader.vertexShader = shader.vertexShader
-        .replace("#include <common>", "#include <common>\nattribute vec3 aBase;\nattribute float aEmissive;\nattribute float aFill;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;\nvarying float vFill;\nvarying vec3 vPos;\nvarying float vWall;")
-        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvBase = aBase;\nvEmi = aEmissive;\nvCap = max(0.0, objectNormal.y);\nvFill = aFill;\nvPos = position;\nvWall = 1.0 - abs(objectNormal.y);");
+        .replace("#include <common>", "#include <common>\nattribute vec3 aBase;\nattribute float aEmissive;\nattribute float aFill;\nattribute float aRim;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vRim;\nvarying float vCap;\nvarying float vFill;\nvarying vec3 vPos;\nvarying float vWall;")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvBase = aBase;\nvEmi = aEmissive;\nvRim = aRim;\nvCap = max(0.0, objectNormal.y);\nvFill = aFill;\nvPos = position;\nvWall = 1.0 - abs(objectNormal.y);");
       shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", "#include <common>\nuniform float uPaper;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;\nvarying float vFill;\nvarying vec3 vPos;\nvarying float vWall;")
+        .replace("#include <common>", "#include <common>\nuniform float uPaper;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vRim;\nvarying float vCap;\nvarying float vFill;\nvarying vec3 vPos;\nvarying float vWall;")
         .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb *= vBase;\ndiffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb * 0.3, vec3(0.0), uPaper), 1.0 - vFill);")
         .replace(
           "#include <emissivemap_fragment>",
@@ -304,7 +321,8 @@ export class NodeFabric {
               "if (vFill < 0.5 && uPaper > 0.5 && length(vPos.xz) < 0.72) discard;\n" +
               "float hollowP = (1.0 - vFill) * uPaper;\n" +
               "diffuseColor.a *= 1.0 - 0.7 * vWall * hollowP;\n" +
-              "totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, 0.5 + 0.95 * vCap + 1.1 * fres, vFill) + vBase * (hollowP * (1.0 - 0.75 * vWall));"
+              "totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, 0.5 + 0.95 * vCap + 1.1 * fres, vFill) + vBase * (hollowP * (1.0 - 0.75 * vWall));\n" +
+              `totalEmissiveRadiance += vec3(${RIM_LOOK.chip.toFixed(3)}) * vRim * fres * (1.0 - uPaper);`
             : // spheres (hyper nodes): a view-dependent FRESNEL rim so they read as glowing 3D orbs
               // instead of flat blobs (user). Coeffs keep the average near the old flat vEmi so the
               // dim/hover and bloom-threshold behaviour is unchanged. The rim is the shared
@@ -315,7 +333,8 @@ export class NodeFabric {
               "#include <emissivemap_fragment>\n" +
               ORB_FRESNEL_GLSL +
               "if (vFill < 0.5 && uPaper > 0.5 && fres < 0.1) discard;\n" +
-              `totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, ${ORB_FRESNEL_MIX}, vFill) + vBase * ((1.0 - vFill) * uPaper);`,
+              `totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, ${ORB_FRESNEL_MIX}, vFill) + vBase * ((1.0 - vFill) * uPaper);\n` +
+              `totalEmissiveRadiance += vec3(${RIM_LOOK.sphere.toFixed(3)}) * vRim * fres * (1.0 - uPaper);`,
         );
     };
     return mat;
@@ -381,6 +400,13 @@ export class NodeFabric {
     // the edge-lit cap/side treatment stays): unit radius, unit height, scaled to
     // (geoSize, HEX_H, geoSize). Identifiers keep their hex-era names.
     const hexGeo = (this._hexGeo ||= new THREE.CylinderGeometry(1, 1, 1, 32)).clone();
+    const rimArr = new Float32Array(total);
+    const wrapRim = (geo: THREE.BufferGeometry): THREE.InstancedBufferAttribute => {
+      const aR = new THREE.InstancedBufferAttribute(rimArr, 1);
+      aR.setUsage(THREE.DynamicDrawUsage);
+      geo.setAttribute("aRim", aR);
+      return aR;
+    };
     const wrap = (geo: THREE.BufferGeometry): THREE.InstancedBufferAttribute => {
       geo.setAttribute("aBase", new THREE.InstancedBufferAttribute(baseArr, 3));
       geo.setAttribute("aFill", new THREE.InstancedBufferAttribute(fillArr, 1));
@@ -391,6 +417,9 @@ export class NodeFabric {
     };
     this.aEmiSphere = wrap(sphereGeo);
     this.aEmiHex = wrap(hexGeo);
+    this.aRimSphere = wrapRim(sphereGeo);
+    this.aRimHex = wrapRim(hexGeo);
+    this.rimArr = rimArr;
 
     const mkMesh = (geo: THREE.BufferGeometry, side: THREE.Side, hexEdges = false): THREE.InstancedMesh => {
       const mat = this._makeNodeMaterial(hexEdges, hexEdges ? HEX_ALPHA : 1);
@@ -447,6 +476,13 @@ export class NodeFabric {
     const picks = new Array(total);
     const sphereGeo = new THREE.SphereGeometry(0.5, 16, 12);
     const hexGeo = new THREE.CylinderGeometry(1, 1, 1, 32); // round chip (see the validator note)
+    const rimArr = new Float32Array(total);
+    const wrapRim = (geo: THREE.BufferGeometry): THREE.InstancedBufferAttribute => {
+      const aR = new THREE.InstancedBufferAttribute(rimArr, 1);
+      aR.setUsage(THREE.DynamicDrawUsage);
+      geo.setAttribute("aRim", aR);
+      return aR;
+    };
     const wrap = (geo: THREE.BufferGeometry): THREE.InstancedBufferAttribute => {
       geo.setAttribute("aBase", new THREE.InstancedBufferAttribute(baseArr, 3));
       geo.setAttribute("aFill", new THREE.InstancedBufferAttribute(fillArr, 1));
@@ -457,6 +493,9 @@ export class NodeFabric {
     };
     this.metaAESphere = wrap(sphereGeo);
     this.metaAEHex = wrap(hexGeo);
+    this.metaARimSphere = wrapRim(sphereGeo);
+    this.metaARimHex = wrapRim(hexGeo);
+    this.metaRim = rimArr;
 
     const mkMesh = (geo: THREE.BufferGeometry, side: THREE.Side, hexEdges = false): THREE.InstancedMesh => {
       const mat = this._makeNodeMaterial(hexEdges, hexEdges ? HEX_ALPHA : 1);
@@ -673,6 +712,7 @@ export class NodeFabric {
       Math.abs(dim - this._appliedDim) > 0.001;
     const base = this.baseArr;
     const emi = this.emiArr;
+    const rim = this.rimArr;
     // A hovered/selected node dims the rest so it stands out — same in every view, and NOT gated
     // on the committed filter (user, 2026-08-11): `dim` answers filter membership and `back`
     // answers focus, one effect each, so making `back` a function of the filter handed it the
@@ -711,6 +751,7 @@ export class NodeFabric {
       // behind — one frame at the easing rate is not a visible lag, and keeping the tier ranked
       // in ONE place beats re-deriving focusId in the geometry pass.
       u.fw += (fw - u.fw) * ek;
+      rim[u.index] = u.fw; // the focus rim's weight (RIM_LOOK)
       // dimModel.nodeEmissive: the SAME glow model the metagraph loop below calls (user: one node
       // model — the DAG core's nodes are metagraph nodes that orbit the origin). The base's
       // hyper→globe endpoints live in the domain, so the two call sites cannot pass different
@@ -745,6 +786,8 @@ export class NodeFabric {
     // Both meshes share emiArr; flag both attributes for re-upload.
     this.aEmiSphere.needsUpdate = true;
     this.aEmiHex.needsUpdate = true;
+    if (this.aRimSphere) this.aRimSphere.needsUpdate = true;
+    if (this.aRimHex) this.aRimHex.needsUpdate = true;
     if (recolour) {
       (this.instSphere.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
       (this.instHex.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
@@ -766,6 +809,7 @@ export class NodeFabric {
     const ek = emphasisK(dt); // emphasis easing — hoisted once per frame (the hoist rule)
     const grow = focusGrow(c); // the size channel — see placeValidators (one node model)
     const emi = this.metaEmi;
+    const rim = this.metaRim;
     const base = this.metaBaseArr;
     const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort; // see the validator loop
     for (const r of records) {
@@ -793,6 +837,7 @@ export class NodeFabric {
       const fw = focusWeightOf(rPrimary, rGroup);
       r.growW += (growWeightOf(rPrimary, rGroup) - r.growW) * ek; // the size channel's own share
       r.fw += (fw - r.fw) * ek; // the size channel's eased state — see the validator loop
+      rim[r.index] = r.fw; // the focus rim's weight (RIM_LOOK)
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
       // dimModel.nodeEmissive: composes glow + arc flash, then the hover/selection focus
       // boost/dim-back — one function, both loops. The write EASES toward it
@@ -876,6 +921,8 @@ export class NodeFabric {
     this.metaHex.visible = this._fleetW > 0.002 && (w > 0.001 || c.ledger || trOnM);
     this.metaAESphere.needsUpdate = true;
     this.metaAEHex.needsUpdate = true;
+    if (this.metaARimSphere) this.metaARimSphere.needsUpdate = true;
+    if (this.metaARimHex) this.metaARimHex.needsUpdate = true;
     (this.metaSphere.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
     (this.metaHex.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
   }

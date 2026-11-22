@@ -201,7 +201,8 @@ export default function TrendTether() {
       <g mask="url(#trend-tether-mask)">
         <line style={TETHER_STROKE} strokeWidth={1} strokeDasharray="3 4" />
         <line style={TETHER_STROKE} strokeWidth={1} strokeDasharray="3 4" />
-        <line stroke="var(--primary)" strokeOpacity={0.9} strokeWidth={2} strokeLinecap="round" />
+        {/* The axis mark is a HAIRLINE: at 2px in the full accent it outweighed the series above it. */}
+        <line stroke="var(--primary)" strokeOpacity={0.7} strokeWidth={1} strokeLinecap="round" />
       </g>
     </svg>,
     host,
