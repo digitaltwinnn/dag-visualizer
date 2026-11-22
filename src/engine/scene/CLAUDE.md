@@ -992,19 +992,23 @@ the chamber is on screen. Four rules, each a user round the same day:
   the same reflection at two coarse mips is a soft pool of each mark's colour around its
   reflection, so the light is the marks' own and follows their emphasis with no lamp.
 
-**History's ground is a DOT FLOOR** (`TrendsView`, `DOT_FLOOR`; user, 2026-11-22, after four rounds
+**History's ground is a LINE FLOOR** (`TrendsView`, `LINE_FLOOR`; user, 2026-11-22, after four rounds
 on the bands — grey, hued, hugging the card, then a DOM mirror of the front chart: "drop mirror and
 wash and come with a completely different but subtle scene background"). One level plane under the
-deck draws a lattice of small dots in the structure ink, antialiased in screen space, fading out
-over a pool centred behind the deck and dissolving where the pitch falls under a few pixels. It is
-texture, not a mark: a dot states no line or row, so nothing in it reads as a gridline, and
-perspective closing the rows up toward the horizon is the depth cue. **The dots wear the deck's
-colours** (user: "I like the history effect, can we give it metagraph colors and make it more visible
-in light mode?"): the cards' identity hues in the deck's order, front to back, a band per card
-(`band` slot gaps deep — at the cards' true spacing a band was three rows), the structure ink beyond
-the last card; fed by `setSlotHues` from `Engine._syncTrendHues`. Paper draws the dot larger
-(`paperDot`) and at a gain above 1, because ink has no glow to carry a two-pixel dot. ⚠️ The shadow BANDS described under
-"The History view's ground" above still exist in the file at presence 0 (`GROUND_PRESENCE`) and their mesh is hidden; only their per-slot hue plumbing is in use, by the dots.
+deck draws level hairlines ACROSS the floor, one per row of an even lattice, a constant width in
+screen pixels (`fwidth`), fading out over a pool centred behind the deck and dissolving where the
+pitch falls under a few pixels. Perspective closing the rows up toward the horizon is the depth cue.
+It was a lattice of DOTS first, which the user liked as an effect and rejected as a mark: "we use
+dots also for nodes, can we use something else (lines?)" — a dot is a node everywhere else. Lines
+in depth are not drawn: they converge on the vanishing point, the hard diagonals the side rails were
+cut for. **The lines wear the deck's colours** ("can we give it metagraph colors and make it more
+visible in light mode?"): the cards' identity hues in the deck's order, front to back, a band per
+card (`band` slot gaps deep — at the cards' true spacing a band was two or three rows), the
+structure ink beyond the last card; fed by `setSlotHues` from `Engine._syncTrendHues`. Paper draws
+the line wider (`paperWidth`) and at a gain above 1, because ink has no glow to carry a hairline.
+⚠️ The shadow BANDS described under "The History view's ground" above still exist in the file at
+presence 0 (`GROUND_PRESENCE`) and their mesh is hidden; only their per-slot hue plumbing is in use,
+by the lines.
 
 **The chamber's boxes are FACE-SHADED** (`objects/faceShade.ts`): the bars, lane tiles, data marks and
 blocks stay unlit, and a per-vertex multiplier by face direction is baked into the geometry (the
