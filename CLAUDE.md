@@ -41,7 +41,7 @@ Four views drive the 3D scene:
   blocks stand above the floor as a layered DAG drawing, token blocks on their metagraph snapshot's
   tile; **Data blocks** (`/data-blocks`, D6 2026-11-07 — user: "Threeway.") the Metagraph snapshots
   chamber as it stands, same source, plus a mark on each tile whose exact read says it carried data
-  blocks, its height the count of data updates (a cL1 block holds transactions, a dL1 block data
+  blocks, a column with one box per data block (a cL1 block holds transactions, a dL1 block data
   updates — the protocol's own split). A register is a setting of a view, never a Mode
   (`viewPolicy.registers` lists them; the view switch holds no sixth button), its pages live in ONE map
   (`components/views.ts`' `REGISTER_PAGES`, pinned by `views.test.ts`), the chamber dispatches on ONE

@@ -71,7 +71,7 @@ import {
   type LaneBlock,
 } from "../../domain/ledgerModel";
 import { blockPlace, forkSpread, frontMark, referenceSegments, silentRun, stretchLabel, type BlockRead } from "../../domain/blockBraid";
-import { DATA_MARK, carriesData, dataMarkCount } from "../../domain/dataMark";
+import { DATA_MARK, DATA_STACK, carriesData, dataMarkCount, dataStackBoxes } from "../../domain/dataMark";
 import { ENTRY_STAG, entryStep, entryTotal } from "../../domain/entryBeat";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, RIBBON_LANE_HALF, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
@@ -242,7 +242,7 @@ export const TILE_LOOK: Readonly<TileLook> = { rest: 0.1, ink: 0.3, halo: 2.5 };
  *    thread) — `"all"` of them; `"blocks"`, only those carrying a token block (`_blockTiles`); or
  *    `"data"`, only those whose exact read says they carried DATA BLOCKS (`domain/dataMark.carriesData`;
  *    user, 2026-11-07: "a metagraph that anchored but had no datablock … don't show it"), each
- *    wearing a mark on its top, its height the count of data updates (`domain/dataMark.ts`; the Data
+ *    wearing a column of boxes over it, one per data block (`domain/dataMark.ts`; the Data
  *    blocks register, D6). Data blocks have no parents, so there is no braid and no link: the register
  *    is the Snapshots furniture as it stands — the same source, ribbons, bands and live edge — with the
  *    tiles kept to the data-carrying snapshots, plus the marks. A tile whose tick's read has not landed
@@ -522,7 +522,8 @@ export class LedgerView implements SceneView {
    *  the read not landed). Filled at event time with the pick table (`_rebuildTilePicks`). */
   private _dataMarkMesh!: THREE.InstancedMesh;
   private readonly _dataMarkN = new Float32Array(META_TRAIL_MAX).fill(-1);
-  private _dataMarkLastDrawn = 0;
+  /** How many boxes each tile's column holds (`dataMark.dataStackBoxes`), resolved with the count. */
+  private readonly _dataBoxN = new Uint8Array(META_TRAIL_MAX);
   /** One tether per mark, in the same slot order (`DATA_TETHER`). */
   private _dataTether!: SoftLines;
 
@@ -1959,27 +1960,29 @@ export class LedgerView implements SceneView {
         // The Data blocks register's mark: the count from THIS snapshot's own exact row — the tile
         // the resolver named — or none while that read has not landed (rule 10). Resolved BEFORE the
         // pick is kept: in that register the mark decides whether the tile is drawn at all.
-        this._dataMarkN[mi] = this._cargo.tiles === "data" && pick?.kind === "metaSnap" ? this._dataMarkOf(pick.sel.globalOrdinal, pick.sel.metaId, pick.sel.ordinal) : -1;
+        const dataRow = this._cargo.tiles === "data" && pick?.kind === "metaSnap" ? this._dataRowOf(pick.sel.globalOrdinal, pick.sel.metaId, pick.sel.ordinal) : null;
+        this._dataMarkN[mi] = dataMarkCount(dataRow) ?? -1;
+        this._dataBoxN[mi] = dataStackBoxes(dataRow);
         // A tile the register does not draw (`_tileDrawn`) is not pickable either.
         this._tilePicks[mi] = pick && this._tileDrawn(b, mi) ? pick : null;
         if (b.filled) k++;
         mi++;
       }
     }
-    for (let j = mi; j < META_TRAIL_MAX; j++) { this._tilePicks[j] = null; this._dataMarkN[j] = -1; }
+    for (let j = mi; j < META_TRAIL_MAX; j++) { this._tilePicks[j] = null; this._dataMarkN[j] = -1; this._dataBoxN[j] = 0; }
     // A held hover's tile index is only valid against THIS table — and so is the selected
     // tile's (the callout anchor).
     this._syncHoverTile();
     this._resolveSelTile();
   }
 
-  /** A metagraph snapshot's data-mark count from its tick's exact read (`dataMark.dataMarkCount`),
-   *  or -1 for no mark. Event-time, beside the pick it belongs to. */
-  private _dataMarkOf(globalOrdinal: number, metaId: string, ordinal: number): number {
+  /** A metagraph snapshot's own row in its tick's exact read, or null while that read has not
+   *  landed — what its data mark counts and how tall its column stands (`domain/dataMark.ts`). */
+  private _dataRowOf(globalOrdinal: number, metaId: string, ordinal: number) {
     const rows = this._exact[globalOrdinal]?.rows;
-    if (!rows) return -1;
-    for (const r of rows) if (r.metaId === metaId && r.ordinal === ordinal) return dataMarkCount(r) ?? -1;
-    return -1;
+    if (!rows) return null;
+    for (const r of rows) if (r.metaId === metaId && r.ordinal === ordinal) return r;
+    return null;
   }
 
   private _syncPickables(): void {
@@ -2141,6 +2144,9 @@ export class LedgerView implements SceneView {
 
     // ── lane tiles on the metagraph-snapshot floor
     let mi = 0;
+    // The data columns' own cursor: a tile's boxes take the next slots of the mark pool, so the
+    // pool is packed and `count` draws exactly the boxes standing this frame.
+    let si = 0;
     // Hoisted per frame (the hoist rule): one read for every lane's every tile.
     const dimNet = this._netDimKey();
     const tileRest = TILE_LOOK.rest;
@@ -2192,10 +2198,7 @@ export class LedgerView implements SceneView {
           _dummy.scale.setScalar(0);
           _dummy.updateMatrix();
           this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
-          if (dataMarks) {
-            this._dataMarkMesh.setMatrixAt(mi, _dummy.matrix); // its mark goes with it
-            this._dataTether.setAlpha(mi, 0, 0); // and its tether
-          }
+          if (dataMarks) this._dataTether.setAlpha(mi, 0, 0); // its column draws nothing (the pool is packed)
           b.bright = 0; // a slot that comes back eases up from dark, not from a stale row
           mi++;
           continue;
@@ -2275,32 +2278,37 @@ export class LedgerView implements SceneView {
         // accuracy; what was actually missing is hue at the bottom of the span, which is TileLook.ink
         // above. Thin toward the ground, floor the tint — the two answer different halves.
         this._metaTrailMesh.setColorAt(mi, inkMix(_col.copy(ident ? laneColor : this._coreCol), bright, this._colors));
-        // THE DATA MARK (the Data blocks register's cargo): on the tile's top as this frame draws it,
-        // in the lane's identity hue at the tile's own eased brightness (lifted so it reads on it), so
-        // the dim, the focus and the boundary fades all reach it through its tile.
+        // THE DATA COLUMN (the Data blocks register's cargo): one box per data block, standing over
+        // the tile as this frame draws it, in the lane's identity hue at the tile's own eased
+        // brightness (lifted so it reads on it), so the dim, the focus and the boundary fades all
+        // reach it through its tile.
         if (dataMarks) {
-          const n = this._dataMarkN[mi];
-          if (n >= 0) {
-            // The tile's own size (user, 2026-11-08): a second tile hovering a little over the first.
-            const h = tileH * DATA_MARK.height;
+          const boxes = this._dataBoxN[mi];
+          if (boxes > 0 && si + boxes <= META_TRAIL_MAX) {
+            // Each box is a cube inside the tile's footprint; the column rises from the lift.
             const w = b.size * DATA_MARK.foot;
+            const h = w;
             const under = _tileV.y + tileH * DATA_MARK.lift;
-            _dummy.position.set(_tileV.x, under + h / 2, _tileV.z);
+            const pitch = h * (1 + DATA_STACK.gap);
+            // A hovered data block's column takes the subject's full weight (its tile keeps its own).
+            inkMix(_col.copy(laneColor), mi === this._hoverMark ? 1 : Math.min(1, bright * DATA_MARK_GAIN), this._colors);
             _dummy.rotation.set(0, 0, 0);
             _dummy.scale.set(w, h, w);
-            _dummy.updateMatrix();
-            this._dataMarkMesh.setMatrixAt(mi, _dummy.matrix);
-            // A hovered data block's mark takes the subject's full weight (its tile keeps its own).
-            inkMix(_col.copy(laneColor), mi === this._hoverMark ? 1 : Math.min(1, bright * DATA_MARK_GAIN), this._colors);
-            this._dataMarkMesh.setColorAt(mi, _col);
-            // Its tether, tile top to mark underside, in the mark's ink; the entry beat reaches it as
-            // it reaches the tile, through the same fade.
-            this._dataTether.setSegment(mi, _tileV.x, _tileV.y, _tileV.z, _tileV.x, under, _tileV.z);
+            for (let bx = 0; bx < boxes; bx++) {
+              _dummy.position.set(_tileV.x, under + bx * pitch + h / 2, _tileV.z);
+              _dummy.updateMatrix();
+              this._dataMarkMesh.setMatrixAt(si, _dummy.matrix);
+              this._dataMarkMesh.setColorAt(si, _col);
+              si++;
+            }
+            // Its tether, from the tile's top up the column's spine to the top box's underside, in
+            // the column's ink; the entry beat reaches it as it reaches the tile, through the same
+            // fade.
+            this._dataTether.setSegment(mi, _tileV.x, _tileV.y, _tileV.z, _tileV.x, under + (boxes - 1) * pitch, _tileV.z);
             this._dataTether.setColor(mi, _col.r, _col.g, _col.b);
             const ta = (this._paper ? DATA_TETHER.alphaPaper : DATA_TETHER.alpha) * entryF;
             this._dataTether.setAlpha(mi, ta, ta);
           } else {
-            this._zeroDataMark(mi);
             this._dataTether.setAlpha(mi, 0, 0);
           }
         }
@@ -2333,8 +2341,9 @@ export class LedgerView implements SceneView {
     // (the review found the pool's 6,000 zero-scaled boxes submitted every frame in every register,
     // 45% of the chamber's triangles drawing nothing). Every slot below `count` this frame did not
     // write is zero-scaled (rule 5's discipline), and the upload covers only those.
-    const markTo = dataMarks ? mi : 0;
-    if (markTo < this._dataMarkLastDrawn) for (let j = markTo; j < this._dataMarkLastDrawn; j++) this._zeroDataMark(j);
+    // The pool is PACKED: `si` boxes were written this frame, in slots 0…si−1, so `count` draws
+    // exactly those and nothing past them needs zeroing.
+    const markTo = dataMarks ? si : 0;
     this._dataMarkMesh.count = markTo;
     if (markTo > 0) {
       this._dataMarkMesh.instanceMatrix.clearUpdateRanges();
@@ -2346,18 +2355,9 @@ export class LedgerView implements SceneView {
         this._dataMarkMesh.instanceColor.needsUpdate = true;
       }
     }
-    this._dataMarkLastDrawn = markTo;
-    // The tethers draw the same slots: positions and colours move with the trail every frame, so both
-    // upload, ranged to what is drawn (`SoftLines.commit`); 0 draws none.
-    this._dataTether.commit(markTo, true, true);
-  }
-
-  private _zeroDataMark(i: number): void {
-    _dummy.position.set(0, 0, 0);
-    _dummy.rotation.set(0, 0, 0);
-    _dummy.scale.setScalar(0);
-    _dummy.updateMatrix();
-    this._dataMarkMesh.setMatrixAt(i, _dummy.matrix);
+    // The tethers are one per TILE: positions and colours move with the trail every frame, so both
+    // upload, ranged to the tiles drawn (`SoftLines.commit`); 0 draws none.
+    this._dataTether.commit(dataMarks ? mi : 0, true, true);
   }
 
   dispose() {

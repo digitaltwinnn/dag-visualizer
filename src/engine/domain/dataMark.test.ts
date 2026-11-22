@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { DATA_MARK, carriesData, dataMarkCount } from "./dataMark";
+import { DATA_MARK, DATA_STACK, carriesData, dataMarkCount, dataStackBoxes } from "./dataMark";
 
 // THE DATA BLOCKS REGISTER'S TILE MARK (D6, 2026-11-07): a mark on each metagraph snapshot tile whose
-// exact read says it carried data blocks, its height the count of data updates.
+// exact read says it carried data blocks: a column of boxes, one per data block.
 
 describe("dataMarkCount", () => {
   it("marks a snapshot that carried data blocks, with its data updates", () => {
@@ -33,13 +33,31 @@ describe("carriesData", () => {
   });
 });
 
-describe("DATA_MARK — the tile's own size (user, 2026-11-08)", () => {
-  it("is a second tile on the first: the same footprint and height", () => {
-    expect(DATA_MARK.foot).toBe(1);
-    expect(DATA_MARK.height).toBe(1);
+describe("DATA_MARK — a box is a block (user, 2026-11-23)", () => {
+  it("stands inside its tile's footprint", () => {
+    expect(DATA_MARK.foot).toBeGreaterThan(0.3);
+    expect(DATA_MARK.foot).toBeLessThan(1);
   });
-  it("stands clear of its tile: 2–3× the one-tile lift it had (user, 2026-11-09: 'like 2x to 3x current distance')", () => {
-    expect(DATA_MARK.lift).toBeGreaterThanOrEqual(2 * DATA_MARK.height);
-    expect(DATA_MARK.lift).toBeLessThanOrEqual(3 * DATA_MARK.height);
+  it("stands clear of its tile: 2–3 tile heights up (user, 2026-11-09: 'like 2x to 3x current distance')", () => {
+    expect(DATA_MARK.lift).toBeGreaterThanOrEqual(2);
+    expect(DATA_MARK.lift).toBeLessThanOrEqual(3);
+  });
+});
+
+describe("dataStackBoxes — one box per data block (user, 2026-11-23)", () => {
+  it("is the snapshot's own count of data blocks", () => {
+    expect(dataStackBoxes({ dataBlocks: 1 })).toBe(1);
+    expect(dataStackBoxes({ dataBlocks: 3 })).toBe(3);
+  });
+  it("stops at the labelled ceiling", () => {
+    expect(dataStackBoxes({ dataBlocks: DATA_STACK.max + 40 })).toBe(DATA_STACK.max);
+  });
+  it("is empty where the snapshot carried none or its read has not landed (rule 10)", () => {
+    expect(dataStackBoxes({ dataBlocks: 0 })).toBe(0);
+    expect(dataStackBoxes({})).toBe(0);
+    expect(dataStackBoxes(null)).toBe(0);
+  });
+  it("leaves air between the boxes", () => {
+    expect(DATA_STACK.gap).toBeGreaterThan(0);
   });
 });

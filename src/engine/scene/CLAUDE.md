@@ -763,33 +763,33 @@ animation"): the Engine arms `beginEntry(REGISTER_BEAT)` (`domain/entryBeat.ts`,
 ~0.4–0.6 s instead of ~1.3 s) and releases it at once, since there is no choreography to wait out
 inside a view; the tiles, bars and the block tier all ride the same `_entryDrop` / `_entryFade`.
 
-**The mark** is one `InstancedMesh` beside the tiles (`_dataMarkMesh`, the tiles' own species: solid,
-normal-blended, depth-writing, in the bloom set, not pickable — the tile under it answers the click),
-one instance per tile in the tile draw's order — **the tile's own size** since 2026-11-08 (user: "the
-same size as the snapshot block"; `DATA_MARK` foot 1, height 1): a second tile standing on the
-first in the lane's hue, a presence mark; the count of updates is the card's and the explorer's.
-**It is LIFTED 2.5 tiles' height off its tile and TETHERED to it** (user, 2026-11-09: "raise the
-datablocks from their snapshots more, like 2x to 3x current distance with a line attaching the
-blocks"; `DATA_MARK.lift`, was 1): one `SoftLines` hairline per mark (`_dataTether`, the same
-antialiased strip as the Transaction blocks links, since a GL line steps and fringes under the bloom),
-from the tile's top to the mark's underside, in the mark's own ink each frame, its alpha
-`DATA_TETHER` per ground (dark 0.7, paper 0.9) times the entry fade; written and committed in the
-mark's slots with the same `count`, zeroed with it. Not in the bloom set, and not pickable — the tile
-under it answers the click, as for the mark. Its COUNT is resolved at event time with the pick table
-(`_rebuildTilePicks`): the tile resolver names the metagraph snapshot, and that snapshot's own row in
-its tick's exact read gives `dataMarkCount` (`domain/dataMark.ts`) — a mark only where the row says
-it carried data blocks; a tile whose read has not landed shows none (rule 10, never guessed). Per frame
-it stands on the tile's top as that frame draws it (`_tileTop` plus the rewind and the entry drop), its
-HEIGHT `dataMarkHeight(count)` (a floor at one update, a decade's step after, a ceiling — one network
-writes a handful per snapshot, another hundreds), its footprint `DATA_MARK.foot` of the tile's, in the
-lane's identity hue at the tile's own eased brightness lifted by `DATA_MARK_GAIN` — so the dim, the
-focus, the boundary fades and the entry beat all reach it through its tile. Every slot is written or
-zero-scaled each frame in the register; leaving it zero-scales every slot the last such frame wrote
-(rule 5's discipline). A switch between the two registers that read the same source re-lays the trail
-(`_refreshLedger`) rather than re-seating it; only a switch to or from Transaction blocks changes the
-source and re-seats (`Engine`, the register subscription).
+**The mark is a COLUMN OF BLOCKS, one box per data block** (user, 2026-11-23: the marks "look kinda
+flat, sitting right on top of the metagraph snapshots … give it some more vertical presence, like we
+did for the DAG transactions"; `domain/dataMark.ts`: `DATA_STACK`, `dataStackBoxes`). Each box is a
+cube `DATA_MARK.foot` of its tile's footprint wide, the boxes `DATA_STACK.gap` of a box apart, the
+first lifted `DATA_MARK.lift` tile heights off the tile (user, 2026-11-09: "raise the datablocks
+from their snapshots more … with a line attaching the blocks"). A snapshot that carried three data
+blocks is three boxes tall; more than `DATA_STACK.max` draws `max` (a labelled ceiling — the card
+and the explorer state the number, as they state the count of updates). It was one box the tile's
+own size from 2026-11-08, and a column of those slabs still read as flat.
+One `InstancedMesh` (`_dataMarkMesh`, the tiles' own species: solid, normal-blended, depth-writing,
+in the bloom set, not pickable — the tile under it answers the click). **Its pool is PACKED**: a
+tile's boxes take the next slots (`si`), so `count` draws exactly the boxes standing this frame and
+nothing past them needs zeroing; a tile the register does not draw writes none. One `SoftLines`
+tether per TILE (`_dataTether`, in the tiles' own slots) runs from the tile's top up the column's
+spine to the top box's underside, in the column's ink each frame, its alpha `DATA_TETHER` per ground
+(dark 0.7, paper 0.9) times the entry fade. The row behind both numbers is resolved at event time
+with the pick table (`_rebuildTilePicks` → `_dataRowOf`, the snapshot's own row in its tick's exact
+read): `dataMarkCount` gates the tile (a mark only where the row says it carried data blocks) and
+`dataStackBoxes` sizes the column; a tile whose read has not landed shows none (rule 10, never
+guessed). The column wears the lane's identity hue at the tile's own eased brightness lifted by
+`DATA_MARK_GAIN` — so the dim, the focus, the boundary fades and the entry beat all reach it through
+its tile — and a hovered data block lights its snapshot's whole column. A switch between the two
+registers that read the same source re-lays the trail (`_refreshLedger`) rather than re-seating it;
+only a switch to or from Transaction blocks changes the source and re-seats (`Engine`, the register
+subscription).
 
-Pinned by `domain/dataMark.test.ts` (which snapshot is marked, the height scale).
+Pinned by `domain/dataMark.test.ts` (which snapshot is marked, how many boxes its column holds).
 
 ### The unlisted network
 
