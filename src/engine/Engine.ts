@@ -2219,9 +2219,9 @@ export class Engine {
 
     // Per-view bloom (ViewPolicy.bloom): hyper/geo run calmer than ledger — their dense, bright
     // emitters (core, node field, additive coastal walls) piled up an additive bleed + a
-    // strength-driven "black halo" ring + fuzzy walls, worst on OLED/HDR. UnrealBloomPass reads
-    // strength/radius/threshold live each render, so a per-frame set is enough (and it tracks a
-    // mode switch immediately).
+    // strength-driven "black halo" ring + fuzzy walls, worst on OLED/HDR. The mark pass's blur reads
+    // strength/radius/threshold from these knobs each render (SceneContext.renderFrame), so a
+    // per-frame set is enough (and it tracks a mode switch immediately).
     const pb = policy.bloom;
     // × the theme's level (spec §5). Strength alone: radius and threshold say WHAT blooms and how
     // wide the halo is — the pass's shape — while strength is how much of it lands, which is the

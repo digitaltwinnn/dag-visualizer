@@ -932,9 +932,9 @@ opt-in, one mark at a time: a member draws OVER everything (right for a legend a
 grids, wrong for most marks), and it goes around the OutputPass's tone map, so it sets
 `toneMapped = false`. Its one member today is the gather legend (`Globe._rebuildGatherLabels`).
 
-## The finish — antialiasing, the backdrop pool, the dither, face shading
+## The finish — antialiasing, bloom by membership, the backdrop pool, the dither, face shading, the floor mirror
 
-Four things that belong to the frame rather than to a view (2026-11-22, user: "ignore what I decided
+What belongs to the frame rather than to a view (2026-11-22, user: "ignore what I decided
 in the past, make it looks more refined" — which lifted the earlier no-MSAA and flat-void decisions).
 
 **The scene target is multisampled** (`SceneContext`, `msaa`): the composer's own targets carry the
@@ -943,6 +943,15 @@ the final quad reaches the default framebuffer. It smooths geometry edges (coast
 and softens GL lines; the analytic strips (`SoftLines`, the ribbon linings) stay, since a few samples
 do not resolve a 1px mark. ⚠️ Measured on a desktop GPU only, where the whole frame is under 1 ms
 either way; a phone or tablet's cost is unmeasured.
+
+**Dark blooms by MEMBERSHIP, like paper** (`SceneContext.renderFrame`): no whole-frame highpass sits
+in the chain. The mark pass draws `BLOOM_LAYER` plus, on dark only, `GLOW_LAYER` (`joinGlow` — the
+coast walls, the comet trails, the anchor sheets, hyper's anchor packets), blurs it at half
+resolution with the view's own `viewPolicy.bloom` knobs, and the mix adds the blur ALONE (the pass's
+own composite target; the marks themselves are in the main frame). So text, glass, the graticule and
+the atmosphere never halo. `ctx.bloom` is a plain knobs object the Engine writes per frame. A new
+mark that should glow on dark must join one of the two layers, or it draws crisp and unbloomed —
+the failure is silent. `inMarkPass()` is true for PAPER's mark pass only (the halo input lifts).
 
 **The last pass is the FINISH** (`FINISH_SHADER`, after the OutputPass, so in display space): the
 backdrop POOL — a radial lift toward `SceneColors.panel`, screen-blended, dark ground only
@@ -953,7 +962,17 @@ never changes with the camera's distance. The overlay layer draws after it and i
 **The globe has an ATMOSPHERE on dark** (`GeoView.buildAtmosphere`, `ATMO_LOOK`): one back-faced
 additive shell shaded by how close each line of sight passes to the centre — a halo outside the limb,
 a rim light inside — leaning on the rig's sun. The limb carries the roundness, so the far side's walls
-and graticule rest at `FAR_SIDE` (0.14). Paper never draws it and keeps its ocean plate.
+and graticule rest at `FAR_SIDE` (0.14). Paper never draws it and keeps its ocean plate. It is in
+neither bloom layer on purpose: bloomed, the limb read as fuzz (user, same day).
+
+**The base ring's pie takes a hairline gap** (`WEDGE_GAP_W`, 0.07, against the rings' `RING_GAP_W`):
+over the pie's faint fill a ring-width gap was the darkest thing on the disc.
+
+**The global floor MIRRORS what stands on it, on dark** (`objects/FloorMirror.ts`, `MIRROR_LOOK`):
+three's planar `Reflector`, drawn as added light at a fraction of its level and feathered at the
+floor's edges. The mirror plane sits a little ABOVE the glass so nothing lying in the floor (the
+label columns, the dotted lines, the live edge) is reflected under itself. One more scene render at
+1024×640, only while the chamber is on screen; hidden on paper.
 
 **The chamber's boxes are FACE-SHADED** (`objects/faceShade.ts`): the bars, lane tiles, data marks and
 blocks stay unlit, and a per-vertex multiplier by face direction is baked into the geometry (the

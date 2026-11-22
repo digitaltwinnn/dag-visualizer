@@ -106,6 +106,7 @@ import { SilentStretch, type StretchItem } from "../objects/SilentStretch";
 import type { SceneView } from "./SceneView";
 import { joinBloom, inMarkPass } from "../SceneContext";
 import { faceShade } from "../objects/faceShade";
+import { FloorMirror } from "../objects/FloorMirror";
 
 /** The lane-tile instance budget.
  *
@@ -356,6 +357,7 @@ export class LedgerView implements SceneView {
   private _floorBlockers: THREE.Object3D[] = [];
   /** The plane blueprint instances: the global floor (main + gutter) and one per metagraph lane. */
   private _globalPlanes: SnapshotPlane[] = [];
+  private _mirror: FloorMirror | null = null; // the global floor's reflection (dark only)
   /** THE BRAID PANE (2026-11-08): a soft sheet in the DAG braid's plane, just behind the blocks,
    *  drawn in Transaction blocks while DAG blocks stand (`objects/BraidPane.ts`). */
   private _braidPane!: BraidPane;
@@ -664,6 +666,7 @@ export class LedgerView implements SceneView {
         label: { text: gl?.name ?? "gl0", x: lx, z: 0, align: "center" },
       }),
     );
+    this._mirror = new FloorMirror(this.group, W, 2 * PLANE_FIELD_HALF, cx, FLOOR_Y.gl0, this._paper);
     const n = this._laneOrder.length;
     const hz = lanePlaneHalf(n);
     for (let i = 0; i < n; i++) {
@@ -734,6 +737,7 @@ export class LedgerView implements SceneView {
       this._spot.claim("ledger", this._stageSubject, this._stageNormal, STAGE_LIGHTS.ledger.height, a);
     }
     for (const p of this._globalPlanes) p.applyAlpha(GLOBAL_PLANE_LOOK, a, FLOOR_D / 2);
+    this._mirror?.setAlpha(a);
     // The braid pane stands while DAG blocks do (the register's, and not under a token filter,
     // whose window holds no DAG block) — and, EMPTY, while they are on their way (`_braidWaiting`,
     // user 2026-11-19: "show its panel directly"); it fades with the furniture.
@@ -791,6 +795,7 @@ export class LedgerView implements SceneView {
     this._core = c.core;
     this._coreCol.setHex(c.core);
     for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.setColors(c);
+    this._mirror?.setPaper(this._paper);
     this._braidPane.setColors(c);
     for (const p of this._tokenPanes.values()) p.setColors(c);
     this._bar.setColors(c);
@@ -2315,6 +2320,8 @@ export class LedgerView implements SceneView {
     for (const p of this._tokenPanes.values()) p.dispose();
     this._globalPlanes.length = 0;
     this._metaPlanes.clear();
+    this._mirror?.dispose();
+    this._mirror = null;
     this._bar.dispose();
     this._live.dispose();
     this._ribbons.dispose();

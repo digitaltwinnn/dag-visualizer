@@ -73,6 +73,10 @@ the failure is silent — a material that forgets to ask still renders, still re
 cannot be seen. Found live on the geo globe and the ledger's ribbons, which vanished entirely
 under light.
 
+**Both grounds bloom by membership** (dark since 2026-11-22; `src/engine/scene/CLAUDE.md`, "The
+finish"): dark's mark pass adds the blur as light with the view's own knobs, paper's reads it as the
+bleed below. The whole-frame pass this section describes paper declining is no longer in the chain.
+
 ⚠️ **BLOOM IS THE SAME QUESTION, AND ON PAPER THE ANSWER IS A SECOND LAYER.**
 `UnrealBloomPass` is a luminance highpass over the FINISHED frame, so it can only ever select
 what is BRIGHTER than its surroundings — and on paper an identity mark is INK (a DOR band sits
