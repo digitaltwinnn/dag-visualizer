@@ -1213,13 +1213,16 @@ const TrendPlot = memo(function TrendPlot({
                   <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
                     {/* THE FILL CARRIES THE SHAPE (user, 2026-11-23: "play around with the fill" —
                         the dense hourly line read as thick, and he did not want buckets merged). A
-                        bright lip just under the series, falling off fast into a long faint tail:
+                        bright lip just under the series, falling off fast to nothing:
                         the lit band says where the level runs, so the stroke over it can be a
                         hairline. Every stop is a multiple of the one token, so the two grounds keep
                         their ratio. */}
-                    <stop offset="0%" stopColor={hue0} style={{ stopOpacity: "calc(var(--trend-fill-top) * 2.1)" }} />
-                    <stop offset="14%" stopColor={hue0} style={{ stopOpacity: "calc(var(--trend-fill-top) * 0.95)" }} />
-                    <stop offset="45%" stopColor={hue0} style={{ stopOpacity: "calc(var(--trend-fill-top) * 0.3)" }} />
+                    {/* Fuller at the top, clear at the bottom (user, same day): the tail is gone by
+                        two thirds of the way down, so the lower plot is the card's own ground. */}
+                    <stop offset="0%" stopColor={hue0} style={{ stopOpacity: "calc(var(--trend-fill-top) * 2.9)" }} />
+                    <stop offset="16%" stopColor={hue0} style={{ stopOpacity: "calc(var(--trend-fill-top) * 1.35)" }} />
+                    <stop offset="42%" stopColor={hue0} style={{ stopOpacity: "calc(var(--trend-fill-top) * 0.22)" }} />
+                    <stop offset="68%" stopColor={hue0} stopOpacity={0} />
                     <stop offset="100%" stopColor={hue0} stopOpacity={0} />
                   </linearGradient>
                 </defs>

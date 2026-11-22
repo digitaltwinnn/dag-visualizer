@@ -20,9 +20,13 @@ describe("the globe under a network", () => {
     expect(globe).toMatch(/this\._applyGlowFilter\(\);\s*for \(const m of this\._densityGlow\) m\.userData\.scopeNow = m\.userData\.scope;/);
   });
 
-  it("dims a pool off the scope and eases it, where it used to drop it", () => {
+  // A browse or a hover preview dims the pools off the scope; a HELD filter takes them with their
+  // nodes (user, 2026-11-23: the other networks' coloured pools stayed on the ground after their
+  // nodes had gone). Either way the change is eased, never a visibility flip.
+  it("dims a pool off a browsed scope, clears it under a held filter, and eases both", () => {
     expect(globe).not.toMatch(/m\.visible = sel === "all"/);
-    expect(globe).toMatch(/m\.userData\.scope = sel === "all" \|\| m\.userData\.net === sel \? 1 : POOL_OFF_SCOPE/);
+    expect(globe).toMatch(/const off = this\._filterHeld && !this\._previewing\(\) \? 0 : POOL_OFF_SCOPE;/);
+    expect(globe).toMatch(/m\.userData\.scope = sel === "all" \|\| m\.userData\.net === sel \? 1 : off/);
     expect(globe).toMatch(/g\.userData\.scopeNow \+= \(g\.userData\.scope - g\.userData\.scopeNow\) \* Math\.min\(1, dt \* 3\)/);
   });
 });
