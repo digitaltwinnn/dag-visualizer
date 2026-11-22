@@ -256,12 +256,16 @@ const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolea
 };
 /** A data mark's brightness over its tile's: a footnote on the tile, but one that must read on it. */
 const DATA_MARK_GAIN = 2.2;
-/** THE MARK'S TETHER (user, 2026-11-09: "raise the datablocks from their snapshots more … with a line
- *  attaching the blocks"): one soft hairline from the tile's top to its lifted mark's underside, in the
- *  mark's own ink, so the lift reads as "this block came off THAT snapshot" rather than a block adrift.
- *  Its alpha per ground: on the dark ground the additive line glows, on paper an ink line needs more
- *  presence to read at all (the lamp rule's direction, `src/engine/CLAUDE.md`). */
-const DATA_TETHER: Readonly<{ alpha: number; alphaPaper: number }> = { alpha: 0.7, alphaPaper: 0.9 };
+/** THE LIFT, DRAWN (user, 2026-11-23: "instead of a boring line, can we have some nice visual effect
+ *  to link/relate them to the snapshot?"). A block was tied to its snapshot by one hairline up the
+ *  middle (2026-11-09, "with a line attaching the blocks"). It is four now, one from each corner of
+ *  the tile to the matching corner of the block: the snapshot's footprint drawn narrowing to the
+ *  block's, the way a drawing shows a part pulled out of its seat — the block is not near the
+ *  snapshot, it came off it. Hairlines, like the rest of the chamber's ties (`SoftLines`), in the
+ *  block's own ink. `alpha` is their level where they leave the tile, per ground (on paper an ink
+ *  line needs more presence to read at all), and `thin` the share of it left where they reach the
+ *  block, so the eye is led up without a cage around the lift. */
+const DATA_LIFT: Readonly<{ alpha: number; alphaPaper: number; thin: number }> = { alpha: 0.75, alphaPaper: 0.9, thin: 0.3 };
 
 /** A block's edge above the floor (a DAG block) and on a tile (a token block — a tile is 0.48 at most). */
 const DAG_BLOCK = 0.62;
@@ -524,7 +528,7 @@ export class LedgerView implements SceneView {
   private readonly _dataMarkN = new Float32Array(META_TRAIL_MAX).fill(-1);
   /** How many boxes each tile's column holds (`dataMark.dataStackBoxes`), resolved with the count. */
   private readonly _dataBoxN = new Uint8Array(META_TRAIL_MAX);
-  /** One tether per mark, in the same slot order (`DATA_TETHER`). */
+  /** The lift lines (`DATA_LIFT`), packed: four per drawn column, a fifth for a column of several boxes. */
   private _dataTether!: SoftLines;
 
   constructor(
@@ -2147,6 +2151,7 @@ export class LedgerView implements SceneView {
     // The data columns' own cursor: a tile's boxes take the next slots of the mark pool, so the
     // pool is packed and `count` draws exactly the boxes standing this frame.
     let si = 0;
+    let li = 0; // …and the lift lines' cursor, packed the same way
     // Hoisted per frame (the hoist rule): one read for every lane's every tile.
     const dimNet = this._netDimKey();
     const tileRest = TILE_LOOK.rest;
@@ -2198,7 +2203,6 @@ export class LedgerView implements SceneView {
           _dummy.scale.setScalar(0);
           _dummy.updateMatrix();
           this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
-          if (dataMarks) this._dataTether.setAlpha(mi, 0, 0); // its column draws nothing (the pool is packed)
           b.bright = 0; // a slot that comes back eases up from dark, not from a stale row
           mi++;
           continue;
@@ -2301,15 +2305,28 @@ export class LedgerView implements SceneView {
               this._dataMarkMesh.setColorAt(si, _col);
               si++;
             }
-            // Its tether, from the tile's top up the column's spine to the top box's underside, in
-            // the column's ink; the entry beat reaches it as it reaches the tile, through the same
-            // fade.
-            this._dataTether.setSegment(mi, _tileV.x, _tileV.y, _tileV.z, _tileV.x, under + (boxes - 1) * pitch, _tileV.z);
-            this._dataTether.setColor(mi, _col.r, _col.g, _col.b);
-            const ta = (this._paper ? DATA_TETHER.alphaPaper : DATA_TETHER.alpha) * entryF;
-            this._dataTether.setAlpha(mi, ta, ta);
-          } else {
-            this._dataTether.setAlpha(mi, 0, 0);
+            // THE LIFT, DRAWN (`DATA_LIFT`): four hairlines from the tile's corners up to the first
+            // box's, so the block reads as raised OUT of its snapshot — the snapshot's footprint
+            // narrowing to the block's — firm where they leave the tile and thinning as they rise.
+            // A column of several boxes carries one more, its spine, box to box. The lines' pool
+            // is packed like the boxes' (`li`).
+            if (li + 5 <= META_TRAIL_MAX) {
+              const ta = (this._paper ? DATA_LIFT.alphaPaper : DATA_LIFT.alpha) * entryF;
+              const ht = b.size / 2, hb = w / 2;
+              for (let c = 0; c < 4; c++) {
+                const sx = c & 1 ? 1 : -1, sz = c & 2 ? 1 : -1;
+                this._dataTether.setSegment(li, _tileV.x + sx * ht, _tileV.y, _tileV.z + sz * ht, _tileV.x + sx * hb, under, _tileV.z + sz * hb);
+                this._dataTether.setColor(li, _col.r, _col.g, _col.b);
+                this._dataTether.setAlpha(li, ta, ta * DATA_LIFT.thin);
+                li++;
+              }
+              if (boxes > 1) {
+                this._dataTether.setSegment(li, _tileV.x, under + h, _tileV.z, _tileV.x, under + (boxes - 1) * pitch, _tileV.z);
+                this._dataTether.setColor(li, _col.r, _col.g, _col.b);
+                this._dataTether.setAlpha(li, ta * DATA_LIFT.thin, ta * DATA_LIFT.thin);
+                li++;
+              }
+            }
           }
         }
         mi++;
@@ -2355,9 +2372,9 @@ export class LedgerView implements SceneView {
         this._dataMarkMesh.instanceColor.needsUpdate = true;
       }
     }
-    // The tethers are one per TILE: positions and colours move with the trail every frame, so both
-    // upload, ranged to the tiles drawn (`SoftLines.commit`); 0 draws none.
-    this._dataTether.commit(dataMarks ? mi : 0, true, true);
+    // The lift lines are packed too: positions and colours move with the trail every frame, so both
+    // upload, ranged to the lines drawn (`SoftLines.commit`); 0 draws none.
+    this._dataTether.commit(dataMarks ? li : 0, true, true);
   }
 
   dispose() {

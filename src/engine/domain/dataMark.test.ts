@@ -38,9 +38,9 @@ describe("DATA_MARK — a box is a block (user, 2026-11-23)", () => {
     expect(DATA_MARK.foot).toBeGreaterThan(0.3);
     expect(DATA_MARK.foot).toBeLessThan(1);
   });
-  it("stands clear of its tile: 2–3 tile heights up (user, 2026-11-09: 'like 2x to 3x current distance')", () => {
-    expect(DATA_MARK.lift).toBeGreaterThanOrEqual(2);
-    expect(DATA_MARK.lift).toBeLessThanOrEqual(3);
+  it("stands well clear of its tile (user, 2026-11-23: 'they are too close')", () => {
+    expect(DATA_MARK.lift).toBeGreaterThanOrEqual(5);
+    expect(DATA_MARK.lift).toBeLessThanOrEqual(9);
   });
 });
 

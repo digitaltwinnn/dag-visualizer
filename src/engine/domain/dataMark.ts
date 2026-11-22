@@ -21,13 +21,14 @@
 // data, so it stands at the floor height.
 
 /** A box's proportions against its TILE: its footprint, and the LIFT between the tile's top and the
- *  first box's underside, in tile heights — two and a half (user 2026-11-09: "raise the datablocks
- *  from their snapshots more, like 2x to 3x current distance with a line attaching the blocks"), so
- *  the column stands clear of its snapshot, tied to it by a tether (`LedgerView`'s `DATA_TETHER`). */
+ *  first box's underside, in tile heights. Six and a half: a tile is a thin slab, so two and a half
+ *  of its heights (2026-11-09, "like 2x to 3x current distance") left a cube barely its own height
+ *  off the snapshot (user, 2026-11-23: "elevate the data blocks more from the snapshots, they are
+ *  too close"). The lift is drawn by `LedgerView`'s `DATA_LIFT`. */
 // A BOX IS A BLOCK (2026-11-23): each box is a cube, as a transaction block is, `foot` of its tile's
 // footprint wide and as tall as it is wide. While the mark was one box it was the tile's own slab
 // (foot 1, a third as tall as wide), and a column of slabs still read as flat.
-export const DATA_MARK: Readonly<{ foot: number; lift: number }> = { foot: 0.6, lift: 2.5 };
+export const DATA_MARK: Readonly<{ foot: number; lift: number }> = { foot: 0.6, lift: 6.5 };
 
 /** THE MARK IS A COLUMN, ONE BOX PER DATA BLOCK (user, 2026-11-23: the marks "look kinda flat,
  *  sitting right on top of the metagraph snapshots … give it some more vertical presence, like we

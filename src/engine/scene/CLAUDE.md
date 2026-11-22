@@ -767,18 +767,22 @@ inside a view; the tiles, bars and the block tier all ride the same `_entryDrop`
 flat, sitting right on top of the metagraph snapshots … give it some more vertical presence, like we
 did for the DAG transactions"; `domain/dataMark.ts`: `DATA_STACK`, `dataStackBoxes`). Each box is a
 cube `DATA_MARK.foot` of its tile's footprint wide, the boxes `DATA_STACK.gap` of a box apart, the
-first lifted `DATA_MARK.lift` tile heights off the tile (user, 2026-11-09: "raise the datablocks
-from their snapshots more … with a line attaching the blocks"). A snapshot that carried three data
+first lifted `DATA_MARK.lift` tile heights off the tile (6.5 since 2026-11-23, "they are too
+close"; a tile is a thin slab, so 2.5 left a cube barely its own height up). A snapshot that carried three data
 blocks is three boxes tall; more than `DATA_STACK.max` draws `max` (a labelled ceiling — the card
 and the explorer state the number, as they state the count of updates). It was one box the tile's
 own size from 2026-11-08, and a column of those slabs still read as flat.
 One `InstancedMesh` (`_dataMarkMesh`, the tiles' own species: solid, normal-blended, depth-writing,
 in the bloom set, not pickable — the tile under it answers the click). **Its pool is PACKED**: a
 tile's boxes take the next slots (`si`), so `count` draws exactly the boxes standing this frame and
-nothing past them needs zeroing; a tile the register does not draw writes none. One `SoftLines`
-tether per TILE (`_dataTether`, in the tiles' own slots) runs from the tile's top up the column's
-spine to the top box's underside, in the column's ink each frame, its alpha `DATA_TETHER` per ground
-(dark 0.7, paper 0.9) times the entry fade. The row behind both numbers is resolved at event time
+nothing past them needs zeroing; a tile the register does not draw writes none. **The lift is
+DRAWN** (`DATA_LIFT`; user, 2026-11-23: "instead of a boring line, can we have some nice visual
+effect to link/relate them to the snapshot?"): four `SoftLines` hairlines, one from each corner of
+the tile to the matching corner of the first box, so the snapshot's footprint is seen narrowing to
+the block's and the block reads as pulled out of its snapshot; firm at the tile and thinning to
+`thin` of that at the box, in the column's ink, per ground (dark 0.75, paper 0.9) times the entry
+fade. A column of several boxes carries one more line, its spine. The lines' pool is packed like
+the boxes' (`li`). It was one hairline up the middle from 2026-11-09. The row behind both numbers is resolved at event time
 with the pick table (`_rebuildTilePicks` → `_dataRowOf`, the snapshot's own row in its tick's exact
 read): `dataMarkCount` gates the tile (a mark only where the row says it carried data blocks) and
 `dataStackBoxes` sizes the column; a tile whose read has not landed shows none (rule 10, never
