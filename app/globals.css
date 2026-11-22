@@ -1853,8 +1853,24 @@
   animation-delay: max(0ms, calc((4 - var(--slot, 0)) * 120ms));
 }
 @keyframes planeLeave { to { opacity: 0; transform: translateY(26px); } }
+/* THE DECK'S TURN (2026-11-23, user: the swipe "looks ugly how the cards move up/down, hardly
+   visible"). A turn re-deals every card one slot and the projector eases each to its new place —
+   but the card that turns away usually LEAVES THE WINDOW (twelve networks, five slots), so React
+   unmounted it on the spot and the deck's contents simply changed. The card that travels is now
+   seen doing it, in the direction of the flick:
+     · a turn FORWARD (`data-turn="out"`): the front card lifts off the deck and fades, and only
+       then does the deck step forward (`TrendStack.turnDeck` holds the rotation for this beat);
+     · a turn BACK (`"in"`): the deck steps back at once and the card that takes the front comes
+       down into it from the same height.
+   `transform` and `opacity` on the card only: the anchor's matrix3d and the card's own `translate`
+   utility are untouched. The lift is a share of the card's own height (`--plane-h`). */
+#trend-stack [data-plane][data-turn="out"] .plane-card { animation: planeTurnOut 0.24s cubic-bezier(0.4, 0, 1, 1) forwards; }
+#trend-stack [data-plane][data-turn="in"] .plane-card { animation: planeTurnIn 0.36s cubic-bezier(0, 0, 0.2, 1) both; }
+@keyframes planeTurnOut { to { opacity: 0; transform: translateY(calc(var(--plane-h) * -0.42)); } }
+@keyframes planeTurnIn { from { opacity: 0; transform: translateY(calc(var(--plane-h) * -0.42)); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  #trend-stack[data-deal="1"] .plane-card, #trend-stack[data-leave] .plane-card { animation: none; }
+  #trend-stack[data-deal="1"] .plane-card, #trend-stack[data-leave] .plane-card,
+  #trend-stack [data-plane][data-turn] .plane-card { animation: none; }
 }
 @keyframes cardMaterialize { from { opacity: 0; transform: translateY(5px) scale(0.985); } to { opacity: 1; transform: none; } }
 @theme inline {
