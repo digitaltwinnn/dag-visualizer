@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useBootLadder } from "@/components/useBootStage";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,17 @@ export type TabSignal = { id: string; icon: LucideIcon; hue?: string; active?: b
 // window a sheet opened long after a pulse would replay the stale sweep on open.
 // Exported so `PhoneDockSweep` (the shared full-width phone switch-sweep, page.tsx) can drive the
 // SAME debounce/window semantics as the per-card carriers here, without re-deriving them.
-export function usePulseWindow(key: unknown): { pulse: number; live: boolean } {
+//
+// ⚠️ THE WINDOW ENDS WHEN THE SWEEP DOES, NOT ON A CLOCK (user, 2026-11-23: on the phone the dock's
+// top line "goes only half way"). The window was a 1.3 s timer from the pulse, a hair over the
+// sweep's 1.2 s. But a CSS animation starts at the carrier's first PAINT, and a view switch is the
+// heaviest frame the app has — on a phone the paint landed half a second late, the timer fired on
+// time, and the carrier unmounted with the segment in mid-travel. `onEnd` is handed to the
+// carrier's `onAnimationEnd` and closes the window on the sweep's own last frame; the timer stays
+// only as a long backstop for a sweep that never runs (reduced motion plays a shorter blink).
+const SWEEP = "edge-pulse-sweep";
+const PULSE_BACKSTOP_MS = 5000;
+export function usePulseWindow(key: unknown): { pulse: number; live: boolean; onEnd: (e: AnimationEvent) => void } {
   const pulse = useEdgePulse(key);
   const [live, setLive] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -37,10 +47,16 @@ export function usePulseWindow(key: unknown): { pulse: number; live: boolean } {
     if (pulse === 0) return;
     setLive(true);
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setLive(false), 1300);
+    timer.current = setTimeout(() => setLive(false), PULSE_BACKSTOP_MS);
   }, [pulse]);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  return { pulse, live };
+  // The sweep's own end, or reduced motion's blink (the one animation that plays there).
+  const onEnd = useCallback((e: AnimationEvent) => {
+    if (e.animationName !== SWEEP && e.animationName !== "edge-line-blink") return;
+    if (timer.current) clearTimeout(timer.current);
+    setLive(false);
+  }, []);
+  return { pulse, live, onEnd };
 }
 
 // Tablet/phone edge dock for a rail's content: a slim fixed edge tab (one chevron) that opens the
@@ -649,9 +665,10 @@ export default function RailDock({
   // The closed tab's edge, end to end: the recipe's own insets and its faded tips would leave the
   // line well short of the tab, so it takes the whole height and a longer segment.
   const tabEdge = cn("inset-y-0 [--pulse-len:60%] [&>.edge-pulse]:inset-y-0!", side === "left" ? "right-0" : "left-0");
-  const pulseSpan = (p: { pulse: number; live: boolean }, cls: string, short = false) =>
+  const pulseSpan = (p: { pulse: number; live: boolean; onEnd: (e: AnimationEvent) => void }, cls: string, short = false) =>
     p.live && (
       <span
+        onAnimationEnd={p.onEnd}
         className={cn("absolute w-[3px] pointer-events-none z-[43]", short && "[--pulse-len:45%]", cls)}
         style={{ ...style, ["--spine" as string]: "var(--filter-accent, var(--primary))" } as CSSProperties}
         aria-hidden
