@@ -18,9 +18,22 @@
 import * as THREE from "three";
 import { STAGE_LIGHTS, type StagedView } from "../../domain/stageLight";
 
+/** The beam's body: a unit cone with its apex at the origin, opening down −Y to a unit-radius rim
+ *  at y = −1 (so a scale of (r, h, r) is a cone h long and r wide at its foot). */
+const BEAM_GEO = new THREE.ConeGeometry(1, 1, 48, 1, true).translate(0, -0.5, 0);
+const _down = new THREE.Vector3(0, -1, 0);
+const _dir = new THREE.Vector3();
+
 export class StageLight {
   readonly light: THREE.SpotLight;
   private _i = 0; // eased intensity
+  /** THE VISIBLE BEAM (`StageLightRow.beam`): one additive cone from the lamp to its subject. A
+   *  shell, shaded so it has no outline — brightest through its middle, clear at its silhouette —
+   *  and gone before it reaches the subject, so it lays no disc on what it lights. Sleeps with
+   *  the light. */
+  private readonly beam: THREE.Mesh;
+  private readonly beamMat: THREE.ShaderMaterial;
+  private _beam = 0; // eased level
 
   // The frame's presence per view (furniture alpha) and its winning claim. Both allocated once.
   private presence: Record<StagedView, number> = { hyper: 0, geo: 0, ledger: 0 };
@@ -43,6 +56,35 @@ export class StageLight {
     this.light.visible = false;
     scene.add(this.light);
     scene.add(this.light.target);
+    this.beamMat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+      uniforms: { uOp: { value: 0 } },
+      vertexShader: /* glsl */ `
+        varying float vAlong; varying vec3 vN; varying vec3 vV;
+        void main() {
+          vAlong = uv.y; // 1 at the lamp, 0 at the foot
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          vN = normalize(normalMatrix * normal);
+          vV = normalize(-mv.xyz);
+          gl_Position = projectionMatrix * mv;
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform float uOp;
+        varying float vAlong; varying vec3 vN; varying vec3 vV;
+        void main() {
+          // Brightest where the eye meets the cone's skin square on, gone at its silhouette: the
+          // cone has no outline, only a soft core of light.
+          float body = abs(dot(normalize(vN), normalize(vV)));
+          float along = smoothstep(0.0, 0.6, vAlong) * smoothstep(1.0, 0.85, vAlong);
+          gl_FragColor = vec4(vec3(1.0), body * body * along * uOp);
+        }
+      `,
+    });
+    this.beam = new THREE.Mesh(BEAM_GEO, this.beamMat);
+    this.beam.visible = false;
+    this.beam.frustumCulled = false;
+    scene.add(this.beam);
   }
 
   /** THEME FLIP — which level the claims ease toward (see `paper` above). Event-driven, not
@@ -91,9 +133,22 @@ export class StageLight {
       this.light.position.copy(this.pos).addScaledVector(this.normal, this.height);
       const target = (this.paper ? row.intensityPaper ?? row.intensity : row.intensity) * this.weight;
       this._i += (target - this._i) * Math.min(1, dt * 3);
+      // The beam: from the lamp to the subject, as wide at its foot as the row's spread of the
+      // lit cone. Dark only — light cannot be added to the air over a printed sheet.
+      const beamT = this.paper ? 0 : (row.beam ?? 0) * this.weight;
+      this._beam += (beamT - this._beam) * Math.min(1, dt * 3);
+      if (row.beam) {
+        this.beam.position.copy(this.light.position);
+        this.beam.quaternion.setFromUnitVectors(_down, _dir.copy(this.normal).negate().normalize());
+        const r = Math.tan(this.light.angle) * this.height * (row.beamSpread ?? 1);
+        this.beam.scale.set(r, this.height, r);
+      }
     } else {
       this._i += -this._i * Math.min(1, dt * 3);
+      this._beam += -this._beam * Math.min(1, dt * 3);
     }
+    this.beamMat.uniforms.uOp.value = this._beam;
+    this.beam.visible = this._beam > 0.002;
     this.light.intensity = this._i;
     this.light.visible = this._i > 0.02;
     this.claimed = null;
