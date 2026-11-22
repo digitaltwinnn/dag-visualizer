@@ -21,7 +21,10 @@ import * as THREE from "three";
  *  it has faded out by (the block hangs clear above it); `drift` how much of the level the rising
  *  band carries, and `seconds` how long one band takes to climb the column. */
 export const MIST_LOOK: Readonly<{ dark: number; paper: number; reach: number; drift: number; seconds: number }> = {
-  dark: 0.5, paper: 0.34, reach: 0.92, drift: 0.35, seconds: 3.2,
+  // Quieter and finer on 2026-11-23 (user: "a bit more subtle and refined, but I do like it"):
+  // the level down from 0.5 / 0.34, the band slower and fainter (0.35 over 3.2 s), and each face
+  // narrowed to a soft core (the shader's squared profile) so the column reads as a wisp.
+  dark: 0.3, paper: 0.22, reach: 0.88, drift: 0.2, seconds: 4.4,
 };
 
 export class LiftMist {
@@ -76,6 +79,7 @@ export class LiftMist {
         void main() {
           // No edge on a face: it fades out toward both of its sides.
           float across = sin(3.14159265 * vUv.x);
+          across *= across;
           // Strongest at the tile, gone by uLook.x of the way up.
           float up = 1.0 - smoothstep(0.0, uLook.x, vUv.y);
           up *= up;

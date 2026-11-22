@@ -1475,6 +1475,18 @@
      and the edge tabs are the handles and stay solid. */
   [data-slot="sheet-content"] { transition: opacity 0.18s ease-out; }
   [data-slot="sheet-content"][data-dim] { opacity: 0.4; transition: opacity 0.3s ease; }
+  /* THE PHONE'S CLEARED STAGE (user, 2026-11-23: "on phone we don't have scene mode, but we do
+     dim the cards when we pinch … if the bottom section is collapsed, can we apply that to bottom
+     section AND top bar also and make the dim even stronger so make it almost look like we're in
+     scene mode?"). With no sheet up, the dock bar and the top bar are all that stands over the
+     scene, and under the reader's own hand they step back almost to nothing: the phone's scene
+     mode, held for exactly as long as the gesture. `PhoneSceneYield` (RailShade.tsx) raises the
+     attribute — phone tier, no sheet open, a drag or a pinch in progress. With a sheet OPEN the
+     bars stay solid, as above: there they are the sheet's handles. The register switch follows
+     (`!important`: its own yield is a utility at the ordinary level, in a later layer). */
+  html[data-scene-deep] #topbar,
+  html[data-scene-deep] [data-phone-dock] { opacity: 0.1; transition: opacity 0.3s ease; }
+  html[data-scene-deep] #register-switch { opacity: 0.1 !important; }
   /* ⚠️ Every ARM must be listed: the state rules above carry their own `transition` at (0,2,0)
      — a bare `.rail-shade` reset is (0,1,0) and loses to them (CSS trap 4). */
   @media (prefers-reduced-motion: reduce) {
@@ -1482,7 +1494,9 @@
     .rail-shade[data-hidden],
     .rail-shade[data-dim],
     [data-slot="sheet-content"],
-    [data-slot="sheet-content"][data-dim] { transition: none; }
+    [data-slot="sheet-content"][data-dim],
+    html[data-scene-deep] #topbar,
+    html[data-scene-deep] [data-phone-dock] { transition: none; }
   }
   #leftcol > aside { width: auto; }
   #leftcol > * { pointer-events: auto; }

@@ -517,6 +517,20 @@ policy row, `viewPolicy.metagraphCard`** (PR review, 2026-10-19 — it had becom
 `mode === "geo"` compares): `railCards.metagraphCardNetwork` resolves it, and the card's × and
 the slot's hint read the same row.
 
+**The phone's cleared stage** (`PhoneSceneYield` in `RailShade.tsx`, `html[data-scene-deep]` in
+globals.css; user, 2026-11-23: the phone has no scene mode, so "if the bottom section is collapsed,
+can we apply that [dim] to bottom section AND top bar also and make the dim even stronger"). With
+no sheet open, a drag or a pinch on the scene takes the dock bar, the top bar and the register
+switch down to a tenth of their presence for as long as the hand is on it. With a sheet open the
+bars stay solid, as before: there they are the sheet's handles, and the sheet takes the ordinary
+0.4. Only the reader's own hand raises it, never a commit flight — a flight follows a tap on a
+control, and the bar just tapped must not vanish under the finger.
+
+**An edge pulse's carrier lives until its sweep ends** (`usePulseWindow`, 2026-11-23): the mount
+window closes on the sweep's own `animationend` (a 5 s timer is only the backstop). It was a 1.3 s
+timer over a 1.2 s sweep, and on a phone the sweep starts late on a view switch's heavy frame, so
+the dock's top line was cut mid-travel.
+
 **A deck turn is SEEN** (`TrendStack.turnDeck`, "THE DECK'S TURN" in globals.css; user, 2026-11-23:
 the swipe "looks ugly how the cards move up/down, hardly visible"). A turn re-deals every card one
 slot, but the card that turns away usually leaves the five-card window and is unmounted on the spot,
