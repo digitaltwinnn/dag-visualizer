@@ -57,7 +57,7 @@ import { auditInstances, findingKey, type InstanceFinding } from "./scene/instan
 import { CalloutSync, type CalloutState } from "./CalloutSync";
 import { Picking } from "./Picking";
 import { TrendStackSync, type TrendStackState } from "./TrendStackSync";
-import { fitDistance, focusDepth, loneShiftPx, windowCount } from "./domain/trendStack";
+import { fitDistance, focusDepth, loneShiftPx, stackPoses, windowCount } from "./domain/trendStack";
 import { stackRoster } from "@/src/data/trendScope";
 import { DevTunePanel } from "./DevTunePanel";
 import { CameraDirector } from "./CameraDirector";
@@ -2488,6 +2488,7 @@ export class Engine {
       // `_frameDt`, the projector's own clock (`?slowmo` included), so floor and cards ease as one.
       const tier = breakpointOf(window.innerWidth);
       this.trends.face(this.ctx.camera, count, shift, viewH, this._frameDt, tier !== "desktop", tier === "phone");
+      this._syncTrendHues();
     }
     // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim
     // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
@@ -2734,6 +2735,26 @@ export class Engine {
    *  published a roster (see `_writeScene`). */
   private _scopeFor: string | null = null;
   private _scopeCount = 0;
+  // The floor's hues: which network's card stands on each rung, as its identity colour. The deck
+  // is `stackPoses`' own (the projector's arithmetic, so floor and cards can never disagree about
+  // who is in front); it is asked only when one of its inputs, or the theme, has changed — the
+  // per-frame cost is five comparisons.
+  private _hueIds: readonly string[] | null = null;
+  private _hueFocus: string | null = null;
+  private _hueScroll = -1;
+  private _hueTheme = "";
+  private readonly _hueOut: number[] = [];
+  private _syncTrendHues(): void {
+    const st = useStore.getState();
+    if (st.trendIds === this._hueIds && st.trendFocus === this._hueFocus &&
+        st.trendScroll === this._hueScroll && this._theme === this._hueTheme) return;
+    this._hueIds = st.trendIds; this._hueFocus = st.trendFocus;
+    this._hueScroll = st.trendScroll; this._hueTheme = this._theme;
+    const poses = stackPoses(st.trendIds, { scroll: st.trendScroll, focus: st.trendFocus }); // nearest first
+    this._hueOut.length = 0;
+    for (const p of poses) this._hueOut.push(this._sceneColorMap[p.id] ?? 0);
+    this.trends.setSlotHues(this._hueOut);
+  }
   private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [], gapShiftPx: 0, narrow: false, phone: false };
   private _syncTrendStack(): void {
     const st = useStore.getState();

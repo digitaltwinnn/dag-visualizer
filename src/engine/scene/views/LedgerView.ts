@@ -357,7 +357,7 @@ export class LedgerView implements SceneView {
   private _floorBlockers: THREE.Object3D[] = [];
   /** The plane blueprint instances: the global floor (main + gutter) and one per metagraph lane. */
   private _globalPlanes: SnapshotPlane[] = [];
-  private _mirror: FloorMirror | null = null; // the global floor's reflection (dark only)
+  private _mirror: FloorMirror | null = null; // the global floor's reflection
   /** THE BRAID PANE (2026-11-08): a soft sheet in the DAG braid's plane, just behind the blocks,
    *  drawn in Transaction blocks while DAG blocks stand (`objects/BraidPane.ts`). */
   private _braidPane!: BraidPane;
@@ -666,7 +666,7 @@ export class LedgerView implements SceneView {
         label: { text: gl?.name ?? "gl0", x: lx, z: 0, align: "center" },
       }),
     );
-    this._mirror = new FloorMirror(this.group, W, 2 * PLANE_FIELD_HALF, cx, FLOOR_Y.gl0, this._paper);
+    this._mirror = new FloorMirror(this.group, W, 2 * PLANE_FIELD_HALF, cx, FLOOR_Y.gl0, this._paper, this._colors.bg);
     const n = this._laneOrder.length;
     const hz = lanePlaneHalf(n);
     for (let i = 0; i < n; i++) {
@@ -795,7 +795,7 @@ export class LedgerView implements SceneView {
     this._core = c.core;
     this._coreCol.setHex(c.core);
     for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.setColors(c);
-    this._mirror?.setPaper(this._paper);
+    this._mirror?.setGround(this._paper, c.bg);
     this._braidPane.setColors(c);
     for (const p of this._tokenPanes.values()) p.setColors(c);
     this._bar.setColors(c);

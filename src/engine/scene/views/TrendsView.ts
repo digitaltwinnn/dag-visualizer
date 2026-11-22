@@ -15,8 +15,8 @@
 // It was an accent hairline, and an accent line is a MARK — the eye reads it as a gridline or a
 // reading, and there is nothing to read. So each rung is a soft band hanging from the floor line:
 // a quad billboard `shadowH` tall whose alpha rises over the top `SHADOW_LIP` and decays to
-// nothing at the bottom (`shadowTexture`), in a NEUTRAL ink (`SceneColors.fg` on paper, the cooler
-// `muted` on dark, where the foreground's near-white read as a grey smear) rather than the
+// nothing at the bottom (`shadowTexture`), in the NEUTRAL ink (`SceneColors.fg`) on paper and, on dark,
+// in the identity hue of the card standing on it (`setSlotHues`) rather than the
 // accent, with the ends feathered so nothing about it has an edge. Furniture that recedes into the
 // ground it sits on, on both grounds: additive haze on dark, ink on paper.
 //
@@ -130,9 +130,9 @@ const groundY = (centre: number, f: PlaneFormat): number => PLANE_Y - centre * f
 // legible — still above dark's number, for the reason given above — without the dirt. 0.34 since
 // 2026-10-25 (user: "light mode should have a shadow too … for those cards"): at 0.11 the cards
 // stood on almost nothing on paper, while dark's bands read plainly under its deck.
-// Dark is 0.1 in the muted ink (was 0.07 in the foreground's white): the tone carries less
-// luminance, and the level is what keeps the footprint as legible as it was.
-const GROUND_PRESENCE = { dark: 0.1, paper: 0.34 } as const;
+// Dark is 0.16 in the card's identity hue (was 0.07 in the foreground's white): a saturated hue
+// carries a fraction of white's luminance, and the level is what keeps the footprint legible.
+const GROUND_PRESENCE = { dark: 0.16, paper: 0.34 } as const;
 
 /** The shadow band's height in world units — how far below the floor line the soft falloff runs.
  *  A little over a tenth of the card: enough to read as a shadow's spread, not a second card. */
@@ -213,6 +213,9 @@ export class TrendsView implements SceneView {
    *  not the resolved presence: the presence depends on the ground, so a theme flip re-bakes from
    *  the same geometry rather than rebuilding it. */
   private readonly _vertSlot: number[] = [];
+  /** The identity hue of the network on each slot's card (0 = none known → the muted ink), handed
+   *  in by the Engine whenever the deck changes. Dark only: on paper a rung is a neutral shadow. */
+  private readonly _slotHue: number[] = RUNGS.map(() => 0);
   /** Scratch for the colour bake. Module-free and bound once; the bake is event-time either way. */
   private readonly _col = new THREE.Color();
   /** `face()`'s scratch, and the camera orientation it last laid the rungs for (NaN = never). */
@@ -289,6 +292,19 @@ export class TrendsView implements SceneView {
     // registration this contract asks to happen exactly once.
     this._fades.register(this._mat, 1);
     this._restyle();
+  }
+
+  /** WHOSE card stands on each rung: one identity hue per slot, nearest first (0 = no hue). The
+   *  floor under a card is that card's light on the ground — the chart's own line colour, pooled
+   *  under it — so the deck's floor reads front to back in the hues of the networks standing on
+   *  it. Event-time: the Engine calls it when the deck, the focus, the page or the theme changes. */
+  setSlotHues(hues: readonly number[]): void {
+    let changed = false;
+    for (const i of RUNGS) {
+      const h = hues[i] ?? 0;
+      if (this._slotHue[i] !== h) { this._slotHue[i] = h; changed = true; }
+    }
+    if (changed) this._restyle();
   }
 
   /** The transition's furniture alpha — the whole of this view's per-frame surface. */
@@ -412,10 +428,11 @@ export class TrendsView implements SceneView {
     const attr = this._mesh.geometry.getAttribute("color") as THREE.BufferAttribute;
     for (let v = 0; v < this._vertSlot.length; v++) {
       // On paper a shadow is NEUTRAL: the foreground ink, never the accent. On the dark ground
-      // the band is added light, and light in the foreground's near-white is a grey smear on
-      // black; it takes the MUTED ink, the HUD's cool secondary tone, so the floor sits with the
-      // navy backdrop pool instead of over it.
-      this._col.setHex(paper ? this._colors.fg : this._colors.muted);
+      // the band is added light, and neutral light on black is a grey smear (user, 2026-11-22:
+      // "still grey … something with color?"); there it takes the identity hue of the network
+      // whose card stands on it (`setSlotHues`), the muted ink only where no hue is known.
+      const slot = this._vertSlot[v];
+      this._col.setHex(paper ? this._colors.fg : this._slotHue[slot] || this._colors.muted);
       inkMix(this._col, slotPresence(this._vertSlot[v], paper), this._colors);
       attr.setXYZ(v, this._col.r, this._col.g, this._col.b);
     }

@@ -845,8 +845,8 @@ re-tuning the stagger re-tunes the ground with it.
 is a MARK — it reads as a gridline or a reading, and there is nothing to read. Each rung is now a quad
 billboard hanging `SHADOW_H` below the floor line, its alpha rising over a short lip and decaying to
 nothing (`shadowTexture`, a luminance canvas — three reads an alphaMap's green channel, so a canvas
-that varies only in alpha uploads as a solid slab), feathered at both ends, in a NEUTRAL ink
-(`SceneColors.fg` on paper, the cooler `muted` on dark) rather than the accent. Below the desktop tier the rungs stack straight up with
+that varies only in alpha uploads as a solid slab), feathered at both ends, in the NEUTRAL ink
+(`SceneColors.fg`) on paper and in its card's identity hue on dark (see "The finish"). Below the desktop tier the rungs stack straight up with
 the deck (`trendStack.stepX`, the `narrow` flag `face()` takes).
 
 Four decisions are recorded in the file's header and worth knowing before touching it:
@@ -972,7 +972,16 @@ over the pie's faint fill a ring-width gap was the darkest thing on the disc.
 three's planar `Reflector`, drawn as added light at a fraction of its level and feathered at the
 floor's edges. The mirror plane sits a little ABOVE the glass so nothing lying in the floor (the
 label columns, the dotted lines, the live edge) is reflected under itself. One more scene render at
-1024×640, only while the chamber is on screen; hidden on paper.
+1024×640, only while the chamber is on screen. **Paper MULTIPLIES it** (user, same day: "light mode
+is missing the mirror"): the reflection divided by the plate's colour is 1 where the mirror sees the
+page and the mark's ink where it sees a mark, so the floor darkens toward the mark and cannot blow
+out. Levels are per ground (0.2 dark, 0.4 paper — the user took both down from 0.3 / 0.6).
+
+**History's floor wears its cards' hues on dark** (`TrendsView.setSlotHues`, fed by
+`Engine._syncTrendHues` from `stackPoses`, the projector's own deck): each rung takes the identity
+hue of the network whose card stands on it, the muted ink where none is known. Neutral light on black
+read as a grey smear twice (user: "still grey … something with color?"). Paper keeps the neutral
+shadow.
 
 **The chamber's boxes are FACE-SHADED** (`objects/faceShade.ts`): the bars, lane tiles, data marks and
 blocks stay unlit, and a per-vertex multiplier by face direction is baked into the geometry (the
