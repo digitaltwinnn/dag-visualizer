@@ -42,17 +42,6 @@ export interface StageLightRow {
   // staged subjects: the same per-subject variation `heightDag` already is, not a second row.
   heightNode?: number;
   angleNode?: number;
-  /** THE VISIBLE BEAM (user, 2026-11-22): a faint cone of light from the lamp down to its subject,
-   *  so the scene shows where the light is coming from and what it is on. Its level at a full
-   *  claim, on the dark ground; absent, the lamp lights its subject and draws nothing in the air.
-   *  Hyper alone states one: its subjects hang in open space, where a cone has room to read. The
-   *  globe's chips stand on a surface the cone would cut through, and the chamber's claim is
-   *  paper-only, where light cannot be added to the air. */
-  beam?: number;
-  /** The beam's radius at the subject, as a share of the lit cone's own (`tan(angle) × height`):
-   *  the lit pool is wide so its edge falls off the subject softly, and a cone that wide reads as
-   *  a lampshade. */
-  beamSpread?: number;
 }
 
 export const STAGE_LIGHTS: Readonly<Record<StagedView, Readonly<StageLightRow>>> = {
@@ -71,7 +60,6 @@ export const STAGE_LIGHTS: Readonly<Record<StagedView, Readonly<StageLightRow>>>
     // this feels too bright"), beside a softer off-filter dim in `dimModel`; paper holds again.
     angle: 0.9, distance: 40, intensity: 0.45, intensityPaper: 5.5, penumbra: 0.25,
     height: 9, heightDag: 17, heightNode: 3.2, angleNode: 0.5,
-    beam: 0.075, beamSpread: 0.12,
   },
   // geo: intensity 1.5 → 0.9 and height 6 → 8 (2026-09-28, user: "geo, DAG, Falkenstein provider
   // is the brightest place in all of our app … what about the spotlight? too much light, too

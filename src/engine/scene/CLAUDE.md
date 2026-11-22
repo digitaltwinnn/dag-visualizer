@@ -1015,17 +1015,15 @@ were agreed; four are built, each tied to something real, each a plain `Readonly
 - **The selection's pool** (`FloorMirror.pool`, `MIRROR_LOOK.pool*`): a soft pool on the global
   floor under the row the reader points at, else the one they hold. Structure colour added on
   dark; on paper the page is lifted a little toward white, a gain over 1 on the mirror's multiply.
-- **The beam** (`StageLight`, `StageLightRow.beam`): one faint additive cone from the lamp to its
-  subject, shaded so it has no outline. Hyper's row alone states one. ⚠️ At Hypergraph's resting
-  pose the lamp points almost at the camera, so the cone only reads once the camera has flown in
-  to a committed hub.
 - **The arrival glint** (`objects/Glint.ts`, `GLINT_LOOK`): one highlight that runs once along a
   global snapshot's bar when its exact read lands. An event, not a state; one mesh for the chamber.
 
 Not built: **contact pools under the lane tiles.** A shared-buffer skirt was written and removed
 the same day — the metagraph planes are seen edge-on or from below at the chamber's one pose, so
 nothing it drew reached the reader. The global floor already anchors what stands on it (the
-mirror, its spill, and on paper its ink pool). A sun glint on the globe was declined: the globe is
+mirror, its spill, and on paper its ink pool). **A visible beam** from the stage light to its
+subject was built and removed (user: "it doesn't fit the design") — a grey-white cone in the air
+is a stage prop, and nothing else here draws the light itself. A sun glint on the globe was declined: the globe is
 drawn as a diagram, and a photographic highlight would be the one realistic thing on it.
 
 **The dark ground HOLDS A BRIGHT MARK'S HUE** (`SceneContext`, `HUE_HOLD`): one pass after the bloom
