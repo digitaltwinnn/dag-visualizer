@@ -131,8 +131,10 @@ export function MeasureTiles({ measure }: { measure: MeasureControl }) {
                 muted, at the tile's RIGHT edge (user, same day: "right align the kb / dag element"), so
                 the units line up down the column as the figures do; a count says nothing more. A
                 symbol may carry "only" (user, 2026-11-10: "DAG only" — a Transaction blocks list under
-                All counts the DAG's own blocks' amounts alone, `blockMeasure.blockMeasureUnit`). */}
-            {showsTileUnit(o.unit) && <span className="ml-auto flex-none pl-1 text-[0.85em] opacity-70 tabular-nums whitespace-nowrap">{o.unit}</span>}
+                All counts the DAG's own blocks' amounts alone, `blockMeasure.blockMeasureUnit`).
+                Its size is what sets it back: at 70% opacity as well, a 10px symbol on an
+                unselected tile measured 3.2:1 on dark and 3.7:1 on paper (2026-11-22). */}
+            {showsTileUnit(o.unit) && <span className="ml-auto flex-none pl-1 text-[0.85em] tabular-nums whitespace-nowrap">{o.unit}</span>}
           </ToggleGroupItem>
         );
       })}
