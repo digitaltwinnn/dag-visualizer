@@ -830,8 +830,8 @@ a naive regex counted the prose, which let the test pass with the fix deliberate
 
 ## The History view's ground
 
-`views/TrendsView.ts` is the ONLY thing History draws in WebGL, and it is one level plane: the LINE
-FLOOR under the deck (`LINE_FLOOR`; "The finish" below has its design). The view's content is DOM
+`views/TrendsView.ts` is the ONLY thing History draws in WebGL, and it is one level plane: the DOT
+FLOOR under the deck (`DOT_FLOOR`; "The finish" below has its design). The view's content is DOM
 (`components/TrendStack.tsx`, placed per frame by the engine's `TrendStackSync`), so the canvas under
 it is empty by design — and empty is the problem. A composited DOM layer carries no depth cues of its
 own, so with nothing behind them five planes read as five unrelated cards rather than as one stack
@@ -987,20 +987,21 @@ the chamber is on screen. Five rules, each a user round the same day:
   the same reflection at two coarse mips is a soft pool of each mark's colour around its
   reflection, so the light is the marks' own and follows their emphasis with no lamp.
 
-**History's ground is a LINE FLOOR** (`TrendsView`, `LINE_FLOOR`; user, 2026-11-22, after four rounds
-on the bands — grey, hued, hugging the card, then a DOM mirror of the front chart: "drop mirror and
-wash and come with a completely different but subtle scene background"). One level plane under the
-deck draws level hairlines ACROSS the floor, one per row of an even lattice, a constant width in
-screen pixels (`fwidth`), fading out over a pool centred behind the deck and dissolving where the
-pitch falls under a few pixels. Perspective closing the rows up toward the horizon is the depth cue.
-It was a lattice of DOTS first, which the user liked as an effect and rejected as a mark: "we use
-dots also for nodes, can we use something else (lines?)" — a dot is a node everywhere else. Lines
-in depth are not drawn: they converge on the vanishing point, the hard diagonals the side rails were
-cut for. **The lines wear the deck's colours** ("can we give it metagraph colors and make it more
-visible in light mode?"): the cards' identity hues in the deck's order, front to back, a band per
-card (`band` slot gaps deep — at the cards' true spacing a band was two or three rows), the
-structure ink beyond the last card; fed by `setSlotHues` from `Engine._syncTrendHues`. Paper draws
-the line wider (`paperWidth`) and at a gain above 1, because ink has no glow to carry a hairline.
+**History's ground is a DOT FLOOR** (`TrendsView`, `DOT_FLOOR`; user, 2026-11-22, after four rounds
+on shadow bands — grey, hued, hugging the card, then a DOM mirror of the front chart: "drop mirror
+and wash and come with a completely different but subtle scene background"). One level plane under
+the deck draws a lattice of small dots, round at any distance (`fwidth`), fading out over a pool
+and dissolving where the pitch falls under a few pixels. Perspective closing the rows up toward the
+horizon is the depth cue. It was level hairlines for a day ("we use dots also for nodes, can we use
+something else (lines?)") and the user came back to the dots: "I actually like the earlier proposal
+where we had a plane of dots". **The dots wear the deck's colours** ("can we give it metagraph
+colors and make it more visible in light mode?"): the cards' identity hues in the deck's order,
+front to back, a band per card (`band` slot gaps deep), the structure ink beyond the last card; fed
+by `setSlotHues` from `Engine._syncTrendHues`. Paper draws the dot larger (`paperDot`) and at a gain
+above 1, because ink has no glow to carry a two-pixel dot. **The pool is per tier** (`centre`,
+`reach`, and their `phone` twins): on a wide screen it is centred behind the deck, so the lattice
+thins toward the viewer; on a phone the card covers everything behind it, so the pool is centred in
+front of the deck and the field runs down the screen to the dock.
 
 **Light that means something** (user, 2026-11-22: "can we use it for some nice effects?"). Five
 were agreed; four are built, each tied to something real, each a plain `Readonly` look constant:

@@ -55,7 +55,12 @@ describe("the top card's scope", () => {
 describe("a swipe that releases a focus", () => {
   it("turns from the deck the release left, read after it", () => {
     const stack = read("components/TrendStack.tsx");
-    expect(stack).toMatch(/st\.setTrendRotation\(useStore\.getState\(\)\.trendRotation \+ step\)/);
+    // The rotation is read from the store AFTER the focus release and the scroll rewind, and the
+    // commit adds the step to that reading (it may run a beat later, once the front card has lifted).
+    const body = stack.slice(stack.indexOf("const turnDeck = "), stack.indexOf("const stepMeasure = "));
+    expect(body.indexOf("st.setTrendScroll(0)")).toBeGreaterThan(-1);
+    expect(body.indexOf("const r = useStore.getState().trendRotation")).toBeGreaterThan(body.indexOf("st.setTrendScroll(0)"));
+    expect(body).toMatch(/setTrendRotation\(r \+ step\)/);
   });
 });
 

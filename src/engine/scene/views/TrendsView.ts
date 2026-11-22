@@ -6,7 +6,7 @@
 // each plane is a flat rectangle that happens to be smaller and further right than the one in
 // front — so with nothing behind them the five planes read as five unrelated cards floating in a
 // void rather than as one stack receding into history. The ground is the depth axis made visible:
-// a LINE FLOOR under the deck (`LINE_FLOOR`), level hairlines closing up toward the horizon, in the
+// a DOT FLOOR under the deck (`DOT_FLOOR`), a lattice whose rows close up toward the horizon, in the
 // identity hues of the cards standing over it.
 //
 // ⚠️ IT IS NOT A SHADOW UNDER EACH CARD, and that was built first. One soft band per slot — the
@@ -64,25 +64,39 @@ const EASE_EPS = 0.0005;
  *  card moves the floor with it. */
 const footY = (centre: number, f: PlaneFormat): number => PLANE_Y - centre * f.stepY - f.worldH / 2;
 
-/** THE LINE FLOOR — History's scene background: level hairlines across a floor under the deck, one
- *  per row of an even lattice, receding to nothing. Perspective does the work: the rows are evenly
- *  spaced in the world, so on screen they close up toward the horizon, which is the depth axis the
- *  stack recedes along. Each line is a constant width in SCREEN pixels (antialiased with `fwidth`),
- *  so it is a hairline at any distance and never a slab near the viewer.
+/** THE DOT FLOOR — History's scene background: a lattice of small dots on a level floor under the
+ *  deck, receding to nothing. It is TEXTURE, not a mark: a dot states no line, no row and no edge,
+ *  so nothing in it can be read as a gridline or a reading, and being crisp at every size it sits
+ *  with the cards' own type instead of smearing under them. Perspective does the work: the lattice
+ *  is even in the world, so on screen its rows close up toward the horizon, which is the depth
+ *  axis the stack recedes along.
  *
- *  It was a lattice of DOTS for a few hours (2026-11-22) and the user liked the effect but not the
- *  mark: "we use dots also for nodes, can we use something else (lines?)" — a dot here is a node
- *  everywhere else in the app. Lines run ACROSS the floor only: lines in depth converge on the
- *  vanishing point and draw the hard diagonals the side rails were cut for (the header).
+ *  It was level HAIRLINES for a day (2026-11-22, on "we use dots also for nodes, can we use
+ *  something else (lines?)") and the user came back to the dots the day after: "I actually like the
+ *  earlier proposal where we had a plane of dots instead of the lines". Git has the lines.
  *
- *  `spacing` is the row pitch in world units (the card is 58 wide), `width` a line's width in
- *  device pixels (`paperWidth` times that on paper, where ink has no glow to carry a hairline),
- *  `band` the depth of one card's colour band in slot gaps, `reach` the radius of the pool the
- *  field fades out over, `drop` how far below the front card's foot the floor lies (a fraction of
- *  the card's height), and the two presences are the lines' level per ground (a gain on the pool's
- *  falloff, capped at a full line). */
-export const LINE_FLOOR: Readonly<{ spacing: number; width: number; paperWidth: number; band: number; reach: number; drop: number; dark: number; paper: number }> = {
-  spacing: 2.5, width: 1, paperWidth: 1.5, band: 2.5, reach: 85, drop: 0.172, dark: 0.16, paper: 0.6,
+ *  `spacing` is the lattice pitch in world units (the card is 58 wide), `dot` a dot's radius as a
+ *  fraction of the pitch (`paperDot` times that on paper, where ink has no glow to carry a
+ *  two-pixel dot), `band` the depth of one card's colour band in slot gaps, `reach` the radius of
+ *  the pool the field fades out over, `drop` how far below the front card's foot the floor lies (a
+ *  fraction of the card's height), and the two presences are the dots' level per ground (a gain on
+ *  the pool's falloff, capped at a full dot — paper's is above 1 so the ink holds its hue further
+ *  out from the pool's centre).
+ *
+ *  ⚠️ THE POOL IS PER TIER (`centre`, `reach` and their `phone` twins; user, 2026-11-23: on the
+ *  phone the floor "sits behind the card"). `centre` is where the pool is centred in depth (world
+ *  z; the front card stands at 0, the deck recedes into the negative). On a wide screen it lies
+ *  well BEHIND the deck, so the lattice thins toward the viewer, where dots seen close up turn
+ *  coarse. A phone's card fills the width and stands in the upper half of a tall screen: the floor
+ *  behind the deck is all covered by the card, and everything the reader can see of it is the part
+ *  between the card and themselves. There the pool is centred in FRONT of the deck and reaches
+ *  further, so the card stands at the back of a field that runs down the screen to the dock. */
+export const DOT_FLOOR: Readonly<{
+  spacing: number; dot: number; paperDot: number; band: number; drop: number; dark: number; paper: number;
+  centre: number; reach: number; centrePhone: number; reachPhone: number;
+}> = {
+  spacing: 2.0, dot: 0.065, paperDot: 2.0, band: 2.5, drop: 0.172, dark: 0.75, paper: 3.2,
+  centre: -34, reach: 85, centrePhone: 20, reachPhone: 130,
 };
 /** The floor plane's side: comfortably past `reach`, so its edge is never on screen. */
 const FLOOR_FIELD = 320;
@@ -111,8 +125,8 @@ export class TrendsView implements SceneView {
     this.group = new THREE.Group();
     scene.add(this.group);
 
-    // THE LINE FLOOR (see LINE_FLOOR). One level plane; the rows are a fragment term over the
-    // world position, antialiased in screen space (`fwidth`) so a line is a hairline at any
+    // THE DOT FLOOR (see DOT_FLOOR). One level plane; the lattice is a fragment term over the
+    // world position, antialiased in screen space (`fwidth`) so a dot is round at any
     // distance, and handed over to nothing where the pitch falls under a few pixels, so the far
     // field dissolves instead of shimmering.
     this._floorMat = new THREE.ShaderMaterial({
@@ -121,19 +135,18 @@ export class TrendsView implements SceneView {
         uColor: { value: new THREE.Color() },
         uOp: { value: 0 },
         uPresence: { value: 0 },
-        uLattice: { value: new THREE.Vector3(LINE_FLOOR.spacing, LINE_FLOOR.width, LINE_FLOOR.reach) },
-        // Centred well BEHIND the deck: the pool then thins toward the viewer, where a lattice
-        // seen close up turns into coarse stretched marks (seen live at the first cut).
-        uCentre: { value: new THREE.Vector2(0, -34) },
-        // THE LINES WEAR THE DECK'S COLOURS (user, 2026-11-22: "can we give it metagraph colors"):
+        uLattice: { value: new THREE.Vector3(DOT_FLOOR.spacing, DOT_FLOOR.dot, DOT_FLOOR.reach) },
+        // The pool's centre in depth, per tier (see DOT_FLOOR); `face()` writes both with the format.
+        uCentre: { value: new THREE.Vector2(0, DOT_FLOOR.centre) },
+        // THE DOTS WEAR THE DECK'S COLOURS (user, 2026-11-22: "can we give it metagraph colors"):
         // the lattice takes the cards' identity hues IN THE DECK'S ORDER, front to back
         // (`setSlotHues`) — the front card's from the viewer to its foot, then a band per card
         // behind it, each easing into the next, and the structure ink beyond the last and where no
-        // hue is known. A band is `LINE_FLOOR.band` slot gaps deep, not one: at the cards' true
-        // spacing a band was two or three rows and the whole deck's colours a thin stripe (seen
+        // hue is known. A band is `DOT_FLOOR.band` slot gaps deep, not one: at the cards' true
+        // spacing a band was three rows of dots and the whole deck's colours a thin stripe (seen
         // live). The floor echoes the deck's order; it does not survey it.
         uHue: { value: SLOTS.map(() => new THREE.Color()) },
-        uGap: { value: PLANE_GAP * LINE_FLOOR.band },
+        uGap: { value: PLANE_GAP * DOT_FLOOR.band },
       },
       vertexShader: /* glsl */ `
         varying vec2 vXZ;
@@ -156,16 +169,15 @@ export class TrendsView implements SceneView {
           vec3 hue = mix(uHue[i0], uHue[i1], smoothstep(0.3, 0.7, fract(t)));
           // Past the last card the lattice returns to the structure ink.
           hue = mix(hue, uColor, smoothstep(float(${VISIBLE_PLANES - 1}) + 0.5, float(${VISIBLE_PLANES}) + 1.5, -vXZ.y / uGap));
-          // Rows across the floor: one line per unit of depth in lattice space. aa is one
-          // device pixel in that space, so the half-width below is in pixels.
-          float gz = vXZ.y / uLattice.x;
-          float aa = fwidth(gz);
-          float d = abs(fract(gz) - 0.5);
-          float half_w = 0.5 * uLattice.y * aa;
-          float lineA = 1.0 - smoothstep(half_w, half_w + aa, d);
+          // One dot per lattice cell, round at any distance: aa is a pixel in lattice space.
+          vec2 g = vXZ / uLattice.x;
+          vec2 fw = fwidth(g);
+          float aa = max(fw.x, fw.y);
+          float d = length(fract(g) - 0.5);
+          float dotA = 1.0 - smoothstep(uLattice.y - aa, uLattice.y + aa, d);
           float crowd = 1.0 - smoothstep(0.16, 0.4, aa);
           float far = 1.0 - smoothstep(0.0, uLattice.z, length(vXZ - uCentre));
-          gl_FragColor = vec4(hue, min(1.0, lineA * crowd * far * far * uPresence) * uOp);
+          gl_FragColor = vec4(hue, min(1.0, dotA * crowd * far * far * uPresence) * uOp);
         }
       `,
     });
@@ -228,9 +240,12 @@ export class TrendsView implements SceneView {
     this._count = count;
     this._fmt = fmt;
     this._floor.visible = count > 0;
+    // The pool for this tier (see DOT_FLOOR).
+    (this._floorMat.uniforms.uCentre.value as THREE.Vector2).y = phone ? DOT_FLOOR.centrePhone : DOT_FLOOR.centre;
+    (this._floorMat.uniforms.uLattice.value as THREE.Vector3).z = phone ? DOT_FLOOR.reachPhone : DOT_FLOOR.reach;
     // A little under the front card's foot. A card is DOM and composites in front of the canvas,
     // so the floor can never cross its plot whatever the drop.
-    this._floor.position.y = footY(this._centre, fmt) - fmt.worldH * LINE_FLOOR.drop;
+    this._floor.position.y = footY(this._centre, fmt) - fmt.worldH * DOT_FLOOR.drop;
   }
 
   /** The theme flip. Joins the Engine's `_colorConsumers` fan-out like the other views. */
@@ -239,7 +254,7 @@ export class TrendsView implements SceneView {
     this._restyle();
   }
 
-  /** The lines' colours, level and blend for the ground they are drawn on. Event-time — a theme
+  /** The dots' colours, level and blend for the ground they are drawn on. Event-time — a theme
    *  flip, a change of deck, and construction. A material whose blending changes after
    *  construction has to say `needsUpdate` — three caches the program per blending mode. */
   private _restyle(): void {
@@ -250,9 +265,9 @@ export class TrendsView implements SceneView {
     (this._floorMat.uniforms.uColor.value as THREE.Color).setHex(ink);
     const hues = this._floorMat.uniforms.uHue.value as THREE.Color[];
     for (const i of SLOTS) hues[i].setHex(this._slotHue[i] || ink);
-    this._floorMat.uniforms.uPresence.value = paper ? LINE_FLOOR.paper : LINE_FLOOR.dark;
-    // Ink has no bloom and no glow to carry a hairline: on paper the line is drawn wider.
-    (this._floorMat.uniforms.uLattice.value as THREE.Vector3).y = LINE_FLOOR.width * (paper ? LINE_FLOOR.paperWidth : 1);
+    this._floorMat.uniforms.uPresence.value = paper ? DOT_FLOOR.paper : DOT_FLOOR.dark;
+    // Ink has no bloom and no glow to carry a two-pixel dot: on paper the dot is drawn larger.
+    (this._floorMat.uniforms.uLattice.value as THREE.Vector3).y = DOT_FLOOR.dot * (paper ? DOT_FLOOR.paperDot : 1);
     this._floorMat.blending = glowBlend(this._colors);
     this._floorMat.needsUpdate = true;
   }

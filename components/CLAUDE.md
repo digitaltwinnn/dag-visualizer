@@ -517,6 +517,15 @@ policy row, `viewPolicy.metagraphCard`** (PR review, 2026-10-19 — it had becom
 `mode === "geo"` compares): `railCards.metagraphCardNetwork` resolves it, and the card's × and
 the slot's hint read the same row.
 
+**A deck turn is SEEN** (`TrendStack.turnDeck`, "THE DECK'S TURN" in globals.css; user, 2026-11-23:
+the swipe "looks ugly how the cards move up/down, hardly visible"). A turn re-deals every card one
+slot, but the card that turns away usually leaves the five-card window and is unmounted on the spot,
+so the deck's contents simply changed. Forward, the front card lifts off the deck and fades
+(`data-turn="out"`), and the rotation is written only when it has gone (`TURN_OUT_MS`); back, the
+rotation is written at once and the card taking the front drops into it (`"in"`). A turn made while
+one is pending lands the pending one first. Reduced motion commits at once. The swipe's duration
+is read from the events' own `timeStamp`, not the clock inside the handler.
+
 **The front card's plot states its scale** (`TrendChart yTicks`, 2026-11-22): the gridlines sit on
 round values (`yTickValues` — one home for the recharts grid and the figures beside it) and each
 carries a small figure at its left end, the top one with the plot's unit at its cadence ("2.5K per
