@@ -151,10 +151,12 @@ export default function MotionHint() {
         "absolute left-1/2 z-[5] -translate-x-1/2 pointer-events-none select-none whitespace-nowrap",
         // 13.5px: between `text-body` and `text-title` on the scale. No shadow at all.
         "inline-flex items-center text-[13.5px] leading-none font-normal text-foreground",
-        // The plate: the ground's colour at 82%, blurred — `--background` is `light-dark()`, so the
-        // one rule serves both grounds. No border, no shadow. (Removed for a round on a misread
-        // "remove the pill" — the user meant the beating DOT, not the plate; 2026-09-26.)
-        "rounded-full px-3.5 py-2 bg-[color-mix(in_oklch,var(--background)_82%,transparent)] backdrop-blur-[6px]",
+        // THE PLATE IS THE COMMAND BAR'S (user, 2026-11-23: "it just has a white hardly visible
+        // background"): the bar's glass, its hairline and its elevation token, as a pill. The
+        // ground's own colour at 82% with no edge vanished into a paper scene, which is nearly that
+        // colour; the bar's plate is the HUD's one chrome surface and reads on both grounds. It is
+        // still no card — no callout glass, no shadow on paper (`--card-ambient` is zero there).
+        "rounded-full px-3.5 py-2 border border-border backdrop-blur-md [background:var(--topbar-glass)] [box-shadow:var(--card-ambient)]",
         // The entrance: fade + a short rise, delayed a beat on the way IN only. One arbitrary
         // `[transition:…]` rather than two utilities — `transition-*` is a twMerge group.
         // Three states on one property: OFF (quick fade), ON (quick fade in, a beat late), and

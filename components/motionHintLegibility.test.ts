@@ -10,7 +10,9 @@ describe("the motion hint", () => {
     expect(hint).toMatch(/font-normal text-foreground"/);
     expect(hint).not.toMatch(/font-normal text-foreground-dim/);
   });
-  it("stands on a plate that holds back a lit scene", () => {
-    expect(hint).toMatch(/bg-\[color-mix\(in_oklch,var\(--background\)_82%,transparent\)\]/);
+  // user, 2026-11-23: the ground-coloured plate was "hardly visible" on paper — it wears the
+  // command bar's own plate and hairline now.
+  it("stands on the command bar's plate, edged, so it reads on both grounds", () => {
+    expect(hint).toMatch(/border border-border backdrop-blur-md \[background:var\(--topbar-glass\)\]/);
   });
 });
