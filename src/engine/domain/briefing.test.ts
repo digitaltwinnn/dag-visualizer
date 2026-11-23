@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_REGISTER } from "./viewPolicy";
 import { BRIEFING_COVER, BRIEFING_LAND_MAX_MS, BRIEFING_NO_MOTION_MS, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_SETTLE_MS, BRIEFING_STOPS, BRIEFING_TYPE_SLOW, BRIEFING_WORDS_OUT_MS, HANDOVER_MS, HANDOVER_SHEET_AT_MS, HANDOVER_SHEET_GROW_MS,LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, handoverHand, handoverPulses, hasLanded, liftSettling, mayAdvance, nextStop, prevStop, stopRegister } from "./briefing";
 
 const on = { pathname: "/", seen: false };
@@ -14,13 +15,13 @@ describe("how long a stop stands", () => {
 
 describe("the tour's route", () => {
   it("visits every 3D view, starting on the globe", () => {
-    expect(BRIEFING_STOPS).toEqual([{ mode: "geo" }, { mode: "ledger" }, { mode: "hyper" }, { mode: "trend" }]);
+    expect(BRIEFING_STOPS).toEqual([{ mode: "geo" }, { mode: "ledger", register: "snapshots" }, { mode: "hyper" }, { mode: "trend" }]);
     expect(BRIEFING_STOPS[2]).toEqual({ mode: "hyper" });
   });
 
-  it("puts the Snapshots view in the Snapshots register at any stop that names none", () => {
+  it("shows Metagraph snapshots at its own stop, and leaves the view's default at every stop that names none", () => {
     expect(stopRegister(BRIEFING_STOPS[1]!)).toBe("snapshots");
-    expect(stopRegister(BRIEFING_STOPS[2]!)).toBe("snapshots");
+    expect(stopRegister(BRIEFING_STOPS[2]!)).toBe(DEFAULT_REGISTER);
     expect(stopRegister({ mode: "ledger", register: "blocks" })).toBe("blocks");
   });
 

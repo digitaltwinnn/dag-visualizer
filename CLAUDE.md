@@ -42,7 +42,9 @@ Four views drive the 3D scene:
   tile; **Data blocks** (`/data-blocks`, D6 2026-11-07 — user: "Threeway.") the Metagraph snapshots
   chamber as it stands, same source, plus a mark on each tile whose exact read says it carried data
   blocks, a column with one box per data block (a cL1 block holds transactions, a dL1 block data
-  updates — the protocol's own split). A register is a setting of a view, never a Mode
+  updates — the protocol's own split). The view OPENS on Data blocks (`viewPolicy.DEFAULT_REGISTER`, user 2026-11-23); `/snapshots` still
+  names Metagraph snapshots, and the tour's Snapshots stop names it too (its line is that note's).
+  A register is a setting of a view, never a Mode
   (`viewPolicy.registers` lists them; the view switch holds no sixth button), its pages live in ONE map
   (`components/views.ts`' `REGISTER_PAGES`, pinned by `views.test.ts`), the chamber dispatches on ONE
   keyed map (`LedgerView`'s `REGISTER_CARGO`), and `switchLedgerRegister`

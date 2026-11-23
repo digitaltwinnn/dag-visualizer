@@ -8,7 +8,7 @@ const ok = (text: string, line?: string): NoteResponse => ({ state: "ok", text, 
 describe("the note a stop reads", () => {
   it("is the same note a visitor with no filter gets", () => {
     expect(briefingReq({ mode: "geo" })).toEqual({ view: "geo", subject: "all", span: null });
-    expect(briefingReq({ mode: "ledger" })).toEqual({ view: "ledger", subject: "all", span: null });
+    expect(briefingReq({ mode: "ledger", register: "snapshots" })).toEqual({ view: "ledger", subject: "all", span: null });
     expect(briefingReq({ mode: "hyper" })).toEqual({ view: "hyper", subject: "all", span: null });
     expect(briefingReq({ mode: "trend" })).toEqual({ view: "trend", subject: "dag", span: "30d" });
     // A stop that names the blocks register would read the block DAG's own note (no stop does now).

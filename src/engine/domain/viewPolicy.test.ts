@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Mode } from "@/src/store/store";
 import type { LedgerRegister } from "@/src/store/mode";
-import { REGISTER_DATA_BLOCKS, REGISTER_LAYER, REGISTER_SOURCE, VIEW_POLICIES, drawsDataBlocks, readsBlockWindow, registerOf, registerRuns } from "./viewPolicy";
+import { DEFAULT_REGISTER, REGISTER_DATA_BLOCKS, REGISTER_LAYER, REGISTER_SOURCE, VIEW_POLICIES, drawsDataBlocks, readsBlockWindow, registerOf, registerRuns } from "./viewPolicy";
 import { is3D } from "./viewTransition";
 
 const MODES: Mode[] = ["hyper", "geo", "ledger", "trend", "soon"];
@@ -278,5 +278,13 @@ describe("REGISTER_LAYER / registerRuns — a register's subject needs a layer (
       expect(registerRuns(r, null)).toBe(true);
       expect(registerRuns(r, [])).toBe(true);
     }
+  });
+});
+
+describe("the default register", () => {
+  // user, 2026-11-23: "default sub-view for snapshots, use data blocks?"
+  it("is Data blocks, one the Snapshots view offers", () => {
+    expect(DEFAULT_REGISTER).toBe("data");
+    expect(VIEW_POLICIES.ledger.registers).toContain(DEFAULT_REGISTER);
   });
 });

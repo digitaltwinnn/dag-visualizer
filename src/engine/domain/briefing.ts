@@ -1,5 +1,6 @@
 import type { LedgerRegister, Mode } from "@/src/store/mode";
 import { easeInOutQuad } from "./cameraRig";
+import { DEFAULT_REGISTER } from "./viewPolicy";
 
 // THE BRIEFING (user, 2026-10-31): the tour every entry to `/` plays, one stop per 3D view, each
 // in the AI's own line. Most visitors never reach a second view, so the app shows them all once and
@@ -9,18 +10,20 @@ import { easeInOutQuad } from "./cameraRig";
 /** A stop: a view, and for the Snapshots view the register it stands in. */
 export type BriefingStop = { mode: Mode; register?: LedgerRegister };
 
-/** The route: where, then now (the Snapshots view in its own register), then who, then how it
+/** The route: where, then now (the Snapshots view in Metagraph snapshots, named: the stop's line is
+ *  that note's, and the view now opens on Data blocks — `DEFAULT_REGISTER`), then who, then how it
  *  changed. One stop per view: a register inside a view is not a stop of its own. */
 export const BRIEFING_STOPS: readonly BriefingStop[] = [
   { mode: "geo" },
-  { mode: "ledger" },
+  { mode: "ledger", register: "snapshots" },
   { mode: "hyper" },
   { mode: "trend" },
 ];
 
-/** The register a stop leaves the Snapshots view in. A stop with none names the Snapshots register,
- *  so a stop that carries a register never leaves the next one showing it. */
-export const stopRegister = (stop: BriefingStop): LedgerRegister => stop.register ?? "snapshots";
+/** The register a stop leaves the Snapshots view in. A stop with none names the view's default
+ *  register (`DEFAULT_REGISTER`), so a stop that carries a register never leaves the next one
+ *  showing it, and the tour ends with the view as a first visit finds it. */
+export const stopRegister = (stop: BriefingStop): LedgerRegister => stop.register ?? DEFAULT_REGISTER;
 
 /** How long a stop stands, its scene's transition included. A quarter under 6500 went too far (user
  *  2026-11-01: "25% shorter"; 2026-11-02, after reading it against the live lines of 102 to 122
