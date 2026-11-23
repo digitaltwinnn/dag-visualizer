@@ -778,25 +778,38 @@ export default function RailDock({
                 the sheet's own grabber says it drags. The ∧/∨ restated the open state and cost the
                 tray its width. */}
             {tray}
-            {/* Hosted-card UPDATE signal only: a travelling pulse along the half's TOP edge — the
-                shared vertical recipe rotated onto the horizontal edge (the mask/geometry live in
-                the carrier's local coords, so the soft tips + sweep rotate with it), sweeping from
-                THIS half's screen edge toward the centre seam — genuinely local to this half's own
-                card. The view/filter SWITCH signal is NOT rendered per-half here (see the
-                `signalKey` doc) — it rides `PhoneDockSweep`'s single full-width overlay instead,
-                so the two halves don't each play a competing half-sweep. */}
-            {pulseSpan(
-              updateP,
-              cn(
-                "h-[50vw] top-[3px]",
-                side === "left" ? "left-0 origin-top-left -rotate-90" : "right-0 origin-top-right rotate-90",
-              ),
-              true,
-            )}
           </ToggleGroupItem>
         </ToggleGroup>
         , document.body)
-      ) : (
+      ) : null}
+      {/* Hosted-card UPDATE signal: a travelling pulse along the dock's TOP edge, the shared
+          vertical recipe rotated onto the horizontal edge (the mask and geometry live in the
+          carrier's local coords, so the soft tips and the sweep rotate with it). It STARTS at this
+          half's screen edge — the card that changed is this half's — and runs the WHOLE width
+          (user, 2026-11-23: "should cover the width, but only covers the right button section"):
+          it ran to the centre seam and stopped, so the Details half's update read as a fragment.
+          A page-level overlay like `PhoneDockSweep`'s, because the half's own group is a stacking
+          context the other half would paint over. The view/filter SWITCH signal is not here — it
+          rides `PhoneDockSweep`, left edge to right. */}
+      {isBarHalf && portalReady && bootStage >= 2 && updateP.live && createPortal(
+        <span
+          className="hidden max-[700px]:block fixed z-[43] bottom-0 left-0 w-full h-[var(--phone-dock-h)] pointer-events-none"
+          style={{ ...style, ["--spine" as string]: "var(--filter-accent, var(--primary))" } as CSSProperties}
+          aria-hidden
+          onAnimationEnd={updateP.onEnd}
+        >
+          <span
+            className={cn(
+              "absolute top-[3px] w-[3px] h-[100vw] [--pulse-len:45%]",
+              side === "left" ? "left-0 origin-top-left -rotate-90" : "right-0 origin-top-right rotate-90",
+            )}
+          >
+            <PulseEdge pulseKey={updateP.pulse} />
+          </span>
+        </span>,
+        document.body,
+      )}
+      {isBarHalf ? null : (
         // Tablet edge tab (700–1099px only; hidden on desktop AND phone): ONE CHEVRON, and the
         // sheet's one control (see the header — option C2). Closed it sits on the screen edge
         // pointing into the scene; open it rides the sheet's inner edge (`sheetW`, measured), its
