@@ -470,11 +470,26 @@ export default function TrendStack() {
     pendingTurn.current?.();
     pendingTurn.current = null;
     const st = useStore.getState();
-    if (st.trendFocus) applyClickActions(trendPlaneActions(st.trendFocus, st.trendFocus));
+    const released = !!st.trendFocus;
+    if (released) applyClickActions(trendPlaneActions(st.trendFocus!, st.trendFocus!));
     if (st.trendScroll) st.setTrendScroll(0);
     const r = useStore.getState().trendRotation; // read after the release, which rewinds it
-    const commit = () => useStore.getState().setTrendRotation(r + step);
-    const now = rotateOrder(deck, r);
+    // THE COMMIT ONLY LANDS ON THE DECK IT WAS MADE FOR (review, 2026-11-23): a forward turn writes
+    // its rotation a beat later, and a view switch, a filter commit or a focus inside that beat
+    // resets the rotation under it — written then, a stale `r + 1` would carry into the next view.
+    const at = { mode: st.mode, filter: st.filter };
+    const commit = () => {
+      const now = useStore.getState();
+      if (now.mode !== at.mode || now.filter !== at.filter || now.trendRotation !== r || now.trendFocus) return;
+      now.setTrendRotation(r + step);
+    };
+    // THE CARD THAT TRAVELS is read from what will be ON SCREEN (review, 2026-11-23): with a focus
+    // just released, this render's `deck` is still the focused one, and its first card is not the
+    // one in front once the release lands — so the deck is rebuilt as the release leaves it. With
+    // no release, the order already drawn (held through a measure change) is the truth.
+    const now = released
+      ? rotateOrder(deckOf(ranked, { total: !!roster.total, unlisted: !!roster.unlisted, focus: null, unlistedId: UNLISTED_ID }), r)
+      : order;
     const still = now.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (still) {
       setTurn(null);
@@ -798,7 +813,7 @@ export default function TrendStack() {
                 // measure rides the front plot's caption instead (`unitInPlot`).
                 unitInPlot={false}
                 // A finer line: the card is drawn larger than authored, so the chart's own 2px
-                // landed at 2.6 (see `lineWidth`). 1.25 → 1 (user, 2026-11-23: "too thick and/or
+                // landed at 2.6 (see `lineWidth`). 1.25 → 1 → 0.75 (user, 2026-11-23: "too thick and/or
                 // spikey?"): hundreds of hourly buckets on a few hundred pixels fold back on
                 // themselves, and every extra tenth of stroke thickens each fold into a blade.
                 // 0.75 with the fill's lit lip under it (`TrendChart`'s gradient): the band carries

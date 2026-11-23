@@ -1482,11 +1482,14 @@
      scene, and under the reader's own hand they step back almost to nothing: the phone's scene
      mode, held for exactly as long as the gesture. `PhoneSceneYield` (RailShade.tsx) raises the
      attribute — phone tier, no sheet open, a drag or a pinch in progress. With a sheet OPEN the
-     bars stay solid, as above: there they are the sheet's handles. The register switch follows
-     (`!important`: its own yield is a utility at the ordinary level, in a later layer). */
+     bars stay solid, as above: there they are the sheet's handles. The register switch and its
+     caption follow while they are shown (`!important`: their own yield is a utility at the ordinary
+     level, in a later layer; a switch that is away — `data-on="0"` — stays away). Each element keeps
+     its own transition tempo. */
   html[data-scene-deep] #topbar,
-  html[data-scene-deep] [data-phone-dock] { opacity: 0.1; transition: opacity 0.3s ease; }
-  html[data-scene-deep] #register-switch { opacity: 0.1 !important; }
+  html[data-scene-deep] [data-phone-dock] { opacity: 0.1; }
+  html[data-scene-deep] #register-switch:not([data-on="0"]),
+  html[data-scene-deep] #register-caption:not([data-on="0"]) { opacity: 0.1 !important; }
   /* ⚠️ Every ARM must be listed: the state rules above carry their own `transition` at (0,2,0)
      — a bare `.rail-shade` reset is (0,1,0) and loses to them (CSS trap 4). */
   @media (prefers-reduced-motion: reduce) {
@@ -1494,9 +1497,7 @@
     .rail-shade[data-hidden],
     .rail-shade[data-dim],
     [data-slot="sheet-content"],
-    [data-slot="sheet-content"][data-dim],
-    html[data-scene-deep] #topbar,
-    html[data-scene-deep] [data-phone-dock] { transition: none; }
+    [data-slot="sheet-content"][data-dim] { transition: none; }
   }
   #leftcol > aside { width: auto; }
   #leftcol > * { pointer-events: auto; }

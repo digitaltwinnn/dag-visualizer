@@ -2331,7 +2331,7 @@ export class LedgerView implements SceneView {
               this._dataMarkMesh.setColorAt(si, _col);
               si++;
             }
-            // THE MIST it hangs over: the shell stands on the tile's top at the tile's size, in the
+            // THE MIST it hangs over: the sheet stands on the tile's top at the tile's size, in the
             // column's ink at the tile's entry fade (a colour multiply: it is added light on dark,
             // and the instance colour is its only per-column channel).
             _dummy.position.set(_tileV.x, _tileV.y, _tileV.z);

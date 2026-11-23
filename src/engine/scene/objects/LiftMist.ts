@@ -32,7 +32,7 @@ export class LiftMist {
   private readonly _mat: THREE.ShaderMaterial;
   private _paper: boolean;
 
-  /** `max` columns; the sheet is `foot` of the tile's footprint wide at its top and `height` tall,
+  /** `max` columns; the sheet narrows by `foot` from its base to its top and is `height` tall,
    *  both in tile sizes (a column's instance scale is its tile's size). */
   constructor(parent: THREE.Object3D, max: number, foot: number, height: number, paper: boolean) {
     this._paper = paper;
@@ -52,8 +52,9 @@ export class LiftMist {
         uTime: { value: 0 },
         uLook: { value: new THREE.Vector2(MIST_LOOK.reach, MIST_LOOK.drift) },
         // The column's shape in tile sizes: its half-width at the foot and at the top, its height.
-        // The foot is a little wider than half the tile, between the square's side and its diagonal.
-        uShape: { value: new THREE.Vector3(0.6, 0.6 * foot, height) },
+        // 0.4 of the tile at the foot, narrowing by the block's own proportion — the look approved
+        // live (2026-11-23), restated once the width was measured with the parent's scale.
+        uShape: { value: new THREE.Vector3(0.4, 0.4 * foot, height) },
       },
       vertexShader: /* glsl */ `
         uniform vec3 uShape;
@@ -70,7 +71,8 @@ export class LiftMist {
           #ifdef USE_INSTANCING
             im = instanceMatrix;
           #endif
-          float sx = length(im[0].xyz);
+          // The width's scale is the WHOLE transform's (the view group scales too), in view space.
+          float sx = length((modelViewMatrix * im)[0].xyz);
           vec4 mv = modelViewMatrix * im * vec4(0.0, position.y * uShape.z, 0.0, 1.0);
           mv.x += position.x * mix(uShape.x, uShape.y, position.y) * sx;
           gl_Position = projectionMatrix * mv;

@@ -36,9 +36,11 @@ export type TabSignal = { id: string; icon: LucideIcon; hue?: string; active?: b
 // heaviest frame the app has — on a phone the paint landed half a second late, the timer fired on
 // time, and the carrier unmounted with the segment in mid-travel. `onEnd` is handed to the
 // carrier's `onAnimationEnd` and closes the window on the sweep's own last frame; the timer stays
-// only as a long backstop for a sweep that never runs (reduced motion plays a shorter blink).
+// only as the backstop for a carrier whose sweep never ends — one unmounted mid-sweep by a sheet
+// opening, or hidden by its tier — and it is kept short (review, 2026-11-23) so a sheet closed a
+// moment later never replays a stale sweep, the case the window exists for.
 const SWEEP = "edge-pulse-sweep";
-const PULSE_BACKSTOP_MS = 5000;
+const PULSE_BACKSTOP_MS = 2400;
 export function usePulseWindow(key: unknown): { pulse: number; live: boolean; onEnd: (e: AnimationEvent) => void } {
   const pulse = useEdgePulse(key);
   const [live, setLive] = useState(false);
