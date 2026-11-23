@@ -801,7 +801,8 @@ The row behind both numbers is resolved at event time
 with the pick table (`_rebuildTilePicks` → `_dataRowOf`, the snapshot's own row in its tick's exact
 read): `dataMarkCount` gates the tile (a mark only where the row says it carried data blocks) and
 `dataStackBoxes` sizes the column; a tile whose read has not landed shows none (rule 10, never
-guessed). The column wears the lane's identity hue at the tile's own eased brightness lifted by
+guessed). The column wears its TILE's hue — identity on the active row, a hover and the committed
+network's trail, the neutral trail elsewhere (user, 2026-11-23) — at the tile's own eased brightness lifted by
 `DATA_MARK_GAIN` — so the dim, the focus, the boundary fades and the entry beat all reach it through
 its tile — and a hovered data block lights its snapshot's whole column. A switch between the two
 registers that read the same source re-lays the trail (`_refreshLedger`) rather than re-seating it;

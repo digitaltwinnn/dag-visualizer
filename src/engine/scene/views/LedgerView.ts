@@ -2306,7 +2306,7 @@ export class LedgerView implements SceneView {
         // above. Thin toward the ground, floor the tint — the two answer different halves.
         this._metaTrailMesh.setColorAt(mi, inkMix(_col.copy(ident ? laneColor : this._coreCol), bright, this._colors));
         // THE DATA COLUMN (the Data blocks register's cargo): one box per data block, standing over
-        // the tile as this frame draws it, in the lane's identity hue at the tile's own eased
+        // the tile as this frame draws it, in the tile's own hue (identity or the neutral trail) at its eased
         // brightness (lifted so it reads on it), so the dim, the focus and the boundary fades all
         // reach it through its tile.
         if (dataMarks) {
@@ -2321,7 +2321,10 @@ export class LedgerView implements SceneView {
             const under = _tileV.y + tileH * DATA_MARK.lift + bob + (1 - dataIn) * b.size * DATA_ARRIVAL.drop;
             const pitch = h * (1 + DATA_STACK.gap);
             // A hovered data block's column takes the subject's full weight (its tile keeps its own).
-            inkMix(_col.copy(laneColor), mi === this._hoverMark ? 1 : Math.min(1, bright * DATA_MARK_GAIN), this._colors);
+            // Its HUE is its tile's (user, 2026-11-23: "unlike all other elements in the trail, the
+            // data block still keeps its metagraph color"): identity on the active row, a hover
+            // and the committed network's own trail, the neutral trail everywhere else.
+            inkMix(_col.copy(ident || mi === this._hoverMark ? laneColor : this._coreCol), mi === this._hoverMark ? 1 : Math.min(1, bright * DATA_MARK_GAIN), this._colors);
             _dummy.rotation.set(0, 0, 0);
             _dummy.scale.set(w, h, w);
             for (let bx = 0; bx < boxes; bx++) {
