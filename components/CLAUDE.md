@@ -517,6 +517,17 @@ policy row, `viewPolicy.metagraphCard`** (PR review, 2026-10-19 — it had becom
 `mode === "geo"` compares): `railCards.metagraphCardNetwork` resolves it, and the card's × and
 the slot's hint read the same row.
 
+**The node card states the same facts in every view** (user, 2026-11-23; `GeoLiveNode`): place,
+host and ASN no longer yield to a committed country or provider card. A folded entry shows only its
+name, so under the pile rule the node's city and ASN were on screen nowhere. It is the one subject
+card exempt from that rule (its Runs section already was); every other card still never restates
+its ancestors.
+
+**The phone's tour hand-over opens the Explore sheet after the dock bar** (2026-11-23,
+`HANDOVER_SHEET_AT_MS`): 700 ms after the tour ends, once the bar has faded back in, on a 1.2 s even
+grow; the phone's pulses wait for the grown sheet. Opened at once it grew out of a half-faded bar
+through the end's heavy frames.
+
 **The phone's cleared stage** (`PhoneSceneYield` in `RailShade.tsx`, `html[data-scene-deep]` in
 globals.css; user, 2026-11-23: the phone has no scene mode, so "if the bottom section is collapsed,
 can we apply that [dim] to bottom section AND top bar also and make the dim even stronger"). With
@@ -640,7 +651,8 @@ pointermove. Three rules are worth knowing before touching it:
   made inside the layer clears it too. Closing the log used to strand the reader in Snapshots.
 
 **The motion hint says what the scene is doing while it moves** (user, 2026-09-26 — `MotionHint`,
-one quiet sentence on a low plate, centred just under the command bar — or one line lower, under the
+one quiet sentence on the command bar's own plate and hairline as a pill (2026-11-23: the
+ground-coloured plate vanished on paper), centred just under the command bar — or one line lower, under the
 register switch, where the view offers more than one register: D3). Two store channels, and nothing else feeds it.
 `sceneMoving` is ENGINE → REACT: the Engine's `_publishMotion` derives it each frame from the four
 structures that already drive motion — `ViewTransition.active()`, `CameraDirector.flying`, the

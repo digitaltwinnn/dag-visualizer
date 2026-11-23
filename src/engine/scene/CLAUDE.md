@@ -1066,6 +1066,13 @@ ceiling. The filmic curve rolls channels off one by one, so a boosted bar came o
 core near-white. Below the knee nothing changes; paper runs neither. Khronos Neutral, which holds
 hue by design, was tried again (2026-11-22) and still casts dark halos around the globe's nodes.
 
+**On paper the chamber's network hues sit at the HUD's presence** (`LedgerView.setSceneColors`,
+`PAPER_IDENT_LIFT`; user, 2026-11-23: they looked "darker than the regular css elements carrying the
+same color"). Both lanes resolve a hue to nearly one hex, but the HUD draws its identity bars at
+0.6–0.75 opacity (measured L 0.66) while the chamber's opaque tiles and bars stood at the full ink
+(0.59, sides lower). The ledger's map is composited a quarter toward the page in sRGB, once, at
+event time — tiles, bands, ribbons, columns and blocks alike. Dark is untouched.
+
 **The chamber's tray chips rest quieter** (`dimModel.FOCUS_ROWS[view].rest`, a per-view gain on the
 nodes' resting glow: 1 where nodes are the subject, 0.45 in Snapshots, where the row of chips was the
 brightest thing in a view about snapshots).
