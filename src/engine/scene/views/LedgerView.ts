@@ -256,6 +256,22 @@ const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolea
 };
 /** A data mark's brightness over its tile's: a footnote on the tile, but one that must read on it. */
 const DATA_MARK_GAIN = 2.2;
+
+/** How far the chamber's identity hues lean toward the page on paper — the HUD's identity bars'
+ *  own 0.75 opacity, as a share of the page (`setSceneColors`). */
+const PAPER_IDENT_LIFT = 0.25;
+
+/** `hex` composited toward `ground` by `t`, channel by channel in sRGB — what CSS paints for a mark
+ *  at opacity `1 − t` over that ground. Event-time only. */
+function srgbToward(hex: number, ground: number, t: number): number {
+  let out = 0;
+  for (const shift of [16, 8, 0]) {
+    const a = (hex >> shift) & 0xff;
+    const b = (ground >> shift) & 0xff;
+    out |= Math.round(a + (b - a) * t) << shift;
+  }
+  return out;
+}
 /** THE BLOCKS HOVER (user, 2026-11-23: "levitating"): a data column rides up and down a little
  *  over its snapshot — `rise` of the tile's size either way, one cycle every `seconds`, each column
  *  on its own phase so the trail breathes instead of marching. Held still under reduced motion
@@ -800,6 +816,19 @@ export class LedgerView implements SceneView {
   }
 
   setSceneColors(map: Record<string, number>): void {
+    // ON PAPER THE CHAMBER'S HUES SIT AT THE HUD'S PRESENCE (user, 2026-11-23: the metagraph
+    // colours "look a bit darker than the regular css elements carrying the same color"). Both
+    // lanes resolve one hue to nearly one hex, but the HUD draws its identity bars and columns at
+    // 0.6–0.75 opacity over the page, measured L 0.66, while the chamber's opaque tiles and bars
+    // landed at the full ink's 0.59 and their shaded sides lower. The map is lifted once, here,
+    // toward the page as a 0.75 composite in sRGB — what the HUD's own bars paint — so every
+    // instrument that takes it (tiles, bands, ribbons, columns, blocks) matches. Dark is untouched.
+    if (isLightGround(this._colors)) {
+      const bg = this._colors.bg;
+      const lifted: Record<string, number> = {};
+      for (const [id, hex] of Object.entries(map)) lifted[id] = srgbToward(hex, bg, PAPER_IDENT_LIFT);
+      map = lifted;
+    }
     this.sceneColors = map;
     this._laneColors.clear();
     for (const [key, pane] of this._tokenPanes) pane.setTint(this._laneColor(key).getHex());
