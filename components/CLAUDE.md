@@ -538,9 +538,12 @@ bars stay solid, as before: there they are the sheet's handles, and the sheet ta
 control, and the bar just tapped must not vanish under the finger.
 
 **An edge pulse's carrier lives until its sweep ends** (`usePulseWindow`, 2026-11-23): the mount
-window closes on the sweep's own `animationend` (a 5 s timer is only the backstop). It was a 1.3 s
+window closes on the sweep's own `animationend` (a 2.4 s timer is only the backstop). It was a 1.3 s
 timer over a 1.2 s sweep, and on a phone the sweep starts late on a view switch's heavy frame, so
-the dock's top line was cut mid-travel.
+the dock's top line was cut mid-travel. **A half's UPDATE pulse runs the dock's whole width** (same
+day — user: it "should cover the width, but only covers the right button section"): it starts at
+its own half's screen edge, since the card that changed is that half's, and is a page-level overlay
+like `PhoneDockSweep`'s, because each half's group is a stacking context the other half paints over.
 
 **A deck turn is SEEN** (`TrendStack.turnDeck`, "THE DECK'S TURN" in globals.css; user, 2026-11-23:
 the swipe "looks ugly how the cards move up/down, hardly visible"). A turn re-deals every card one
