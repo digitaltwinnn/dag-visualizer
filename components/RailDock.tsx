@@ -852,7 +852,11 @@ export default function RailDock({
                   ...style,
                   height: heightPx,
                   maxHeight: "none",
-                  ...(entry === "grow" && slowGrowRef.current ? { transitionDuration: `${HANDOVER_SHEET_GROW_MS}ms` } : null),
+                  // The hand-over's grow is slower AND even (a standard ease-in-out): the roll's
+                  // curve ran two thirds of the height in a quarter of the time.
+                  ...(entry === "grow" && slowGrowRef.current
+                    ? { transitionDuration: `${HANDOVER_SHEET_GROW_MS}ms`, transitionTimingFunction: "cubic-bezier(0.4, 0, 0.2, 1)" }
+                    : null),
                 }
               : style
           }

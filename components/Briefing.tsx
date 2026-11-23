@@ -14,7 +14,7 @@ import type { NoteView } from "@/src/data/noteTypes";
 import { BLOCKS_PAGE, VIEWS } from "@/components/views";
 import { breakpointOf } from "@/src/data/breakpoint";
 import { SITE_ORIGIN } from "@/src/data/site";
-import { BRIEFING_STOPS, stopRegister, type BriefingStop, BRIEFING_TYPE_SLOW, BRIEFING_WORDS_OUT_MS, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, mayAdvance, nextStop, prevStop } from "@/src/engine/domain/briefing";
+import { BRIEFING_STOPS, stopRegister, type BriefingStop, BRIEFING_TYPE_SLOW, HANDOVER_SHEET_AT_MS, BRIEFING_WORDS_OUT_MS, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, mayAdvance, nextStop, prevStop } from "@/src/engine/domain/briefing";
 import { switchLedgerRegister } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 
@@ -61,7 +61,14 @@ function endBriefing(stop: number, how: End): void {
   // the 'explore' section by default"): the tour is the one arrival that ends with the reader on
   // their own, and a bare globe over a closed dock left them to find the list. Not a pick, so the
   // no-auto-open rule (a selection never opens a sheet) is untouched.
-  if (breakpointOf(window.innerWidth) === "phone") s.setPhoneDock("explore");
+  // It opens once the dock bar has faded back in (`HANDOVER_SHEET_AT_MS`), and only if the reader
+  // has not taken over meanwhile — a tap on a dock half or a gesture that ended the hand-over.
+  if (how === "done" && breakpointOf(window.innerWidth) === "phone") {
+    window.setTimeout(() => {
+      const now = useStore.getState();
+      if (now.handover && now.briefing == null && now.phoneDock == null && breakpointOf(window.innerWidth) === "phone") now.setPhoneDock("explore");
+    }, HANDOVER_SHEET_AT_MS);
+  } else if (breakpointOf(window.innerWidth) === "phone") s.setPhoneDock("explore");
   track("briefing-end", { how, at: stopLabel(BRIEFING_STOPS[stop]!) });
 }
 

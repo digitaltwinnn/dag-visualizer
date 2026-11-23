@@ -120,8 +120,15 @@ export const HANDOVER_MS = 6000;
 
 /** The phone Explore sheet's grow, when the tour hands over (user, 2026-11-05: "animate in like it
  *  usually does but a bit slower"). The sheet's usual entry is the 550 ms navigation tempo; this
- *  arrival, onto a cleared stage, takes a touch longer. */
-export const HANDOVER_SHEET_GROW_MS = 750;
+ *  arrival, onto a cleared stage, takes longer — 750 ms until 2026-11-23 (user: "moves it too
+ *  quickly and … does not make it look very smooth"; measured, its front-loaded curve ran two
+ *  thirds of the height in a quarter of a second), now 1.2 s on an even curve. */
+export const HANDOVER_SHEET_GROW_MS = 1200;
+
+/** When the sheet opens after the tour ends: once the dock bar it grows out of has faded back in
+ *  (its 700 ms fade), and past the end's own heavy frames — the view switch and the HUD's return.
+ *  Opened at once, it grew out of a half-transparent bar through two 40 ms hitches. */
+export const HANDOVER_SHEET_AT_MS = 700;
 
 /** A surface that pulses its edge on the hand-over: the desktop's explore card, card rail and vitals
  *  band, or the phone's open sheet and its dock bar. */
@@ -137,7 +144,9 @@ const PULSE_FIRST_MS = 600;
  *  that reaches the others. */
 export function handoverPulses(phone: boolean): { target: HandoverTarget; atMs: number }[] {
   const order: HandoverTarget[] = phone ? ["sheet", "dock"] : ["explore", "rail", "band"];
-  return order.map((target, i) => ({ target, atMs: PULSE_FIRST_MS + i * PULSE_GAP_MS }));
+  // On the phone the first surface is the sheet, which pulses once it has grown.
+  const first = phone ? HANDOVER_SHEET_AT_MS + HANDOVER_SHEET_GROW_MS : PULSE_FIRST_MS;
+  return order.map((target, i) => ({ target, atMs: first + i * PULSE_GAP_MS }));
 }
 
 /** The traced drag: when it starts (a beat after the last pulse) and how long it runs, its fades
