@@ -24,7 +24,10 @@ export const MIST_LOOK: Readonly<{ dark: number; paper: number; reach: number; d
   // Quieter and finer on 2026-11-23 (user: "a bit more subtle and refined, but I do like it"):
   // the level down from 0.5 / 0.34, the band slower and fainter (0.35 over 3.2 s). A single sheet
   // stacks no faces, so the level came back up a little when the shell went (0.3 → 0.42).
-  dark: 0.42, paper: 0.3, reach: 0.88, drift: 0.2, seconds: 4.4,
+  // Longer and firmer on paper the same day (user: "in light mode the mist is hardly visible, also
+  // make it longer almost touching the block"): it reaches 0.97 of the lift on a gentler falloff,
+  // and paper's wash went 0.3 → 0.7 — a thin wash of ink on a bright page is nearly the page.
+  dark: 0.42, paper: 0.7, reach: 0.97, drift: 0.2, seconds: 4.4,
 };
 
 export class LiftMist {
@@ -85,9 +88,9 @@ export class LiftMist {
           // Soft right across: full along the spine, nothing at either side, no edge between.
           float c = cos(1.5707963 * clamp(abs(vUv.x), 0.0, 1.0));
           float across = c * c * c;
-          // Strongest at the tile, gone by uLook.x of the way up.
-          float up = 1.0 - smoothstep(0.0, uLook.x, vUv.y);
-          up *= up;
+          // Strongest at the tile, gone by uLook.x of the way up — a gentle falloff, so the light
+          // still reads just under the block.
+          float up = pow(1.0 - smoothstep(0.0, uLook.x, vUv.y), 1.3);
           // A soft band climbing the column.
           float band = 0.5 + 0.5 * sin(6.2831853 * (vUv.y * 1.6 - uTime));
           float a = across * up * (1.0 - uLook.y + uLook.y * band);
