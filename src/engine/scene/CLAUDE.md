@@ -757,39 +757,59 @@ fills from its window. The explorer and the Metagraph card's pager read the same
 (`ladderLevels.dataCarryingNetworks`, `REGISTER_MEASURES.data.dataOnly`). Data blocks have no
 parents, so there is no braid and no link; nothing else in `update` branches on the register.
 
+**Between Metagraph snapshots and Data blocks only the COLUMNS arrive** (user, 2026-11-23: "the
+whole elements drop from the sky but in fact we could just drop the blocks on the snapshots, keep
+the rest stable"). The two read one source and draw one chamber, so the Engine arms the whole beat
+below only when the source changes (to or from Transaction blocks); entering Data blocks from
+Metagraph snapshots it calls `LedgerView.beginDataArrival` instead, and the columns come down onto
+snapshots that never moved (`DATA_ARRIVAL`: from above, growing in, their mist rising under them).
+Leaving Data blocks the columns simply go.
+
 **A register switch plays the arrival beat at its own tempo** (user, 2026-11-07: "when switching
 modes within a view, I think we need a transition time as well, although shorter than the view in/out
 animation"): the Engine arms `beginEntry(REGISTER_BEAT)` (`domain/entryBeat.ts`, 2.2 — the one beat,
 ~0.4–0.6 s instead of ~1.3 s) and releases it at once, since there is no choreography to wait out
 inside a view; the tiles, bars and the block tier all ride the same `_entryDrop` / `_entryFade`.
 
-**The mark** is one `InstancedMesh` beside the tiles (`_dataMarkMesh`, the tiles' own species: solid,
-normal-blended, depth-writing, in the bloom set, not pickable — the tile under it answers the click),
-one instance per tile in the tile draw's order — **the tile's own size** since 2026-11-08 (user: "the
-same size as the snapshot block"; `DATA_MARK` foot 1, height 1): a second tile standing on the
-first in the lane's hue, a presence mark; the count of updates is the card's and the explorer's.
-**It is LIFTED 2.5 tiles' height off its tile and TETHERED to it** (user, 2026-11-09: "raise the
-datablocks from their snapshots more, like 2x to 3x current distance with a line attaching the
-blocks"; `DATA_MARK.lift`, was 1): one `SoftLines` hairline per mark (`_dataTether`, the same
-antialiased strip as the Transaction blocks links, since a GL line steps and fringes under the bloom),
-from the tile's top to the mark's underside, in the mark's own ink each frame, its alpha
-`DATA_TETHER` per ground (dark 0.7, paper 0.9) times the entry fade; written and committed in the
-mark's slots with the same `count`, zeroed with it. Not in the bloom set, and not pickable — the tile
-under it answers the click, as for the mark. Its COUNT is resolved at event time with the pick table
-(`_rebuildTilePicks`): the tile resolver names the metagraph snapshot, and that snapshot's own row in
-its tick's exact read gives `dataMarkCount` (`domain/dataMark.ts`) — a mark only where the row says
-it carried data blocks; a tile whose read has not landed shows none (rule 10, never guessed). Per frame
-it stands on the tile's top as that frame draws it (`_tileTop` plus the rewind and the entry drop), its
-HEIGHT `dataMarkHeight(count)` (a floor at one update, a decade's step after, a ceiling — one network
-writes a handful per snapshot, another hundreds), its footprint `DATA_MARK.foot` of the tile's, in the
-lane's identity hue at the tile's own eased brightness lifted by `DATA_MARK_GAIN` — so the dim, the
-focus, the boundary fades and the entry beat all reach it through its tile. Every slot is written or
-zero-scaled each frame in the register; leaving it zero-scales every slot the last such frame wrote
-(rule 5's discipline). A switch between the two registers that read the same source re-lays the trail
-(`_refreshLedger`) rather than re-seating it; only a switch to or from Transaction blocks changes the
-source and re-seats (`Engine`, the register subscription).
+**The mark is a COLUMN OF BLOCKS, one box per data block** (user, 2026-11-23: the marks "look kinda
+flat, sitting right on top of the metagraph snapshots … give it some more vertical presence, like we
+did for the DAG transactions"; `domain/dataMark.ts`: `DATA_STACK`, `dataStackBoxes`). Each box is a
+cube `DATA_MARK.foot` of its tile's footprint wide, the boxes `DATA_STACK.gap` of a box apart, the
+first lifted `DATA_MARK.lift` tile heights off the tile (6.5 since 2026-11-23, "they are too
+close"; a tile is a thin slab, so 2.5 left a cube barely its own height up). A snapshot that carried three data
+blocks is three boxes tall; more than `DATA_STACK.max` draws `max` (a labelled ceiling — the card
+and the explorer state the number, as they state the count of updates). It was one box the tile's
+own size from 2026-11-08, and a column of those slabs still read as flat.
+One `InstancedMesh` (`_dataMarkMesh`, the tiles' own species: solid, normal-blended, depth-writing,
+in the bloom set, not pickable — the tile under it answers the click). **Its pool is PACKED**: a
+tile's boxes take the next slots (`si`), so `count` draws exactly the boxes standing this frame and
+nothing past them needs zeroing; a tile the register does not draw writes none. **The column HOVERS OVER A MIST**
+(`objects/LiftMist.ts`, `MIST_LOOK`; `DATA_HOVER`; user, 2026-11-23: "what about some levitating /
+glow / mist from the snapshot instead of hard lines?"). One instanced SHEET per drawn column stands
+on the tile and always faces the viewer (turned in the vertex shader): as wide as the tile at its
+foot, narrowing to the block's width, soft right across, strongest where it leaves the tile and
+gone before it reaches the block, a slow band drifting up it; the column's ink, added light on dark
+and a thin wash on paper. It was a four-faced shell for an hour, and four faces read as four blades
+with corners between them ("the mist has 4 corners, can we make it more smooth?"). Its proportions
+are `DATA_MARK`'s, fractions of the tile, so one unit geometry serves every column at its tile's
+size; its pool is packed like the boxes' (`li`). The column itself rides up
+and down `DATA_HOVER.rise` of its tile's size, each on its own phase. Reduced motion holds both
+still (`LedgerView.setStill`, from the Engine). A drawn tie was tried twice the same day — one
+hairline up the middle (from 2026-11-09), then four from the tile's corners — and a drawn tie reads
+as a strut: the block stood on a frame instead of hanging over its snapshot.
+The row behind both numbers is resolved at event time
+with the pick table (`_rebuildTilePicks` → `_dataRowOf`, the snapshot's own row in its tick's exact
+read): `dataMarkCount` gates the tile (a mark only where the row says it carried data blocks) and
+`dataStackBoxes` sizes the column; a tile whose read has not landed shows none (rule 10, never
+guessed). The column wears its TILE's hue — identity on the active row, a hover and the committed
+network's trail, the neutral trail elsewhere (user, 2026-11-23) — at the tile's own eased brightness lifted by
+`DATA_MARK_GAIN` — so the dim, the focus, the boundary fades and the entry beat all reach it through
+its tile — and a hovered data block lights its snapshot's whole column. A switch between the two
+registers that read the same source re-lays the trail (`_refreshLedger`) rather than re-seating it;
+only a switch to or from Transaction blocks changes the source and re-seats (`Engine`, the register
+subscription).
 
-Pinned by `domain/dataMark.test.ts` (which snapshot is marked, the height scale).
+Pinned by `domain/dataMark.test.ts` (which snapshot is marked, how many boxes its column holds).
 
 ### The unlisted network
 
@@ -830,8 +850,8 @@ a naive regex counted the prose, which let the test pass with the fix deliberate
 
 ## The History view's ground
 
-`views/TrendsView.ts` is the ONLY thing History draws in WebGL, and it is one level plane: the LINE
-FLOOR under the deck (`LINE_FLOOR`; "The finish" below has its design). The view's content is DOM
+`views/TrendsView.ts` is the ONLY thing History draws in WebGL, and it is one level plane: the DOT
+FLOOR under the deck (`DOT_FLOOR`; "The finish" below has its design). The view's content is DOM
 (`components/TrendStack.tsx`, placed per frame by the engine's `TrendStackSync`), so the canvas under
 it is empty by design — and empty is the problem. A composited DOM layer carries no depth cues of its
 own, so with nothing behind them five planes read as five unrelated cards rather than as one stack
@@ -987,20 +1007,21 @@ the chamber is on screen. Five rules, each a user round the same day:
   the same reflection at two coarse mips is a soft pool of each mark's colour around its
   reflection, so the light is the marks' own and follows their emphasis with no lamp.
 
-**History's ground is a LINE FLOOR** (`TrendsView`, `LINE_FLOOR`; user, 2026-11-22, after four rounds
-on the bands — grey, hued, hugging the card, then a DOM mirror of the front chart: "drop mirror and
-wash and come with a completely different but subtle scene background"). One level plane under the
-deck draws level hairlines ACROSS the floor, one per row of an even lattice, a constant width in
-screen pixels (`fwidth`), fading out over a pool centred behind the deck and dissolving where the
-pitch falls under a few pixels. Perspective closing the rows up toward the horizon is the depth cue.
-It was a lattice of DOTS first, which the user liked as an effect and rejected as a mark: "we use
-dots also for nodes, can we use something else (lines?)" — a dot is a node everywhere else. Lines
-in depth are not drawn: they converge on the vanishing point, the hard diagonals the side rails were
-cut for. **The lines wear the deck's colours** ("can we give it metagraph colors and make it more
-visible in light mode?"): the cards' identity hues in the deck's order, front to back, a band per
-card (`band` slot gaps deep — at the cards' true spacing a band was two or three rows), the
-structure ink beyond the last card; fed by `setSlotHues` from `Engine._syncTrendHues`. Paper draws
-the line wider (`paperWidth`) and at a gain above 1, because ink has no glow to carry a hairline.
+**History's ground is a DOT FLOOR** (`TrendsView`, `DOT_FLOOR`; user, 2026-11-22, after four rounds
+on shadow bands — grey, hued, hugging the card, then a DOM mirror of the front chart: "drop mirror
+and wash and come with a completely different but subtle scene background"). One level plane under
+the deck draws a lattice of small dots, round at any distance (`fwidth`), fading out over a pool
+and dissolving where the pitch falls under a few pixels. Perspective closing the rows up toward the
+horizon is the depth cue. It was level hairlines for a day ("we use dots also for nodes, can we use
+something else (lines?)") and the user came back to the dots: "I actually like the earlier proposal
+where we had a plane of dots". **The dots wear the deck's colours** ("can we give it metagraph
+colors and make it more visible in light mode?"): the cards' identity hues in the deck's order,
+front to back, a band per card (`band` slot gaps deep), the structure ink beyond the last card; fed
+by `setSlotHues` from `Engine._syncTrendHues`. Paper draws the dot larger (`paperDot`) and at a gain
+above 1, because ink has no glow to carry a two-pixel dot. **The pool is per tier** (`centre`,
+`reach`, and their `phone` twins): on a wide screen it is centred behind the deck, so the lattice
+thins toward the viewer; on a phone the card covers everything behind it, so the pool is centred in
+front of the deck and the field runs down the screen to the dock.
 
 **Light that means something** (user, 2026-11-22: "can we use it for some nice effects?"). Five
 were agreed; four are built, each tied to something real, each a plain `Readonly` look constant:
@@ -1044,6 +1065,13 @@ mix and before the tone map scales a pixel's channels together so its brightest 
 ceiling. The filmic curve rolls channels off one by one, so a boosted bar came out peach and a hub's
 core near-white. Below the knee nothing changes; paper runs neither. Khronos Neutral, which holds
 hue by design, was tried again (2026-11-22) and still casts dark halos around the globe's nodes.
+
+**On paper the chamber's network hues sit at the HUD's presence** (`LedgerView.setSceneColors`,
+`PAPER_IDENT_LIFT`; user, 2026-11-23: they looked "darker than the regular css elements carrying the
+same color"). Both lanes resolve a hue to nearly one hex, but the HUD draws its identity bars at
+0.6–0.75 opacity (measured L 0.66) while the chamber's opaque tiles and bars stood at the full ink
+(0.59, sides lower). The ledger's map is composited a quarter toward the page in sRGB, once, at
+event time — tiles, bands, ribbons, columns and blocks alike. Dark is untouched.
 
 **The chamber's tray chips rest quieter** (`dimModel.FOCUS_ROWS[view].rest`, a per-view gain on the
 nodes' resting glow: 1 where nodes are the subject, 0.45 in Snapshots, where the row of chips was the

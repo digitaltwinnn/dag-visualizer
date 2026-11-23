@@ -37,6 +37,14 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   `unstable_cache` at a 5-minute revalidate (was 10 — halved 2026-08-14: a node-set restart read as "unknown node" for most of a cycle) (throwing on an empty result keeps a blip from being
   cached). A `maxDuration` and a per-fetch timeout keep a slow cluster LB from blowing the function
   budget.
+  **A layer whose listed address does not answer is asked of a PEER** (`metagraphs/peerRoster.ts`,
+  2026-11-23): the directory lists one address per layer, usually one of the network's own nodes,
+  and when that node's layer process is down the roster read failed and the layer came back empty —
+  BioFi's listed L0 node answered 502 while its other two nodes sealed snapshots, and every surface
+  read "cL1 only". `clusterNodes` answers `null` on a failed read (not an empty list), and the
+  machines the answering layers named are tried on the failed layer's own port, up to three, 2.5 s
+  each. A layer no peer answers for is still unread and drawn as no nodes; the declared `layers` is
+  what says it exists.
 - **`/api/live`, `/api/live/globals`, `/api/live/meta/[id]`, `/api/live/clusters`** (2026-10-25) are the
   shared live feed: one upstream read serves every tab (design:
   `docs/superpowers/specs/2026-10-25-shared-live-feed-design.md`). `/api/live` is the assembled

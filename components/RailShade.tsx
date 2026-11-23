@@ -1,7 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useStore } from "@/src/store/store";
+import { useBreakpoint } from "@/components/useBreakpoint";
 
 // DESKTOP rail collapse-to-thread + scene-yield dim (card-redesign follow-up, 2026-08-08 — the
 // scene is the star; adjudicated against literal auto-collapse-on-interact, which hides the
@@ -68,4 +69,24 @@ export function useSceneYield(opts?: { flight?: boolean }): boolean {
   // the pane, and the dock — which stays on the raw page — was fading for nothing.
   const sceneShown = useStore((s) => s.section === "scene");
   return sceneShown && (dragging || (!!opts?.flight && flying));
+}
+
+/** THE PHONE'S CLEARED STAGE (see `html[data-scene-deep]` in globals.css): raises the attribute
+ *  while the reader's own hand is on the scene, on the phone tier, with no sheet open. Only the
+ *  hand, never a commit flight — a flight follows a tap on a control, and the bar that was just
+ *  tapped must not vanish under the finger. Renders nothing; mounted once by the shell. */
+export function PhoneSceneYield(): null {
+  const bp = useBreakpoint();
+  const yielding = useSceneYield();
+  const collapsed = useStore((s) => s.phoneDock == null);
+  const on = bp === "phone" && yielding && collapsed;
+  useEffect(() => {
+    const root = document.documentElement;
+    if (on) root.dataset.sceneDeep = "";
+    else delete root.dataset.sceneDeep;
+    return () => {
+      delete root.dataset.sceneDeep;
+    };
+  }, [on]);
+  return null;
 }

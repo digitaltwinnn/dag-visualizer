@@ -14,6 +14,7 @@ import ExploreRail from "@/components/ExploreRail";
 import Inspector from "@/components/Inspector";
 import VitalsDock from "@/components/VitalsDock";
 import PhoneDockSweep from "@/components/PhoneDockSweep";
+import { PhoneSceneYield } from "@/components/RailShade";
 import RailScroll from "@/components/RailScroll";
 import FollowController from "@/components/FollowController";
 import RawSnapshotBridge from "@/components/RawSnapshotBridge";
@@ -122,6 +123,7 @@ export default function AppShell({ doc }: { doc?: DocPage }) {
         <DocGate>
           <StageGate>
             <PhoneDockSweep />
+            <PhoneSceneYield />
           </StageGate>
         </DocGate>
         <RailScroll />

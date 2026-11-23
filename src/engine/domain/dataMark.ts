@@ -7,10 +7,9 @@
 // card's and the explorer's (`ChannelSnapRow.dataTxCount`); the mark says THAT a snapshot carried data
 // and roughly how much.
 //
-// THE MARK IS THE TILE'S OWN SIZE (user, 2026-11-08: "make the data blocks on the metagraph planes
-// the same size as the snapshot block"): a second tile standing on the first, the same footprint and
-// the same height, in the lane's hue — a presence mark, no longer a bar; the count of updates is the
-// card's and the explorer's. (It was a log-scaled bar at 0.42 of the tile's footprint, D6.)
+// THE MARK WAS THE TILE'S OWN SIZE for two weeks (user, 2026-11-08: "the same size as the snapshot
+// block") — a second slab standing on the first, a presence mark — and before that a log-scaled bar
+// (D6). It is a COLUMN OF BLOCKS now: see `DATA_STACK`.
 //
 // A SNAPSHOT THAT CARRIED NO DATA BLOCK IS NOT THE REGISTER'S SUBJECT (user, 2026-11-07: "a
 // metagraph that anchored but had no datablock is still shown; don't show it"): its tile is not drawn,
@@ -21,13 +20,31 @@
 // is UNKNOWN — not drawn yet, never a guess; a snapshot whose data blocks hold no update still carried
 // data, so it stands at the floor height.
 
-/** The mark's proportions as fractions of its TILE's: its footprint, its height, and the LIFT between
- *  the tile's top and the mark's underside. 1 and 1 — the snapshot block's own size — and a lift of
- *  two and a half tiles' height (user 2026-11-09: "raise the datablocks from their snapshots more,
- *  like 2x to 3x current distance with a line attaching the blocks"; it was one tile, 2026-11-08 —
- *  "slightly elevated" — and half a tile vanished under the bloom), so the mark stands clear of its
- *  snapshot, tied to it by a tether (`LedgerView`'s `DATA_TETHER`). */
-export const DATA_MARK: Readonly<{ foot: number; height: number; lift: number }> = { foot: 1, height: 1, lift: 2.5 };
+/** A box's proportions against its TILE: its footprint, and the LIFT between the tile's top and the
+ *  first box's underside, in tile heights. Six and a half: a tile is a thin slab, so two and a half
+ *  of its heights (2026-11-09, "like 2x to 3x current distance") left a cube barely its own height
+ *  off the snapshot (user, 2026-11-23: "elevate the data blocks more from the snapshots, they are
+ *  too close"). The lift is drawn by `LedgerView`'s `DATA_LIFT`. */
+// A BOX IS A BLOCK (2026-11-23): each box is a cube, as a transaction block is, `foot` of its tile's
+// footprint wide and as tall as it is wide. While the mark was one box it was the tile's own slab
+// (foot 1, a third as tall as wide), and a column of slabs still read as flat.
+export const DATA_MARK: Readonly<{ foot: number; lift: number }> = { foot: 0.6, lift: 6.5 };
+
+/** THE MARK IS A COLUMN, ONE BOX PER DATA BLOCK (user, 2026-11-23: the marks "look kinda flat,
+ *  sitting right on top of the metagraph snapshots … give it some more vertical presence, like we
+ *  did for the DAG transactions"). A snapshot's data blocks stand above its tile as a stack — each
+ *  box a cube (`DATA_MARK`), `gap` of a box's height apart — so a snapshot that carried three blocks
+ *  is three boxes tall, the way a global snapshot's transaction blocks stand above the floor.
+ *  `max` is the tallest column drawn: a snapshot carrying more shows `max` boxes, and its card and
+ *  the explorer state the number (a labelled ceiling, rule 10). */
+export const DATA_STACK: Readonly<{ max: number; gap: number }> = { max: 8, gap: 0.55 };
+
+/** How many boxes a snapshot's column holds: its data blocks, up to `DATA_STACK.max`; 0 where it
+ *  carried none or its read has not landed. */
+export function dataStackBoxes(row: { dataBlocks?: number } | null | undefined): number {
+  if (!row || row.dataBlocks == null || row.dataBlocks <= 0) return 0;
+  return Math.min(DATA_STACK.max, Math.floor(row.dataBlocks));
+}
 
 /** What a tile's mark counts: the data updates of a snapshot that carried data blocks, or null where
  *  it carried none or its read has not landed. */

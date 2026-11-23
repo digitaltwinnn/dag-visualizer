@@ -42,6 +42,8 @@ export default function PhoneDockSweep() {
       className="hidden max-[700px]:block fixed z-[43] bottom-0 left-0 w-full h-[var(--phone-dock-h)] pointer-events-none"
       style={{ ["--spine" as string]: accent } as CSSProperties}
       aria-hidden
+      // The window closes on the sweep's own last frame (`usePulseWindow`).
+      onAnimationEnd={switchP.onEnd}
     >
       <span className="absolute top-[3px] left-0 w-[3px] h-[100vw] origin-top-left -rotate-90 [--pulse-len:45%]">
         <PulseEdge pulseKey={switchP.pulse} />

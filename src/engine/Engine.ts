@@ -912,9 +912,16 @@ export class Engine {
           else this._refreshLedger();
           // THE SWITCH'S OWN BEAT (user, 2026-11-07): the chamber's arrival drop at `REGISTER_BEAT`
           // tempo, released at once — there is no choreography to wait out inside a view.
+          // …FOR A CHANGE OF SOURCE ONLY (user, 2026-11-23). Metagraph snapshots and Data blocks
+          // draw the same chamber from the same source, so between them nothing drops but the
+          // data columns, onto snapshots that never moved (`LedgerView.beginDataArrival`).
           if (this.mode === "ledger") {
-            this.ledger.beginEntry(REGISTER_BEAT);
-            this.ledger.releaseEntry();
+            if (wasBlockTrail !== this.ledger.readsBlockWindow) {
+              this.ledger.beginEntry(REGISTER_BEAT);
+              this.ledger.releaseEntry();
+            } else if (st.ledgerRegister === "data") {
+              this.ledger.beginDataArrival();
+            }
           }
         }
         // The bare stage ARMS rather than hides (user, 2026-09-04: "shouldn't their nodes still
@@ -2567,6 +2574,7 @@ export class Engine {
     this.trends.group.visible = trendActive && trendAlpha > 0.001;
     if (ledgerActive) {
       if (this._ledgerDirty) this._refreshLedger();
+      this.ledger.setStill(this._reduceMotion.matches);
       this.ledger.update(dt);
     }
     // Resolve the frame's stage-light claim (hyper/geo made theirs in their update above): stage,

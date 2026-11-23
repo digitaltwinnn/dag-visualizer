@@ -26,7 +26,9 @@ import {
   type Span,
   type TrackGeom,
 } from "@/src/data/trendTimeline";
-import type { TrendMetric } from "@/src/store/store";
+import { useStore, type TrendMetric } from "@/src/store/store";
+import { displayNetwork } from "@/src/data/unlisted";
+import { cardNetwork } from "@/src/engine/domain/trendStack";
 import type { ZoomId } from "@/src/data/trendWindow";
 
 // THE TIMELINE'S TRACK — the SVG and every gesture on it. Split out of
@@ -119,6 +121,17 @@ export default function TrendTrack({
   // A React id holds colons, which a `url(#…)` reference would have to escape.
   const clipId = `span${useId().replace(/:/g, "")}`;
   const fadeId = `fade${useId().replace(/:/g, "")}`;
+  // THE WINDOW WEARS THE FRONT CARD'S COLOUR (user, 2026-11-23: give the band's chart "an effect of
+  // the card it shows, like the sliding window with some color-effects according to the card
+  // color"). The window is the stretch of time the front card is drawing, so its frame, its grips
+  // and a soft wash inside it take that card's identity hue, and turn with the deck. ⚠️ The LINE
+  // stays the structural accent: it is the whole network's series (TrendTimeline: "the frame the
+  // planes sit in, never one chain"), and in a card's colour it would claim to be that card's.
+  // WHICH card is in front is the Metagraph card's own question (`cardNetwork`): the plane brought
+  // forward, else the filter, else the plane standing in front.
+  const cardId = useStore((s) => cardNetwork(s.filter, s.trendFocus, s.trendFront));
+  const frontHue = (cardId !== "all" && displayNetwork(cardId)?.hue) || "var(--primary)";
+  const washId = `${fadeId}w`;
   useEffect(() => {
     if (!track) return;
     const measure = () => setBox({ w: track.clientWidth, h: track.clientHeight });
@@ -439,8 +452,16 @@ export default function TrendTrack({
         )))}
         {brush && box.w > 0 && (
           <>
-            {/* The brush itself: a hairline FRAME, never a fill — a filled rectangle over a chart
-                states a value it does not have. `MIN_BRUSH_PX` keeps a one-hour window over a
+            {/* The window's wash: the front card's hue, strongest at the top edge and gone by the
+                baseline, so it tints the window without covering the line under it. */}
+            <defs>
+              <linearGradient id={washId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={frontHue} stopOpacity={0.22} className="[transition:stop-color_0.3s_ease] motion-reduce:[transition:none]" />
+                <stop offset="100%" stopColor={frontHue} stopOpacity={0.03} className="[transition:stop-color_0.3s_ease] motion-reduce:[transition:none]" />
+              </linearGradient>
+            </defs>
+            {/* The brush itself: a hairline FRAME over a light wash, never a solid fill — a filled
+                rectangle over a chart states a value it does not have. `MIN_BRUSH_PX` keeps a one-hour window over a
                 six-year track findable. */}
             <rect
               // `data-brush`: the History TETHER measures this frame to draw the span up to the
@@ -452,10 +473,11 @@ export default function TrendTrack({
               y={0.5}
               width={Math.max(MIN_BRUSH_PX, Math.min(box.w - 0.5, xAtMs(brush.toMs, geom)) - Math.max(0.5, xAtMs(brush.fromMs, geom)))}
               height={Math.max(0, plotH - 1)}
-              fill="none"
-              stroke="var(--primary)"
+              fill={`url(#${washId})`}
+              stroke={frontHue}
               strokeWidth={1}
               opacity={0.9}
+              className="[transition:stroke_0.3s_ease] motion-reduce:[transition:none]"
             />
             {/* THE GRIPS (design round 2026-09-29, the navigator): the span's two edges are
                 already grabbable (`drawnSpan`'s edge hit-test) — now they LOOK it, so the band
@@ -465,7 +487,7 @@ export default function TrendTrack({
               <g key={i} className="cursor-ew-resize">
                 {/* A grip at either end of the track stands whole inside it (the clip cut the newest
                     edge's grip in half); `gripX` is paint only, the hit test reads the span. */}
-                <rect x={gripX(gx, box.w) - 3} y={plotH * 0.2} width={6} height={plotH * 0.6} rx={2} fill="var(--primary)" />
+                <rect x={gripX(gx, box.w) - 3} y={plotH * 0.2} width={6} height={plotH * 0.6} rx={2} fill={frontHue} className="[transition:fill_0.3s_ease] motion-reduce:[transition:none]" />
                 <line x1={gripX(gx, box.w)} y1={plotH * 0.38} x2={gripX(gx, box.w)} y2={plotH * 0.62} stroke="var(--background)" strokeWidth={1.5} strokeLinecap="round" />
               </g>
             ))}

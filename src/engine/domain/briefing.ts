@@ -1,5 +1,6 @@
 import type { LedgerRegister, Mode } from "@/src/store/mode";
 import { easeInOutQuad } from "./cameraRig";
+import { DEFAULT_REGISTER } from "./viewPolicy";
 
 // THE BRIEFING (user, 2026-10-31): the tour every entry to `/` plays, one stop per 3D view, each
 // in the AI's own line. Most visitors never reach a second view, so the app shows them all once and
@@ -9,18 +10,20 @@ import { easeInOutQuad } from "./cameraRig";
 /** A stop: a view, and for the Snapshots view the register it stands in. */
 export type BriefingStop = { mode: Mode; register?: LedgerRegister };
 
-/** The route: where, then now (the Snapshots view in its own register), then who, then how it
+/** The route: where, then now (the Snapshots view in Metagraph snapshots, named: the stop's line is
+ *  that note's, and the view now opens on Data blocks — `DEFAULT_REGISTER`), then who, then how it
  *  changed. One stop per view: a register inside a view is not a stop of its own. */
 export const BRIEFING_STOPS: readonly BriefingStop[] = [
   { mode: "geo" },
-  { mode: "ledger" },
+  { mode: "ledger", register: "snapshots" },
   { mode: "hyper" },
   { mode: "trend" },
 ];
 
-/** The register a stop leaves the Snapshots view in. A stop with none names the Snapshots register,
- *  so a stop that carries a register never leaves the next one showing it. */
-export const stopRegister = (stop: BriefingStop): LedgerRegister => stop.register ?? "snapshots";
+/** The register a stop leaves the Snapshots view in. A stop with none names the view's default
+ *  register (`DEFAULT_REGISTER`), so a stop that carries a register never leaves the next one
+ *  showing it, and the tour ends with the view as a first visit finds it. */
+export const stopRegister = (stop: BriefingStop): LedgerRegister => stop.register ?? DEFAULT_REGISTER;
 
 /** How long a stop stands, its scene's transition included. A quarter under 6500 went too far (user
  *  2026-11-01: "25% shorter"; 2026-11-02, after reading it against the live lines of 102 to 122
@@ -120,8 +123,15 @@ export const HANDOVER_MS = 6000;
 
 /** The phone Explore sheet's grow, when the tour hands over (user, 2026-11-05: "animate in like it
  *  usually does but a bit slower"). The sheet's usual entry is the 550 ms navigation tempo; this
- *  arrival, onto a cleared stage, takes a touch longer. */
-export const HANDOVER_SHEET_GROW_MS = 750;
+ *  arrival, onto a cleared stage, takes longer — 750 ms until 2026-11-23 (user: "moves it too
+ *  quickly and … does not make it look very smooth"; measured, its front-loaded curve ran two
+ *  thirds of the height in a quarter of a second), now 1.2 s on an even curve. */
+export const HANDOVER_SHEET_GROW_MS = 1200;
+
+/** When the sheet opens after the tour ends: once the dock bar it grows out of has faded back in
+ *  (its 700 ms fade), and past the end's own heavy frames — the view switch and the HUD's return.
+ *  Opened at once, it grew out of a half-transparent bar through two 40 ms hitches. */
+export const HANDOVER_SHEET_AT_MS = 700;
 
 /** A surface that pulses its edge on the hand-over: the desktop's explore card, card rail and vitals
  *  band, or the phone's open sheet and its dock bar. */
@@ -137,7 +147,9 @@ const PULSE_FIRST_MS = 600;
  *  that reaches the others. */
 export function handoverPulses(phone: boolean): { target: HandoverTarget; atMs: number }[] {
   const order: HandoverTarget[] = phone ? ["sheet", "dock"] : ["explore", "rail", "band"];
-  return order.map((target, i) => ({ target, atMs: PULSE_FIRST_MS + i * PULSE_GAP_MS }));
+  // On the phone the first surface is the sheet, which pulses once it has grown.
+  const first = phone ? HANDOVER_SHEET_AT_MS + HANDOVER_SHEET_GROW_MS : PULSE_FIRST_MS;
+  return order.map((target, i) => ({ target, atMs: first + i * PULSE_GAP_MS }));
 }
 
 /** The traced drag: when it starts (a beat after the last pulse) and how long it runs, its fades

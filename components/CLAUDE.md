@@ -517,6 +517,51 @@ policy row, `viewPolicy.metagraphCard`** (PR review, 2026-10-19 — it had becom
 `mode === "geo"` compares): `railCards.metagraphCardNetwork` resolves it, and the card's × and
 the slot's hint read the same row.
 
+**The node card states the same facts in every view** (user, 2026-11-23; `GeoLiveNode`): place,
+host and ASN no longer yield to a committed country or provider card. A folded entry shows only its
+name, so under the pile rule the node's city and ASN were on screen nowhere. It is the one subject
+card exempt from that rule (its Runs section already was); every other card still never restates
+its ancestors.
+
+**The phone's tour hand-over opens the Explore sheet after the dock bar** (2026-11-23,
+`HANDOVER_SHEET_AT_MS`): 700 ms after the tour ends, once the bar has faded back in, on a 1.2 s even
+grow; the phone's pulses wait for the grown sheet. Opened at once it grew out of a half-faded bar
+through the end's heavy frames.
+
+**The phone's cleared stage** (`PhoneSceneYield` in `RailShade.tsx`, `html[data-scene-deep]` in
+globals.css; user, 2026-11-23: the phone has no scene mode, so "if the bottom section is collapsed,
+can we apply that [dim] to bottom section AND top bar also and make the dim even stronger"). With
+no sheet open, a drag or a pinch on the scene takes the dock bar, the top bar and the register
+switch down to a tenth of their presence for as long as the hand is on it. With a sheet open the
+bars stay solid, as before: there they are the sheet's handles, and the sheet takes the ordinary
+0.4. Only the reader's own hand raises it, never a commit flight — a flight follows a tap on a
+control, and the bar just tapped must not vanish under the finger.
+
+**An edge pulse's carrier lives until its sweep ends** (`usePulseWindow`, 2026-11-23): the mount
+window closes on the sweep's own `animationend` (a 2.4 s timer is only the backstop). It was a 1.3 s
+timer over a 1.2 s sweep, and on a phone the sweep starts late on a view switch's heavy frame, so
+the dock's top line was cut mid-travel. **A half's UPDATE pulse runs the dock's whole width** (same
+day — user: it "should cover the width, but only covers the right button section"): it starts at
+its own half's screen edge, since the card that changed is that half's, and is a page-level overlay
+like `PhoneDockSweep`'s, because each half's group is a stacking context the other half paints over.
+
+**A deck turn is SEEN** (`TrendStack.turnDeck`, "THE DECK'S TURN" in globals.css; user, 2026-11-23:
+the swipe "looks ugly how the cards move up/down, hardly visible"). A turn re-deals every card one
+slot, but the card that turns away usually leaves the five-card window and is unmounted on the spot,
+so the deck's contents simply changed. Forward, the front card lifts off the deck and fades
+(`data-turn="out"`), and the rotation is written only when it has gone (`TURN_OUT_MS`); back, the
+rotation is written at once and the card taking the front drops into it (`"in"`). A turn made while
+one is pending lands the pending one first. Reduced motion commits at once. The swipe's duration
+is read from the events' own `timeStamp`, not the clock inside the handler.
+
+**The timeline's window wears the front card's colour** (`TrendTrack`, `TrendTether`; user,
+2026-11-23: give the band's chart "an effect of the card it shows, like the sliding window with
+some color-effects according to the card color"): the window's frame, its grips, a soft wash inside
+it and the tether's legs and axis mark take the identity hue of the card `cardNetwork` names — the
+plane brought forward, else the filter, else the plane in front — and turn with the deck. ⚠️ The
+band's LINE stays the structural accent: it is the whole network's series, and in a card's colour it
+would claim to be that card's.
+
 **The front card's plot states its scale** (`TrendChart yTicks`, 2026-11-22): the gridlines sit on
 round values (`yTickValues` — one home for the recharts grid and the figures beside it) and each
 carries a small figure at its left end, the top one with the plot's unit at its cadence ("2.5K per
@@ -524,7 +569,10 @@ hour"). That unit is what separates the plot's buckets from the head's per-day r
 are DOM beside the memoised plot, placed by the cursor's own box arithmetic, each on a chip of the
 card's ground (a plane takes no shadow). A hover reads its bucket two digits finer than the head
 (`useTrendRoster.formatFine`: "2.03K"). The series line takes round joins, the plot has a floor
-line, and the tether's axis mark under it is a hairline.
+line, and the tether's axis mark under it is a hairline. **The fill carries the shape and the
+stroke is a hairline** (user, 2026-11-23: the dense hourly line read as thick, and no bucket was to
+be merged away): the area's gradient has a bright lip just under the series and a long faint tail
+(four stops, each a multiple of `--trend-fill-top`), and the stack draws the line at 0.75.
 
 **The plane's head is NETWORK · MEASURE · READINGS — on the FRONT card; a rear card's head is the
 NETWORK ALONE** (user, 2026-10-19, later the same day: the title and values "repeated on each
@@ -606,7 +654,8 @@ pointermove. Three rules are worth knowing before touching it:
   made inside the layer clears it too. Closing the log used to strand the reader in Snapshots.
 
 **The motion hint says what the scene is doing while it moves** (user, 2026-09-26 — `MotionHint`,
-one quiet sentence on a low plate, centred just under the command bar — or one line lower, under the
+one quiet sentence on the command bar's own plate and hairline as a pill (2026-11-23: the
+ground-coloured plate vanished on paper), centred just under the command bar — or one line lower, under the
 register switch, where the view offers more than one register: D3). Two store channels, and nothing else feeds it.
 `sceneMoving` is ENGINE → REACT: the Engine's `_publishMotion` derives it each frame from the four
 structures that already drive motion — `ViewTransition.active()`, `CameraDirector.flying`, the

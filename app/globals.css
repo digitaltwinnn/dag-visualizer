@@ -1475,6 +1475,21 @@
      and the edge tabs are the handles and stay solid. */
   [data-slot="sheet-content"] { transition: opacity 0.18s ease-out; }
   [data-slot="sheet-content"][data-dim] { opacity: 0.4; transition: opacity 0.3s ease; }
+  /* THE PHONE'S CLEARED STAGE (user, 2026-11-23: "on phone we don't have scene mode, but we do
+     dim the cards when we pinch … if the bottom section is collapsed, can we apply that to bottom
+     section AND top bar also and make the dim even stronger so make it almost look like we're in
+     scene mode?"). With no sheet up, the dock bar and the top bar are all that stands over the
+     scene, and under the reader's own hand they step back almost to nothing: the phone's scene
+     mode, held for exactly as long as the gesture. `PhoneSceneYield` (RailShade.tsx) raises the
+     attribute — phone tier, no sheet open, a drag or a pinch in progress. With a sheet OPEN the
+     bars stay solid, as above: there they are the sheet's handles. The register switch and its
+     caption follow while they are shown (`!important`: their own yield is a utility at the ordinary
+     level, in a later layer; a switch that is away — `data-on="0"` — stays away). Each element keeps
+     its own transition tempo. */
+  html[data-scene-deep] #topbar,
+  html[data-scene-deep] [data-phone-dock] { opacity: 0.1; }
+  html[data-scene-deep] #register-switch:not([data-on="0"]),
+  html[data-scene-deep] #register-caption:not([data-on="0"]) { opacity: 0.1 !important; }
   /* ⚠️ Every ARM must be listed: the state rules above carry their own `transition` at (0,2,0)
      — a bare `.rail-shade` reset is (0,1,0) and loses to them (CSS trap 4). */
   @media (prefers-reduced-motion: reduce) {
@@ -1853,8 +1868,24 @@
   animation-delay: max(0ms, calc((4 - var(--slot, 0)) * 120ms));
 }
 @keyframes planeLeave { to { opacity: 0; transform: translateY(26px); } }
+/* THE DECK'S TURN (2026-11-23, user: the swipe "looks ugly how the cards move up/down, hardly
+   visible"). A turn re-deals every card one slot and the projector eases each to its new place —
+   but the card that turns away usually LEAVES THE WINDOW (twelve networks, five slots), so React
+   unmounted it on the spot and the deck's contents simply changed. The card that travels is now
+   seen doing it, in the direction of the flick:
+     · a turn FORWARD (`data-turn="out"`): the front card lifts off the deck and fades, and only
+       then does the deck step forward (`TrendStack.turnDeck` holds the rotation for this beat);
+     · a turn BACK (`"in"`): the deck steps back at once and the card that takes the front comes
+       down into it from the same height.
+   `transform` and `opacity` on the card only: the anchor's matrix3d and the card's own `translate`
+   utility are untouched. The lift is a share of the card's own height (`--plane-h`). */
+#trend-stack [data-plane][data-turn="out"] .plane-card { animation: planeTurnOut 0.24s cubic-bezier(0.4, 0, 1, 1) forwards; }
+#trend-stack [data-plane][data-turn="in"] .plane-card { animation: planeTurnIn 0.36s cubic-bezier(0, 0, 0.2, 1) both; }
+@keyframes planeTurnOut { to { opacity: 0; transform: translateY(calc(var(--plane-h) * -0.42)); } }
+@keyframes planeTurnIn { from { opacity: 0; transform: translateY(calc(var(--plane-h) * -0.42)); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  #trend-stack[data-deal="1"] .plane-card, #trend-stack[data-leave] .plane-card { animation: none; }
+  #trend-stack[data-deal="1"] .plane-card, #trend-stack[data-leave] .plane-card,
+  #trend-stack [data-plane][data-turn] .plane-card { animation: none; }
 }
 @keyframes cardMaterialize { from { opacity: 0; transform: translateY(5px) scale(0.985); } to { opacity: 1; transform: none; } }
 @theme inline {

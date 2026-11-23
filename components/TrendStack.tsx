@@ -98,6 +98,10 @@ const NO_IDS: readonly string[] = [];
 /** How far a press may travel and still count as a click, in px. Generous enough for a shaky
  *  finger, tight enough that a deliberate brush never commits a focus or a cursor pick. */
 const DRAG_SLOP = 4;
+/** The deck turn's two beats, in step with their keyframes (globals.css): how long the front card
+ *  takes to lift away before the deck steps forward, and how long an arriving card wears its mark. */
+const TURN_OUT_MS = 230;
+const TURN_IN_MS = 400;
 
 
 export default function TrendStack() {
@@ -363,8 +367,11 @@ export default function TrendStack() {
   const onPointerDown = (e: React.PointerEvent) => {
     // What a SWIPE needs to know about the press (`onPointerUp`): when it began, whether it is a
     // finger, and whether it began on the plot — whose horizontal drag is the brush.
+    // `at` is the EVENT'S own time, not the clock read inside this handler: a flick is judged by
+    // how long the finger took, and on a busy main thread the press and the release are delivered
+    // late and unevenly, which would stretch a quick flick past the half second a swipe may take.
     down.current = {
-      x: e.clientX, y: e.clientY, at: performance.now(), touch: e.pointerType !== "mouse",
+      x: e.clientX, y: e.clientY, at: e.timeStamp, touch: e.pointerType !== "mouse",
       onPlot: !!(e.target as Element | null)?.closest?.("[data-plot]"),
     };
     dragged.current = false;
@@ -412,7 +419,7 @@ export default function TrendStack() {
     // write path (rule 2), and the window rewinds to its first card, so the deck's front IS the
     // rotation's.
     if (!d?.touch) return;
-    const dir = swipeOf(e.clientX - d.x, e.clientY - d.y, performance.now() - d.at, { horizontal: !d.onPlot });
+    const dir = swipeOf(e.clientX - d.x, e.clientY - d.y, e.timeStamp - d.at, { horizontal: !d.onPlot });
     if (!dir) return;
     const intent = swipeIntent(dir);
     if (intent.kind === "measure") {
@@ -448,11 +455,60 @@ export default function TrendStack() {
   }, [metric]);
   // TURN THE DECK (the swipe's and the keys' one action): a standing focus is released through
   // the table first and the window rewinds, so the deck's front is the rotation's.
+  // THE CARD THAT TRAVELS (see "THE DECK'S TURN", globals.css). A turn FORWARD lifts the front
+  // card away first and commits the rotation when it has gone (`TURN_OUT_MS`) — once the rotation
+  // is written the card is usually out of the window and unmounted, so there would be nothing left
+  // to show leaving. A turn BACK commits at once and the card that takes the front comes down into
+  // it. A turn made while one is still pending lands the pending one first, so quick flicks each
+  // count; reduced motion commits at once with no mark.
+  const [turn, setTurn] = useState<{ id: string; way: "out" | "in" } | null>(null);
+  const turnTimer = useRef(0);
+  const pendingTurn = useRef<(() => void) | null>(null);
+  useEffect(() => () => window.clearTimeout(turnTimer.current), []);
   const turnDeck = (step: 1 | -1) => {
+    window.clearTimeout(turnTimer.current);
+    pendingTurn.current?.();
+    pendingTurn.current = null;
     const st = useStore.getState();
-    if (st.trendFocus) applyClickActions(trendPlaneActions(st.trendFocus, st.trendFocus));
+    const released = !!st.trendFocus;
+    if (released) applyClickActions(trendPlaneActions(st.trendFocus!, st.trendFocus!));
     if (st.trendScroll) st.setTrendScroll(0);
-    st.setTrendRotation(useStore.getState().trendRotation + step); // read after the release, which rewinds it
+    const r = useStore.getState().trendRotation; // read after the release, which rewinds it
+    // THE COMMIT ONLY LANDS ON THE DECK IT WAS MADE FOR (review, 2026-11-23): a forward turn writes
+    // its rotation a beat later, and a view switch, a filter commit or a focus inside that beat
+    // resets the rotation under it — written then, a stale `r + 1` would carry into the next view.
+    const at = { mode: st.mode, filter: st.filter };
+    const commit = () => {
+      const now = useStore.getState();
+      if (now.mode !== at.mode || now.filter !== at.filter || now.trendRotation !== r || now.trendFocus) return;
+      now.setTrendRotation(r + step);
+    };
+    // THE CARD THAT TRAVELS is read from what will be ON SCREEN (review, 2026-11-23): with a focus
+    // just released, this render's `deck` is still the focused one, and its first card is not the
+    // one in front once the release lands — so the deck is rebuilt as the release leaves it. With
+    // no release, the order already drawn (held through a measure change) is the truth.
+    const now = released
+      ? rotateOrder(deckOf(ranked, { total: !!roster.total, unlisted: !!roster.unlisted, focus: null, unlistedId: UNLISTED_ID }), r)
+      : order;
+    const still = now.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (still) {
+      setTurn(null);
+      commit();
+      return;
+    }
+    if (step === 1) {
+      setTurn({ id: now[0]!, way: "out" });
+      pendingTurn.current = commit;
+      turnTimer.current = window.setTimeout(() => {
+        pendingTurn.current = null;
+        commit();
+        setTurn(null);
+      }, TURN_OUT_MS);
+      return;
+    }
+    commit();
+    setTurn({ id: now[now.length - 1]!, way: "in" });
+    turnTimer.current = window.setTimeout(() => setTurn(null), TURN_IN_MS);
   };
   const stepMeasure = (dir: -1 | 1, axis: "x" | "y" = "y") => {
     const next = stepMetric(useStore.getState().trendMetric, dir);
@@ -592,6 +648,8 @@ export default function TrendStack() {
             data-plane={pose.id}
             // The FRONT plane — the one a brush and a click act on — which the tether targets.
             data-front={pose.interactive ? "" : undefined}
+            // The card travelling in a deck turn (`turnDeck`).
+            data-turn={turn?.id === pose.id ? turn.way : undefined}
             className={cn(
               // THE ANCHOR: a 0-size box at the layer's origin, hidden until the engine has
               // projected it. `origin-top-left` is what makes the engine's matrix a plain
@@ -755,8 +813,12 @@ export default function TrendStack() {
                 // measure rides the front plot's caption instead (`unitInPlot`).
                 unitInPlot={false}
                 // A finer line: the card is drawn larger than authored, so the chart's own 2px
-                // landed at 2.6 (see `lineWidth`).
-                lineWidth={1.25}
+                // landed at 2.6 (see `lineWidth`). 1.25 → 1 → 0.75 (user, 2026-11-23: "too thick and/or
+                // spikey?"): hundreds of hourly buckets on a few hundred pixels fold back on
+                // themselves, and every extra tenth of stroke thickens each fold into a blade.
+                // 0.75 with the fill's lit lip under it (`TrendChart`'s gradient): the band carries
+                // the level, the stroke only its edge.
+                lineWidth={0.75}
                 // THE HEADLINE IS THE ROSTER'S `head` (user, 2026-09-29: "keep it consistent") —
                 // the same number the Networks list states: the span's average per day over a
                 // window of a day or more, the latest full day under one.

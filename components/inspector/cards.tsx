@@ -781,12 +781,12 @@ export function GeoLiveCard() {
 // provider card already followed since 2026-08-02 ("a facts rail shouldn't say the same thing
 // twice"), generalised.
 //
-// The gate is PRESENCE, not view (convention 7): each fact drops exactly when the rung that owns
-// it is committed — the same `!= null` conditions `railCards` uses for its `present` flags — so
-// it stays correct if a ladder changes. What survives per view is the COMPLEMENT of the ladder
-// above: geo (network→country→provider) leaves composition; hyper (network→composition) leaves
-// place + host; ledger (network) leaves all three. Read down the pile the fact set is identical
-// in every view — only its distribution across planks moves.
+// ⚠️ THE NODE CARD IS THE EXCEPTION TO THAT RULE, AND STATES THE SAME FACTS IN EVERY VIEW (user,
+// 2026-11-23). It used to drop place, host and ASN under a committed country and provider, so the
+// card read differently in Geography and Hypergraph — and a folded ancestor shows only its NAME,
+// so the city and the ASN, which sit in the provider card's body, were on screen nowhere. The
+// "Runs" section already broke the rule on purpose (shown under a committed composition card);
+// now place and host do too. Another subject card still never restates its ancestors.
 //
 // CONSISTENCY LEVER: the ORDER never changes. Whichever facts survive render in the fixed
 // reading order place → role → host → reference, so the card always reads the same way; it just
@@ -825,9 +825,6 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // delegated-staking opt-in — had a row under it until 2026-10-02; see the note in the body.)
   const nickState = useNodeNames();
   const nickname = nodeName(nickState.names, p.node);
-  // The three ancestor rungs that can own one of this card's facts.
-  const country = useStore((s) => s.country);
-  const cohort = useStore((s) => s.cohort);
   // Hosting provider from the node's IP lookup (GeoInfo.isp/asn) — Absent = the lookup didn't
   // know; the line simply doesn't render (honesty: no "Unknown" filler in a facts card).
   const geo = "geo" in p ? p.geo : undefined;
@@ -854,9 +851,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   const archEntry = p.node?.ip ? archive?.entries.get(p.node.ip) : undefined;
   const archState = archiveFactState(archEntry, archive?.since, archSettled, p.node?.roles ?? []);
   const archReach = archEntry ? archiveReach(archEntry) : null;
-  // The host's ASN answers to the provider rung exactly as the Hosting line above it does — one
-  // condition, so the two can't disagree about who owns the host.
-  const asn = cohort == null ? geo?.asn : null;
+  const asn = geo?.asn;
   // CO-LOCATION (user, 2026-08-16 — "can we show this in the node card?"): what ELSE this
   // machine runs, from the one home in network.ts (the roster's Co-located column reads the
   // same call). A host fact, so it sits with the host block. Usually "none" — stated, per the
@@ -874,12 +869,14 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // THE LEAD IS CONTEXTUAL (user, 2026-10-02 — "in snapshot view it should say something like
   // 'validated snapshot 123'. This should be the principle for that section"): it opens with what
   // this node is TO THE SUBJECT ON SCREEN — under a committed metagraph snapshot, whether it signed
-  // it — and only then where the node sits and who hosts it — the City / Country / Hosting rows read as one
-  // sentence. Each piece still YIELDS to the ancestor card that states it (the pile rule), so
-  // under a committed country and provider the lead is the relation alone, or nothing: a card
-  // never restates its ancestors to fill a slot.
-  const place = [cohort == null ? geo?.city : null, country == null ? geo?.country : null].filter(Boolean).join(", ");
-  const host = cohort == null ? geo?.isp : null;
+  // it — and only then where the node sits.
+  // ONE CARD IN EVERY VIEW (user, 2026-11-23: "node card is different between hypergraph and geo,
+  // does that still make sense or make it uniform?"). Where the node sits and who hosts it are
+  // stated whatever cards stand above it: they used to yield to a committed country and provider,
+  // but a folded entry shows only its NAME, so the node's city and ASN — which live in the
+  // provider card's body — were on screen nowhere while this card was open.
+  const place = [geo?.city, geo?.country].filter(Boolean).join(", ");
+  const host = geo?.isp;
   // NO MID-DOT LEADS (user, 2026-10-03: "I don't like those dots separating texts"): the lead is
   // ONE statement — the relation, else where the node sits — and the host is a row of its own.
   const lead = signed != null || !!place;

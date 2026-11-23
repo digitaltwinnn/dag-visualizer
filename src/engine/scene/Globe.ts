@@ -96,7 +96,8 @@ const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math
 // shadow while staying well short of the blot the OP comment above warns about.
 const POOL_SHADE = 0.34;
 const POOL_SHADE_OP = 0.72;
-/** How much of its light a pool keeps off the network in scope. */
+/** How much of its light a pool keeps off the network in scope while that network is BROWSED or
+ *  previewed. Under a HELD filter it keeps none (see `_applyGlowFilter`). */
 const POOL_OFF_SCOPE = 0.2;
 
 // View-transition staging grid: THE cell pitch (world units). setGatherFit may only shrink it
@@ -234,8 +235,17 @@ export class Globe implements GeoViewHost {
   metaList: MetaLayout[] = [];
   filter = "all";
   /** Is `filter` the top bar's own (held) rather than a browsed network? Only a held one hides the
-   *  rest (`dimModel.hideFrac`). Written by the Engine, the store bridge. */
-  filterHeld = false;
+   *  rest (`dimModel.hideFrac`). Written by the Engine, the store bridge. The density pools answer
+   *  it too, so a change re-targets them. */
+  private _filterHeld = false;
+  get filterHeld(): boolean {
+    return this._filterHeld;
+  }
+  set filterHeld(v: boolean) {
+    if (v === this._filterHeld) return;
+    this._filterHeld = v;
+    this._applyGlowFilter();
+  }
   private _hoverNodeId: string | null = null;
   // The hovered node's own record, resolved at hover time (see setHoverNode) — the stage light's
   // preview subject.
@@ -1040,10 +1050,16 @@ export class Globe implements GeoViewHost {
   // change never re-clusters the light pools. The pools follow the SELECTOR the chips follow — the
   // hover preview when there is one, else the committed filter (user, 2026-10-24: "not only the
   // other nodes should be affected but also the node-coloured plane sitting on top of the sphere")
-  // — and answer it as the chips do (user, 2026-11-02: dim, never remove). Eased per frame.
+  // — and answer it AS THE CHIPS DO, which is two answers (`dimModel.hideFrac`): a browse or a hover
+  // preview DIMS the other networks (user, 2026-11-02: dim, never remove), and a HELD top-bar filter
+  // HIDES them (2026-11-03). The pools kept dimming under a held filter, so the other networks'
+  // nodes left the globe and their coloured pools stayed behind on the ground where they had stood
+  // (user, 2026-11-23: "the globe still shows the other colored floors where usually the nodes
+  // sit"). Eased per frame.
   private _applyGlowFilter(): void {
     const sel = this._selector();
-    for (const m of this._densityGlow) m.userData.scope = sel === "all" || m.userData.net === sel ? 1 : POOL_OFF_SCOPE;
+    const off = this._filterHeld && !this._previewing() ? 0 : POOL_OFF_SCOPE;
+    for (const m of this._densityGlow) m.userData.scope = sel === "all" || m.userData.net === sel ? 1 : off;
     this.arcs.setSelector(sel); // the packets take the same isolate (objects/Arcs.ts)
   }
 

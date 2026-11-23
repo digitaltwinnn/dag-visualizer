@@ -71,7 +71,7 @@ import {
   type LaneBlock,
 } from "../../domain/ledgerModel";
 import { blockPlace, forkSpread, frontMark, referenceSegments, silentRun, stretchLabel, type BlockRead } from "../../domain/blockBraid";
-import { DATA_MARK, carriesData, dataMarkCount } from "../../domain/dataMark";
+import { DATA_MARK, DATA_STACK, carriesData, dataMarkCount, dataStackBoxes } from "../../domain/dataMark";
 import { ENTRY_STAG, entryStep, entryTotal } from "../../domain/entryBeat";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, RIBBON_LANE_HALF, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
@@ -90,7 +90,6 @@ import type { ViewPolicy } from "../../domain/viewPolicy";
 type LedgerRegister = ViewPolicy["registers"][number];
 import { fmtKB } from "@/src/util/format"; // the HUD's own size vocabulary — one formatter, so scene and cards can't disagree
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
-import { SoftLines } from "../objects/SoftLines";
 import { ByteBar, SEED_W } from "../objects/ByteBar";
 import { LiveEdge } from "../objects/LiveEdge";
 import { snapBright, snapFocusOf, focusWeightOf, emphasisK } from "../../domain/dimModel";
@@ -109,6 +108,7 @@ import { joinBloom, inMarkPass } from "../SceneContext";
 import { faceShade } from "../objects/faceShade";
 import { FloorMirror, joinMirror } from "../objects/FloorMirror";
 import { Glint } from "../objects/Glint";
+import { LiftMist } from "../objects/LiftMist";
 
 /** The lane-tile instance budget.
  *
@@ -242,7 +242,7 @@ export const TILE_LOOK: Readonly<TileLook> = { rest: 0.1, ink: 0.3, halo: 2.5 };
  *    thread) — `"all"` of them; `"blocks"`, only those carrying a token block (`_blockTiles`); or
  *    `"data"`, only those whose exact read says they carried DATA BLOCKS (`domain/dataMark.carriesData`;
  *    user, 2026-11-07: "a metagraph that anchored but had no datablock … don't show it"), each
- *    wearing a mark on its top, its height the count of data updates (`domain/dataMark.ts`; the Data
+ *    wearing a column of boxes over it, one per data block (`domain/dataMark.ts`; the Data
  *    blocks register, D6). Data blocks have no parents, so there is no braid and no link: the register
  *    is the Snapshots furniture as it stands — the same source, ribbons, bands and live edge — with the
  *    tiles kept to the data-carrying snapshots, plus the marks. A tile whose tick's read has not landed
@@ -256,12 +256,34 @@ const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolea
 };
 /** A data mark's brightness over its tile's: a footnote on the tile, but one that must read on it. */
 const DATA_MARK_GAIN = 2.2;
-/** THE MARK'S TETHER (user, 2026-11-09: "raise the datablocks from their snapshots more … with a line
- *  attaching the blocks"): one soft hairline from the tile's top to its lifted mark's underside, in the
- *  mark's own ink, so the lift reads as "this block came off THAT snapshot" rather than a block adrift.
- *  Its alpha per ground: on the dark ground the additive line glows, on paper an ink line needs more
- *  presence to read at all (the lamp rule's direction, `src/engine/CLAUDE.md`). */
-const DATA_TETHER: Readonly<{ alpha: number; alphaPaper: number }> = { alpha: 0.7, alphaPaper: 0.9 };
+
+/** How far the chamber's identity hues lean toward the page on paper — the HUD's identity bars'
+ *  own 0.75 opacity, as a share of the page (`setSceneColors`). */
+const PAPER_IDENT_LIFT = 0.25;
+
+/** `hex` composited toward `ground` by `t`, channel by channel in sRGB — what CSS paints for a mark
+ *  at opacity `1 − t` over that ground. Event-time only. */
+function srgbToward(hex: number, ground: number, t: number): number {
+  let out = 0;
+  for (const shift of [16, 8, 0]) {
+    const a = (hex >> shift) & 0xff;
+    const b = (ground >> shift) & 0xff;
+    out |= Math.round(a + (b - a) * t) << shift;
+  }
+  return out;
+}
+/** THE BLOCKS HOVER (user, 2026-11-23: "levitating"): a data column rides up and down a little
+ *  over its snapshot — `rise` of the tile's size either way, one cycle every `seconds`, each column
+ *  on its own phase so the trail breathes instead of marching. Held still under reduced motion
+ *  (`setStill`). What ties the column to its tile is the mist under it (`objects/LiftMist.ts`). */
+const DATA_HOVER: Readonly<{ rise: number; seconds: number }> = { rise: 0.07, seconds: 4.6 };
+/** THE COLUMNS' OWN ARRIVAL (user, 2026-11-23: switching between Metagraph snapshots and Data blocks
+ *  "the whole elements drop from the sky but in fact we could just drop the blocks on the
+ *  snapshots, keep the rest stable"). Those two registers read the same source and draw the same
+ *  chamber, so nothing in it has moved: the columns alone come down onto their snapshots, from
+ *  `drop` tile sizes above, over `seconds`, growing in as they fall with their mist rising under
+ *  them. A switch to or from Transaction blocks changes the source and keeps the whole beat. */
+const DATA_ARRIVAL: Readonly<{ drop: number; seconds: number }> = { drop: 3.2, seconds: 0.6 };
 
 /** A block's edge above the floor (a DAG block) and on a tile (a token block — a tile is 0.48 at most). */
 const DAG_BLOCK = 0.62;
@@ -522,9 +544,15 @@ export class LedgerView implements SceneView {
    *  the read not landed). Filled at event time with the pick table (`_rebuildTilePicks`). */
   private _dataMarkMesh!: THREE.InstancedMesh;
   private readonly _dataMarkN = new Float32Array(META_TRAIL_MAX).fill(-1);
-  private _dataMarkLastDrawn = 0;
-  /** One tether per mark, in the same slot order (`DATA_TETHER`). */
-  private _dataTether!: SoftLines;
+  /** How many boxes each tile's column holds (`dataMark.dataStackBoxes`), resolved with the count. */
+  private readonly _dataBoxN = new Uint8Array(META_TRAIL_MAX);
+  /** The mist each data column hangs over (`objects/LiftMist.ts`), one per drawn column, packed. */
+  private _liftMist!: LiftMist;
+  /** The hover's clock, and whether motion is held still (reduced motion; the Engine says). */
+  private _hoverT = 0;
+  private _still = false;
+  /** The columns' arrival, 0 to 1 (`DATA_ARRIVAL`); 1 = standing. */
+  private _dataIn = 1;
 
   constructor(
     scene: THREE.Scene,
@@ -647,8 +675,7 @@ export class LedgerView implements SceneView {
     // before any data, and the pool would submit all META_TRAIL_MAX zero-scaled boxes every frame.
     this._dataMarkMesh.count = 0;
     this.group.add(this._dataMarkMesh);
-    this._dataTether = new SoftLines(META_TRAIL_MAX, this._colors);
-    this.group.add(this._dataTether.mesh);
+    this._liftMist = new LiftMist(this.group, META_TRAIL_MAX, DATA_MARK.foot, TILE_D * DATA_MARK.lift, this._paper);
   }
 
   private _laneColor(id: string): THREE.Color {
@@ -789,6 +816,19 @@ export class LedgerView implements SceneView {
   }
 
   setSceneColors(map: Record<string, number>): void {
+    // ON PAPER THE CHAMBER'S HUES SIT AT THE HUD'S PRESENCE (user, 2026-11-23: the metagraph
+    // colours "look a bit darker than the regular css elements carrying the same color"). Both
+    // lanes resolve one hue to nearly one hex, but the HUD draws its identity bars and columns at
+    // 0.6–0.75 opacity over the page, measured L 0.66, while the chamber's opaque tiles and bars
+    // landed at the full ink's 0.59 and their shaded sides lower. The map is lifted once, here,
+    // toward the page as a 0.75 composite in sRGB — what the HUD's own bars paint — so every
+    // instrument that takes it (tiles, bands, ribbons, columns, blocks) matches. Dark is untouched.
+    if (isLightGround(this._colors)) {
+      const bg = this._colors.bg;
+      const lifted: Record<string, number> = {};
+      for (const [id, hex] of Object.entries(map)) lifted[id] = srgbToward(hex, bg, PAPER_IDENT_LIFT);
+      map = lifted;
+    }
     this.sceneColors = map;
     this._laneColors.clear();
     for (const [key, pane] of this._tokenPanes) pane.setTint(this._laneColor(key).getHex());
@@ -816,7 +856,7 @@ export class LedgerView implements SceneView {
     for (const p of this._tokenPanes.values()) p.setColors(c);
     this._bar.setColors(c);
     this._ribbons.setColors(c);
-    this._dataTether?.setColors(c);
+    this._liftMist?.setGround(this._paper);
     for (const t of this._tiers) t.setColors(c);
     this._stretch.setColors(c);
     this._rebuildBlockTier(); // the DAG's blocks and links bake the structural cyan (`_core`)
@@ -1646,6 +1686,18 @@ export class LedgerView implements SceneView {
     this._hoverTile = -1;
   }
 
+  /** Bring the data columns down onto their snapshots (`DATA_ARRIVAL`) — the Engine's answer to a
+   *  switch between the two registers that share a source. Event-time. */
+  beginDataArrival(): void {
+    this._dataIn = this._still ? 1 : 0;
+  }
+
+  /** REDUCED MOTION, from the Engine (plain data): the data columns' hover and their mist's drift
+   *  hold still. */
+  setStill(still: boolean): void {
+    this._still = still;
+  }
+
   /** The COMMITTED (clicked) or followed snapshot — the only thing the trail rewind tracks. */
   setPinned(ordinal: number | null) {
     this._rewind.setPinned(ordinal);
@@ -1959,27 +2011,29 @@ export class LedgerView implements SceneView {
         // The Data blocks register's mark: the count from THIS snapshot's own exact row — the tile
         // the resolver named — or none while that read has not landed (rule 10). Resolved BEFORE the
         // pick is kept: in that register the mark decides whether the tile is drawn at all.
-        this._dataMarkN[mi] = this._cargo.tiles === "data" && pick?.kind === "metaSnap" ? this._dataMarkOf(pick.sel.globalOrdinal, pick.sel.metaId, pick.sel.ordinal) : -1;
+        const dataRow = this._cargo.tiles === "data" && pick?.kind === "metaSnap" ? this._dataRowOf(pick.sel.globalOrdinal, pick.sel.metaId, pick.sel.ordinal) : null;
+        this._dataMarkN[mi] = dataMarkCount(dataRow) ?? -1;
+        this._dataBoxN[mi] = dataStackBoxes(dataRow);
         // A tile the register does not draw (`_tileDrawn`) is not pickable either.
         this._tilePicks[mi] = pick && this._tileDrawn(b, mi) ? pick : null;
         if (b.filled) k++;
         mi++;
       }
     }
-    for (let j = mi; j < META_TRAIL_MAX; j++) { this._tilePicks[j] = null; this._dataMarkN[j] = -1; }
+    for (let j = mi; j < META_TRAIL_MAX; j++) { this._tilePicks[j] = null; this._dataMarkN[j] = -1; this._dataBoxN[j] = 0; }
     // A held hover's tile index is only valid against THIS table — and so is the selected
     // tile's (the callout anchor).
     this._syncHoverTile();
     this._resolveSelTile();
   }
 
-  /** A metagraph snapshot's data-mark count from its tick's exact read (`dataMark.dataMarkCount`),
-   *  or -1 for no mark. Event-time, beside the pick it belongs to. */
-  private _dataMarkOf(globalOrdinal: number, metaId: string, ordinal: number): number {
+  /** A metagraph snapshot's own row in its tick's exact read, or null while that read has not
+   *  landed — what its data mark counts and how tall its column stands (`domain/dataMark.ts`). */
+  private _dataRowOf(globalOrdinal: number, metaId: string, ordinal: number) {
     const rows = this._exact[globalOrdinal]?.rows;
-    if (!rows) return -1;
-    for (const r of rows) if (r.metaId === metaId && r.ordinal === ordinal) return dataMarkCount(r) ?? -1;
-    return -1;
+    if (!rows) return null;
+    for (const r of rows) if (r.metaId === metaId && r.ordinal === ordinal) return r;
+    return null;
   }
 
   private _syncPickables(): void {
@@ -2141,11 +2195,20 @@ export class LedgerView implements SceneView {
 
     // ── lane tiles on the metagraph-snapshot floor
     let mi = 0;
+    // The data columns' own cursor: a tile's boxes take the next slots of the mark pool, so the
+    // pool is packed and `count` draws exactly the boxes standing this frame.
+    let si = 0;
+    let li = 0; // …and the mist's cursor, packed the same way
     // Hoisted per frame (the hoist rule): one read for every lane's every tile.
     const dimNet = this._netDimKey();
     const tileRest = TILE_LOOK.rest;
     const tileInk = TILE_LOOK.ink;
     const dataMarks = this._cargo.tiles === "data";
+    if (dataMarks && !this._still) this._hoverT = (this._hoverT + dt / DATA_HOVER.seconds) % 1000;
+    const hoverPh = this._hoverT * Math.PI * 2;
+    // The columns' arrival, eased out so they settle onto the lift rather than stop on it.
+    if (this._dataIn < 1) this._dataIn = Math.min(1, this._dataIn + dt / DATA_ARRIVAL.seconds);
+    const dataIn = 1 - (1 - this._dataIn) * (1 - this._dataIn) * (1 - this._dataIn);
     // A focus is a SELECTED row (pinned or live-followed — how it was reached is not what it is),
     // a hovered row or a hovered tile. The bare lead is none of them: with nothing selected the
     // chamber is simply running, and stepping the whole trail back against a row it advanced onto
@@ -2192,10 +2255,6 @@ export class LedgerView implements SceneView {
           _dummy.scale.setScalar(0);
           _dummy.updateMatrix();
           this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
-          if (dataMarks) {
-            this._dataMarkMesh.setMatrixAt(mi, _dummy.matrix); // its mark goes with it
-            this._dataTether.setAlpha(mi, 0, 0); // and its tether
-          }
           b.bright = 0; // a slot that comes back eases up from dark, not from a stale row
           mi++;
           continue;
@@ -2275,33 +2334,44 @@ export class LedgerView implements SceneView {
         // accuracy; what was actually missing is hue at the bottom of the span, which is TileLook.ink
         // above. Thin toward the ground, floor the tint — the two answer different halves.
         this._metaTrailMesh.setColorAt(mi, inkMix(_col.copy(ident ? laneColor : this._coreCol), bright, this._colors));
-        // THE DATA MARK (the Data blocks register's cargo): on the tile's top as this frame draws it,
-        // in the lane's identity hue at the tile's own eased brightness (lifted so it reads on it), so
-        // the dim, the focus and the boundary fades all reach it through its tile.
+        // THE DATA COLUMN (the Data blocks register's cargo): one box per data block, standing over
+        // the tile as this frame draws it, in the tile's own hue (identity or the neutral trail) at its eased
+        // brightness (lifted so it reads on it), so the dim, the focus and the boundary fades all
+        // reach it through its tile.
         if (dataMarks) {
-          const n = this._dataMarkN[mi];
-          if (n >= 0) {
-            // The tile's own size (user, 2026-11-08): a second tile hovering a little over the first.
-            const h = tileH * DATA_MARK.height;
-            const w = b.size * DATA_MARK.foot;
-            const under = _tileV.y + tileH * DATA_MARK.lift;
-            _dummy.position.set(_tileV.x, under + h / 2, _tileV.z);
+          const boxes = this._dataBoxN[mi];
+          if (boxes > 0 && si + boxes <= META_TRAIL_MAX) {
+            // Each box is a cube inside the tile's footprint; the column rises from the lift.
+            const w = b.size * DATA_MARK.foot * dataIn;
+            const h = w;
+            // The hover: each column on its own phase (its tile's place in the trail), still under
+            // reduced motion.
+            const bob = this._still ? 0 : Math.sin(hoverPh + mi * 1.7) * b.size * DATA_HOVER.rise;
+            const under = _tileV.y + tileH * DATA_MARK.lift + bob + (1 - dataIn) * b.size * DATA_ARRIVAL.drop;
+            const pitch = h * (1 + DATA_STACK.gap);
+            // A hovered data block's column takes the subject's full weight (its tile keeps its own).
+            // Its HUE is its tile's (user, 2026-11-23: "unlike all other elements in the trail, the
+            // data block still keeps its metagraph color"): identity on the active row, a hover
+            // and the committed network's own trail, the neutral trail everywhere else.
+            inkMix(_col.copy(ident || mi === this._hoverMark ? laneColor : this._coreCol), mi === this._hoverMark ? 1 : Math.min(1, bright * DATA_MARK_GAIN), this._colors);
             _dummy.rotation.set(0, 0, 0);
             _dummy.scale.set(w, h, w);
+            for (let bx = 0; bx < boxes; bx++) {
+              _dummy.position.set(_tileV.x, under + bx * pitch + h / 2, _tileV.z);
+              _dummy.updateMatrix();
+              this._dataMarkMesh.setMatrixAt(si, _dummy.matrix);
+              this._dataMarkMesh.setColorAt(si, _col);
+              si++;
+            }
+            // THE MIST it hangs over: the sheet stands on the tile's top at the tile's size, in the
+            // column's ink at the tile's entry fade (a colour multiply: it is added light on dark,
+            // and the instance colour is its only per-column channel).
+            _dummy.position.set(_tileV.x, _tileV.y, _tileV.z);
+            _dummy.scale.set(b.size, b.size * dataIn, b.size); // it rises under the arriving column
             _dummy.updateMatrix();
-            this._dataMarkMesh.setMatrixAt(mi, _dummy.matrix);
-            // A hovered data block's mark takes the subject's full weight (its tile keeps its own).
-            inkMix(_col.copy(laneColor), mi === this._hoverMark ? 1 : Math.min(1, bright * DATA_MARK_GAIN), this._colors);
-            this._dataMarkMesh.setColorAt(mi, _col);
-            // Its tether, tile top to mark underside, in the mark's ink; the entry beat reaches it as
-            // it reaches the tile, through the same fade.
-            this._dataTether.setSegment(mi, _tileV.x, _tileV.y, _tileV.z, _tileV.x, under, _tileV.z);
-            this._dataTether.setColor(mi, _col.r, _col.g, _col.b);
-            const ta = (this._paper ? DATA_TETHER.alphaPaper : DATA_TETHER.alpha) * entryF;
-            this._dataTether.setAlpha(mi, ta, ta);
-          } else {
-            this._zeroDataMark(mi);
-            this._dataTether.setAlpha(mi, 0, 0);
+            this._liftMist.mesh.setMatrixAt(li, _dummy.matrix);
+            this._liftMist.mesh.setColorAt(li, this._paper ? _col : _col.multiplyScalar(entryF));
+            li++;
           }
         }
         mi++;
@@ -2333,8 +2403,9 @@ export class LedgerView implements SceneView {
     // (the review found the pool's 6,000 zero-scaled boxes submitted every frame in every register,
     // 45% of the chamber's triangles drawing nothing). Every slot below `count` this frame did not
     // write is zero-scaled (rule 5's discipline), and the upload covers only those.
-    const markTo = dataMarks ? mi : 0;
-    if (markTo < this._dataMarkLastDrawn) for (let j = markTo; j < this._dataMarkLastDrawn; j++) this._zeroDataMark(j);
+    // The pool is PACKED: `si` boxes were written this frame, in slots 0…si−1, so `count` draws
+    // exactly those and nothing past them needs zeroing.
+    const markTo = dataMarks ? si : 0;
     this._dataMarkMesh.count = markTo;
     if (markTo > 0) {
       this._dataMarkMesh.instanceMatrix.clearUpdateRanges();
@@ -2346,18 +2417,9 @@ export class LedgerView implements SceneView {
         this._dataMarkMesh.instanceColor.needsUpdate = true;
       }
     }
-    this._dataMarkLastDrawn = markTo;
-    // The tethers draw the same slots: positions and colours move with the trail every frame, so both
-    // upload, ranged to what is drawn (`SoftLines.commit`); 0 draws none.
-    this._dataTether.commit(markTo, true, true);
-  }
-
-  private _zeroDataMark(i: number): void {
-    _dummy.position.set(0, 0, 0);
-    _dummy.rotation.set(0, 0, 0);
-    _dummy.scale.setScalar(0);
-    _dummy.updateMatrix();
-    this._dataMarkMesh.setMatrixAt(i, _dummy.matrix);
+    // The mist is packed too, ranged to the columns drawn; 0 draws none. Its band holds still with
+    // the hover.
+    this._liftMist.commit(dataMarks ? li : 0, this._fades.alpha, this._still ? 0 : dt);
   }
 
   dispose() {
@@ -2375,7 +2437,7 @@ export class LedgerView implements SceneView {
     this._bar.dispose();
     this._live.dispose();
     this._ribbons.dispose();
-    this._dataTether.dispose();
+    this._liftMist.dispose();
     for (const t of this._tiers) t.dispose();
     this._stretch.dispose();
     for (const o of this.group.children.slice()) {

@@ -471,6 +471,12 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
   soon: FLAT,
 };
 
+/** THE SNAPSHOTS VIEW OPENS ON DATA BLOCKS (user, 2026-11-23: "default sub-view for snapshots, use
+ *  data blocks?"): the register the app starts in, and the one the tour shows. `/snapshots` still
+ *  names Metagraph snapshots — a URL says what it shows; only an arrival with no register named
+ *  takes this one. */
+export const DEFAULT_REGISTER: LedgerRegister = "data";
+
 /** THE REGISTER THE VIEW ON SCREEN READS (D3, 2026-11-07): the store's setting where the view's row
  *  offers it, else the row's first — its only one. The register is a setting of the Snapshots view
  *  that persists across views (the `/blocks` route seeds it), so a surface that behaves per register

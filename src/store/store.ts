@@ -12,7 +12,7 @@ import type { ThemePref, Theme } from "@/src/theme/resolve";
 // import keeps the store from holding a data-layer VALUE.
 import type { ZoomId } from "@/src/data/trendWindow";
 import { entryFocus, focusOnReturn, planeOfChain, scrollToKeep } from "@/src/engine/domain/trendStack";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { DEFAULT_REGISTER, VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // The catalog and the unlisted id, for the one fold the return path needs (`planeOfChain`): both
 // are static data — the catalog is config's, `unlistedId` is the import-free leaf.
 import { METAGRAPHS } from "@/src/engine/config";
@@ -715,7 +715,7 @@ export const useStore = create<AppState>((set) => ({
   trendMetric: "snapshots",
   ledgerMeasure: "fee",
   dataMeasure: "data",
-  ledgerRegister: "snapshots",
+  ledgerRegister: DEFAULT_REGISTER,
   blockMeasure: "amount",
   block: null,
   dataBlock: null,
