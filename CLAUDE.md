@@ -44,6 +44,10 @@ Four views drive the 3D scene:
   blocks, a column with one box per data block (a cL1 block holds transactions, a dL1 block data
   updates — the protocol's own split). The view OPENS on Data blocks (`viewPolicy.DEFAULT_REGISTER`, user 2026-11-23); `/snapshots` still
   names Metagraph snapshots, and the tour's Snapshots stop names it too (its line is that note's).
+  **Who submits a data block** (2026-11-27): on Data blocks each data block's box splits into bands by
+  submitter — a DED block's ORGANISATIONS (named, up to three bands plus Other), a Dor block's DEVICES
+  (counted, never named); `src/data/submitters.ts` is the one table (`submitters.test.ts`), the palette of
+  the seven busiest organisations of all time colours them (`submitterPalette`, the sixth publish channel).
   A register is a setting of a view, never a Mode
   (`viewPolicy.registers` lists them; the view switch holds no sixth button), its pages live in ONE map
   (`components/views.ts`' `REGISTER_PAGES`, pinned by `views.test.ts`), the chamber dispatches on ONE
@@ -55,6 +59,10 @@ Four views drive the 3D scene:
   ground that draws each plane's footprint, with a shared time cursor marking one instant on every
   plane at once. The planes are DOM, not WebGL — `TrendChart`, the app's one chart —
   and the bottom band is a scrubbable timeline rather than vitals cells.
+  A DATA network's plane brings a **Data submitters** card (2026-11-27): who sent the range's data
+  blocks — DED's organisations broken down over time, Dor's devices counted — read from the `sub:`
+  key family (`/api/submitters`, its own 1h/1d tiers outside `t:`; `src/data/CLAUDE.md`, "Who submits
+  the data"), measured only inside the sampler's span.
 
 **The Briefing** (2026-10-31, `domain/briefing.ts`, `components/Briefing.tsx`,
 `docs/superpowers/specs/2026-10-31-briefing-design.md`): `/` opens on Geography and plays every 3D
@@ -111,13 +119,14 @@ rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`d
 homes and the slab's geometry — the pager included — keys on `data-tier`),
 `components/cssTrapBoundary.test.ts` (CSS traps 3 and 6 — a `bg-[var()]` never points at a gradient
 token, and every custom `text-*`/`tracking-*`/`rounded-*` token is registered with twMerge),
-`components/publishChannelBoundary.test.ts` (the five React→Engine publish channels are one-way and
+`components/publishChannelBoundary.test.ts` (the six React→Engine publish channels are one-way and
 single-publisher: `focusRung` is a fresh object bridged by reference, the `sceneCover*` family
 is reported by `RailDock` and sided by its owner — a tablet side sheet's MEASURED width by the two
 rails, a phone dock's bottom HEIGHT from its own target-height state by all three docks, `boxedCard` is Inspector's alone, and
 `trendIds` — the History stack's busiest-first roster, derived from fetched data that lives only in
-React's cache — is `TrendStack`'s alone and is never read back by a component, and `briefing`, the tour's stop, is
-`Briefing`'s alone),
+React's cache — is `TrendStack`'s alone and is never read back by a component, `briefing`, the tour's stop, is
+`Briefing`'s alone, and `submitterPalette` — the organisation palette the chamber's bands colour from,
+fetched in React's cache — is `SubmitterPaletteBridge`'s alone and read only by the Engine),
 `components/trendStackBoundary.test.ts` (the DOM chart planes' split with their projector: the two
 markers, the anchor's 0-size shape, no blur or shadow anywhere on a plane, the memoised plot and the
 plot box its cursor overlay is calculated against),

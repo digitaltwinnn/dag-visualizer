@@ -181,7 +181,8 @@ since the chain publishes none; `snapshot-exact-v10`): the Data block card reads
 reads deep for a data block. **A data block the decoder cannot read is UNREAD** (`unread: true`,
 review M3, 2026-11-09; `snapshot-exact-v11`): its snapshot's `dataTxCount` is absent (unknown), so
 every sum of data updates and the register switch's data-block count read that tick as unread, never
-a 0.
+a 0. **Each data block also carries who submitted it** (`DataBlockSummary.submitters`,
+`snapshot-exact-v12`; see "Who submits the data" below).
 
 **A block's parents come only from a FULL READ** of the snapshot that accepted it
 (`blockReads.ts`, `components/BlockReadsBridge.tsx`): one read per block-bearing snapshot in the
@@ -315,6 +316,38 @@ backend and the chain holds the tamper-proof roots. So the decoder surfaces deco
 and the card shows "Data updates: N". This is structural, not per-network: probed across all anchoring
 channels over 12 live ticks, zero undecodable entries and three distinct payload shapes all rendering
 honestly through the same generic extraction.
+
+## Who submits the data
+
+**One table, `src/data/submitters.ts`** (2026-11-27, pinned by `submitters.test.ts`): one row per network
+whose updates name their submitter, read mechanically off the update (`submitterOf`, `tallySubmitters`).
+Digital Evidence's updates are `MetagraphBatchMessage`s carrying an `orgId` — an ORGANISATION, unit
+"batches"; Dor's carry a `publicId` — a DEVICE, unit "check-ins". Every other network has no row and
+answers null: absent is absent, never a guess (rule 10). An update naming no submitter is not counted;
+the block's other figures never depend on it.
+
+**Dor is counted, not named.** A device id is stored truncated to `DEVICE_ID_LEN` and only ever counted
+(a union of ids), never given a name, a colour or a breakdown — a device is not a party anyone can name.
+DED's organisations are named from DED's own public API (`/v1/fingerprints/latest`, read each sampler
+run) and, for organisations that stopped before the sampler started, a one-off seed from dagscan's
+evidence summary (`scripts/seed-ded-names.ts`, never over a name DED gave). An organisation without a
+name is "Org xxxxxxxx" (its id's first eight characters), never a made-up one.
+
+**Colour is a PALETTE, not a hue per organisation** (`src/palette/submitterHue.ts`,
+`SubmittersWindow.palette`): the seven busiest organisations of all time, the same in every window,
+take distinct hues kept clear of DED's and Dor's identity hues and of the chamber's core cyan; every
+other organisation draws the neutral "Other". The chamber reads the palette from the store's
+`submitterPalette` (a single-publisher channel, `components/publishChannelBoundary.test.ts`); every
+surface hovers an organisation on `hoverSubmitter`.
+
+**The honesty rules.** The sampler measures a SPAN (`sub:…:span`, `from`–`to`); a bucket is measured
+only when it lies wholly inside the span at its tier, and everything outside it is NULL — "not measured
+before", never a zero (`app/api/submitters/assemble.test.ts`). A day (1d) is exactly the sum of its
+hours (1h); devices are exact unions of ids, never a sum of per-bucket counts (a device seen in two hours
+is one device). The in-progress bucket is null, History's partial-edge rule. A network that carried no
+data blocks in a range is read from the absence of a submitters row, not asserted from the chain.
+Read through `/api/submitters` (`useSubmitters`), written by the sampler and `scripts/walk-submitters.ts`
+(`app/api/CLAUDE.md`).
 
 ## The measured history — one data path
 

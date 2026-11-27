@@ -168,6 +168,14 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   network's new address) is read back to its FIRST snapshot within the same depth
   (`fetchSince.ts`), not just its newest page. The History view (`/trends`) is the read route's
   consumer.
+- **`/api/submitters`** (2026-11-27) is the READ route for who sent a network's data blocks: `?net=` (DED or
+  Dor, anything else 400) with either `window=24h` (the 24 whole hours ending at the newest whole
+  measured hour) or `from`/`to` epoch ms (within ten years). Answers a `SubmittersWindow` (`assemble.ts`):
+  per-bucket organisation tallies (or Dor's exact device unions), the names hash, the busiest-of-all-time
+  `palette`, and the measured span — a bucket outside it is null. Same idiom as `/api/trends`: reading
+  searchParams keeps it per-request, `public, s-maxage=300, stale-while-revalidate=600`, the read-only
+  token, 503 `no-store` when the store is down. Which hashes a range reads is `readSubmitters`
+  (`read.ts`), shared with the notes.
 - **`/api/submitters/sample`** (2026-11-27) is the Vercel-Cron sampler (quarter-hourly at 3,18,33,48,
   `CRON_SECRET` auth) for WHO SUBMITS a data block: Digital Evidence's organisations (`orgId`) and Dor's
   devices (`publicId`), the two networks in `src/data/submitters.ts`. Its own key family `sub:mainnet:`
@@ -279,6 +287,13 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   call, and `retried`, every note that needed its second attempt), and
   `npx tsx scripts/notes-stats.ts` prints the last 14 days on the read-only token: it is the
   instrument for how the model is holding up.
+  **Submitter facts** (2026-11-27): a DED or Dor History/Data note also states who submitted — DED's
+  organisations (named, with their start/end inside the span, `readSubmitters` through
+  `NoteReads.submitters`) and Dor's active devices (counted, never named). A failed or absent `sub:` read
+  is no submitter data, and the note is written as before; the Data blocks note states no organisation
+  when no names were read. The gate is actor-scoped: a share or a % / multiplier labelled with an
+  organisation is held to the sentence that names that organisation. Its limit is stated: it checks
+  the figure and whose it is, by label, not what the prose claims about a count.
   **Subject notes** (user, 2026-10-29) are a card's own note: a country, a provider, a node make-up.
   The grammar has ONE home, `notes/keys.ts` — `CC_TAIL_RE`, `ISP_TAIL_RE`, `TYPE_TAIL_RE`,
   `subjectKindOf`, `isSubjectNote`: `cc:XX` (fleet country), `<net>/cc:XX`, `isp:<key>`,
@@ -377,7 +392,7 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   decode. **A deterministic miss (the channel provably isn't in this immutable global) is cached
   like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
   the whole global, an anonymous amplification loop; only transient failures throw and retry.
-- **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, the transfer totals in DAG and each transfer's `{ from, to, amount, fee }` in `transfers`, signature count; hashes paired by index from the explorer record, `""` where it lists none) — never its `tips`, which nothing reads (`decodeBlocks.ts`; cache key `snapshot-exact-v11` — v7 added the rows' data updates, the hashes read apart and cached on success only; v8 re-keys after an undecodable row's data updates became unknown rather than 0, so no cached entry still states the 0; v9 the state's shape and dL1 signers; v10 one summary per data block; v11 an unreadable data block is `unread` and its snapshot's data updates unknown — `cachedExact.ts` keeps the history).
+- **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, the transfer totals in DAG and each transfer's `{ from, to, amount, fee }` in `transfers`, signature count; hashes paired by index from the explorer record, `""` where it lists none) — never its `tips`, which nothing reads (`decodeBlocks.ts`; cache key `snapshot-exact-v11` — v7 added the rows' data updates, the hashes read apart and cached on success only; v8 re-keys after an undecodable row's data updates became unknown rather than 0, so no cached entry still states the 0; v9 the state's shape and dL1 signers; v10 one summary per data block; v11 an unreadable data block is `unread` and its snapshot's data updates unknown; v12 each data block's submitters — `cachedExact.ts` keeps the history).
 - **`/api/network/[address]/snapshots/[ordinal]/blocks`** is a metagraph snapshot's blocks, read from the chain's own L0 (`urls.l0` from the directory, 5 min; `network/metaL0.ts`) through the same `decodeBlocks` (cache key `metagraph-snap-blocks-v3`); the snapshots route's address gate (catalog + unlisted), `public, max-age=86400, s-maxage=86400, immutable`, 503 `no-store` on upstream failure (its
   `route.test.ts` and `snapshot/decodeBlocks.test.ts` pin the answer). The ordinal is a number; anything else, `latest` included, is a 400 — the chain's newest snapshot is read nowhere.
 - **`/api/network/unlisted`** lists the UNLISTED chains — the explorer's `/currency` list less every
