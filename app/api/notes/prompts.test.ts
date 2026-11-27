@@ -264,6 +264,8 @@ describe("who submitted the data", () => {
   it("is one line in History's and the Data blocks' prompts, and in no other view's", () => {
     expect(SUBMITTER_WORDS).toMatch(/organisation is named exactly as the facts name it/);
     expect(SUBMITTER_WORDS).toMatch(/device is never named/);
+    // The actor rule (the gate holds a share or a change to its own actor): taught, not only enforced.
+    expect(SUBMITTER_WORDS).toMatch(/organisation's share or change goes in a sentence of its own, never beside the network's own change/);
     // Dor's device counts are estimates (R19): the model says "about" before them.
     expect(SUBMITTER_WORDS).toMatch(/device count the facts label "about" is an estimate: write "about" before it/);
     for (const label of ["Digital Evidence", DATA_WHOLE]) expect(PROMPTS.data.system(label)).toContain(SUBMITTER_WORDS);

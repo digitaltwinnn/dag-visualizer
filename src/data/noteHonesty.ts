@@ -422,6 +422,20 @@ export function checkNote(
       : subject ? ratios.filter((f) => labelHas(f, [subject]))
       : ratios.filter((f) => !labelHas(f, names));
     const dir = direction(s);
+    // THE ACTOR RULE, NAMED IN THE RETRY (final review, 2026-11-27): a figure this sentence may not
+    // cite only because it belongs to another actor (an organisation's share or change, or the
+    // network's own beside an organisation) is told where it goes, so the second answer can move it
+    // rather than drop it. Null when no actor's fact backs it either.
+    const actorReason = (t: Tok): string | null => {
+      if (!actors.length) return null;
+      const f = facts.find((g) => !factsHere.includes(g) && (g.kind === "share" || g.move) && says(t, g, ratios, dir));
+      if (!f) return null;
+      const word = f.move ? "change" : "share";
+      const of = actors.find((a) => hasName(f.label, a));
+      return of
+        ? `"${t.raw}" is ${of}'s ${word}: say it in a sentence about ${of} alone`
+        : `"${t.raw}" is the network's own ${word}: say it in a sentence of its own, never beside an organisation`;
+    };
 
     const digits = s.replace(NUMBER_WORD_RE, (w) => ` ${NUMBER_WORDS[w.toLowerCase()]} `);
     const toks = sharedUnits(digits, tokens(digits));
@@ -432,7 +446,7 @@ export function checkNote(
     const isPast = toks.map((t, k) => !isCurrent[k] && factsHere.some((f) => f.pair?.end === "from" && says(t, f, own, dir)));
     toks.forEach((t, k) => {
       if (isCurrent[k]) return;
-      if (!isPast[k]) return void reasons.push(`"${t.raw}" is not backed by any measured fact`);
+      if (!isPast[k]) return void reasons.push(actorReason(t) ?? `"${t.raw}" is not backed by any measured fact`);
       const why = pastReason(k, digits, toks, isPast, factsHere, own, dir);
       if (why) reasons.push(why);
     });

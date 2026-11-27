@@ -92,7 +92,7 @@ export const TREND_FIGURES = `Figures "at the start of the span" and "at the end
 /** WHO SUBMITTED THE DATA (2026-11-27): the History and Data blocks facts name Digital Evidence's
  *  organisations by the label every surface gives them ("Org" and the start of its id for one with
  *  no known name) and count Dor's devices, never one of them. One line in those two prompts. */
-export const SUBMITTER_WORDS = "An organisation is named exactly as the facts name it, never shortened, translated or explained; a device is never named or told apart from another, only counted. A device count the facts label \"about\" is an estimate: write \"about\" before it, never the bare figure.";
+export const SUBMITTER_WORDS = "An organisation is named exactly as the facts name it, never shortened, translated or explained; a device is never named or told apart from another, only counted. An organisation's share or change goes in a sentence of its own, never beside the network's own change. A device count the facts label \"about\" is an estimate: write \"about\" before it, never the bare figure.";
 
 /** THE WHOLE NETWORK'S SUBJECT LABELS for the two register notes (`sources.ts` writes them): a
  *  one-network note's label is the network's own name, so its prompt asks the one-network question

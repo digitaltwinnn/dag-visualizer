@@ -572,6 +572,15 @@ describe("checkNote — a share or a change is said only of the actor it belongs
     expect(checkNote("Open Poker's metagraph snapshots rose 3x.", facts, names, opts).ok).toBe(false);
   });
 
+  it("names the actor rule in the retry reason, so the second answer knows where the figure goes", () => {
+    const why = (t: string) => { const r = checkNote(t, facts, names, opts); return r.ok ? [] : r.reasons; };
+    expect(why("Gate AI sent 50% of the batches.")).toContain(`"50%" is Open Poker's share: say it in a sentence about Open Poker alone`);
+    expect(why("Batches rose 100% over the week.")).toContain(`"100%" is Open Poker's change: say it in a sentence about Open Poker alone`);
+    expect(why("Open Poker's metagraph snapshots rose 3x.")).toContain(`"3x" is the network's own change: say it in a sentence of its own, never beside an organisation`);
+    // a figure no fact backs keeps the plain reason
+    expect(why("Gate AI sent 70% of the batches.")).toContain(`"70%" is not backed by any measured fact`);
+  });
+
   it("leaves a plain count unscoped (the gate's standing limit) and changes nothing without actors", () => {
     expect(checkNote("Gate AI sent 96 batches a day.", facts, names, opts)).toEqual({ ok: true });
     expect(checkNote("Gate AI's batches rose 100% to 96 per day.", facts, names, { subject: "Digital Evidence" })).toEqual({ ok: true });
