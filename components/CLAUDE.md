@@ -511,7 +511,8 @@ named "Data submitters" in the slot titles. Four bodies (`submittersCardState`):
 network with a `SUBMITTERS` row and its count over the span ("5 organisations", "57 devices"), each row
 bringing that plane forward through `trendPlaneActions` and the executor (paired on `hoverFilter`, the
 Moment's rows' exemption in `cardHoverBoundary`), plain rows under a filter; a network with no row says
-"<network> carried no data blocks in this range, so there is no one to show" and is never fetched for;
+"<network>'s data names no submitter this app reads, so there is no one to show" (`noSubmitterLine`,
+R21 — true by construction, never a claim about what the chain carried) and is never fetched for;
 Digital Evidence draws the span's TOTAL batches per bucket with its organisations as bands that
 partition it (ruling R4 — the top five palette members by the span's totals in their own hue,
 `TrendBand.hue`, every other one "Other (n)" in the neutral), the bands' share table as its key (the

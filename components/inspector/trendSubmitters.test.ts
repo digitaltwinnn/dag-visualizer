@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { DED_ID, DOR_ID, SUBMITTERS } from "@/src/data/submitters";
 import type { SubmittersWindow } from "@/app/api/submitters/assemble";
-import { submittersCardState, submittersScope, querySpan, organisationChart, measuredFloor, BAND_MAX } from "@/components/inspector/trendSubmitters";
+import { submittersCardState, submittersScope, querySpan, organisationChart, measuredFloor, noSubmitterLine, BAND_MAX } from "@/components/inspector/trendSubmitters";
 
 const USDC = "DAG0S16WDgdAvh8VvroR6MWLdjmHYdzAF5S181xh";
 const carries = (id: string) => Object.hasOwn(SUBMITTERS, id);
@@ -19,6 +19,13 @@ describe("submittersCardState — which card History's Data submitters slot draw
   });
   it("Dor → its devices, counted", () => {
     expect(submittersCardState(DOR_ID, carries)).toEqual({ mode: "devices", net: DOR_ID });
+  });
+});
+
+describe("noSubmitterLine — a network with no SUBMITTERS row (R21)", () => {
+  it("says what is true by construction, never what the chain carried", () => {
+    expect(noSubmitterLine("USDC.dag")).toBe("USDC.dag's data names no submitter this app reads, so there is no one to show");
+    expect(noSubmitterLine("USDC.dag")).not.toMatch(/carried|data blocks/);
   });
 });
 

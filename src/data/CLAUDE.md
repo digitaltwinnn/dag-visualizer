@@ -344,8 +344,10 @@ surface hovers an organisation on `hoverSubmitter`.
 only when it lies wholly inside the span at its tier, and everything outside it is NULL — "not measured
 before", never a zero (`app/api/submitters/assemble.test.ts`). A day (1d) is exactly the sum of its
 hours (1h); devices are exact unions of ids, never a sum of per-bucket counts (a device seen in two hours
-is one device). The in-progress bucket is null, History's partial-edge rule. A network that carried no
-data blocks in a range is read from the absence of a submitters row, not asserted from the chain.
+is one device). The in-progress bucket is null, History's partial-edge rule. A network with no
+submitters row says only what is true by construction — "<network>'s data names no submitter this app
+reads, so there is no one to show" (`trendSubmitters.noSubmitterLine`, R21) — never what its chain carried
+in a range, which nothing here measures.
 Read through `/api/submitters` (`useSubmitters`), written by the sampler and `scripts/walk-submitters.ts`
 (`app/api/CLAUDE.md`).
 

@@ -18,12 +18,18 @@ export type SubmittersCardState =
 
 /** The card for `scope` (null = no single network). `carriesData` says whether a network names its
  *  submitters (the network has a `SUBMITTERS` row) — one that does but sent nothing in the range
- *  still draws its chart, at 0; one that does not reads the "no data blocks" sentence and is never
- *  fetched for. */
+ *  still draws its chart, at 0; one that does not reads `noSubmitterLine` and is never fetched for. */
 export function submittersCardState(scope: string | null, carriesData: (id: string) => boolean): SubmittersCardState {
   if (scope == null) return { mode: "all" };
   if (!carriesData(scope)) return { mode: "none", net: scope };
   return { mode: SUBMITTERS[scope]?.kind === "device" ? "devices" : "organisations", net: scope };
+}
+
+/** THE SENTENCE FOR A NETWORK WITH NO `SUBMITTERS` ROW (ruling R21): true by construction — its
+ *  data names no submitter this app reads — never a claim about what the chain carried in the range,
+ *  which nothing here measures (rule 10). */
+export function noSubmitterLine(network: string): string {
+  return `${network}'s data names no submitter this app reads, so there is no one to show`;
 }
 
 /** THE NETWORK THE DECK STANDS ON (`trendStack.cardNetwork`, the rule the Range card's lead reads),

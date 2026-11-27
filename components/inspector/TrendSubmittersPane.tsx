@@ -6,7 +6,7 @@ import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import TrendChart from "@/components/docs/TrendChart";
 import { CUT_ROW, Fact, FactGroup, Lead, SectionLabel, TABLE_ROW, TableHead, UnitMarks, figWidth, shareWords } from "@/components/inspector/parts";
-import { measuredFloor, organisationChart, querySpan, submittersCardState, submittersScope } from "@/components/inspector/trendSubmitters";
+import { measuredFloor, noSubmitterLine, organisationChart, querySpan, submittersCardState, submittersScope } from "@/components/inspector/trendSubmitters";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import useSubmitters from "@/components/useSubmitters";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
@@ -31,7 +31,7 @@ import type { SubmittersWindow } from "@/app/api/submitters/assemble";
 // it always stands in History. Which body it draws is pure (`trendSubmitters.ts`): under All, one row
 // per network that names its submitters, each row bringing that network's plane forward through the
 // one executor (rule 2, the Moment card's rows' own builder); a network with no submitters table says
-// so in one sentence and is never fetched for; DED draws the range's total batches with its
+// so in one sentence (`noSubmitterLine`, R21) and is never fetched for; DED draws the range's total batches with its
 // organisations as bands (ruling R4), Dor its devices per bucket.
 //
 // ⚠️ RULE 10: a bucket outside the sampler's measured span is null (the route's own rule), so a range
@@ -85,7 +85,7 @@ export default function TrendSubmittersPane({ collapsed, onToggle }: { collapsed
       {!collapsed && (
         <div>
           {state.mode === "all" && <NetworkRows q={q} filter={filter} />}
-          {state.mode === "none" && <Lead>{`${shown?.name ?? state.net} carried no data blocks in this range, so there is no one to show`}</Lead>}
+          {state.mode === "none" && <Lead>{noSubmitterLine(shown?.name ?? state.net)}</Lead>}
           {fetched && <WindowBody org={state.mode === "organisations"} data={data} error={error} hue={shown?.hue ?? "var(--primary)"} />}
         </div>
       )}
