@@ -2,7 +2,7 @@ import { SUBMITTERS } from "@/src/data/submitters";
 import { stepMsOf } from "../trends/keys";
 import type { TrendsStore } from "../trends/store";
 import { assembleSubmitters, parseSpan, windowRange24h, type SubmittersWindow } from "./assemble";
-import { subNamesKeyOf, subSlotOf, subSpanKeyOf, type SubTier } from "./keys";
+import { subHolesKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf, type SubTier } from "./keys";
 
 // THE SUBMITTERS READ — one network's range of the `sub:` family, gathered and folded
 // (`assembleSubmitters`). ONE home for which hashes a range reads, so the route and the AI notes'
@@ -27,7 +27,9 @@ export async function readSubmitters(
   nowMs: number,
   opts: { years?: boolean } = {},
 ): Promise<SubmittersWindow> {
-  const [span, names] = await Promise.all([store.hgetall(subSpanKeyOf(net)), store.hgetall(subNamesKeyOf(net))]);
+  const [span, names, holes] = await Promise.all([
+    store.hgetall(subSpanKeyOf(net)), store.hgetall(subNamesKeyOf(net)), store.hgetall(subHolesKeyOf(net)),
+  ]);
   const { fromMs, toMs } = range === "24h" ? windowRange24h(span, nowMs) : range;
   const tier: SubTier = range === "24h" ? "1h" : subTierOf(fromMs, toMs);
   const step = stepMsOf(tier);
@@ -45,5 +47,5 @@ export async function readSubmitters(
     for (let y = first; y <= new Date(nowMs).getUTCFullYear(); y++) years.push(subSlotOf(net, "1d", Date.UTC(y, 5, 1)).key);
   }
   const [hashes, yearHashes] = await Promise.all([read([...keys]), read(years)]);
-  return assembleSubmitters({ net, tier, fromMs, toMs, hashes, span, names, yearHashes });
+  return assembleSubmitters({ net, tier, fromMs, toMs, hashes, span, names, holes, yearHashes });
 }

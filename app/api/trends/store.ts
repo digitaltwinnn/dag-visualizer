@@ -3,7 +3,9 @@
 // Upstash usage contract (spec): no TCP pooling, hashes + EXPIRE only.
 import { Redis } from "@upstash/redis";
 
-export interface TrendsWrite { key: string; map: Record<string, number | string>; ttlS: number | null }
+/** One key's writes in a transaction: `map` HSET, then `hdel` fields deleted (the submitters' holes,
+ *  `walkHoles`), then the EXPIRE. */
+export interface TrendsWrite { key: string; map: Record<string, number | string>; ttlS: number | null; hdel?: string[] }
 
 export interface TrendsStore {
   hgetall(key: string): Promise<Record<string, string> | null>;
@@ -58,6 +60,7 @@ function wrap(r: Redis): TrendsStore {
       const tx = r.multi(); // MULTI/EXEC — a real transaction, not the non-atomic .pipeline()
       for (const w of writes) {
         if (Object.keys(w.map).length) tx.hset(w.key, w.map);
+        if (w.hdel?.length) tx.hdel(w.key, ...w.hdel);
         if (w.ttlS != null) tx.expire(w.key, w.ttlS);
       }
       await tx.exec();

@@ -22,15 +22,26 @@ export function bucketSubmitters(
   }
 }
 
-/** Extends the measured span only when the read is contiguous with it; otherwise a new span
- *  starts at the read (an outage before it is not measured). */
+/** The measured span after a read of `[readFromMs, readToMs]`: `from` is KEPT whatever the read
+ *  (ruling R20 — a gap is a HOLE, `holeOf`, never a restart that erases the history before it); `to`
+ *  moves out to the read's end. With no span yet the read starts one. */
 export function nextSpan(
   prev: { from?: number; to?: number } | null,
   readFromMs: number,
   readToMs: number,
 ): { from: number; to: number } {
-  if (prev?.from != null && prev.to != null && readFromMs <= prev.to) {
+  if (prev?.from != null && prev.to != null) {
     return { from: Math.min(prev.from, readFromMs), to: Math.max(prev.to, readToMs) };
   }
   return { from: readFromMs, to: readToMs };
+}
+
+const HOUR_MS = 3600000;
+
+/** THE HOURS A GAP LEAVES UNMEASURED (R20): from the hour holding the span's old `to` (counted only up
+ *  to it) to the END of the hour holding the first record read after the gap. That hour is taken in
+ *  even when the record sits on its edge: metagraph snapshots share their global's timestamp, so a
+ *  missed one may carry the very same stamp. */
+export function holeOf(prevToMs: number, firstMs: number): { from: number; to: number } {
+  return { from: Math.floor(prevToMs / HOUR_MS) * HOUR_MS, to: Math.floor(firstMs / HOUR_MS) * HOUR_MS + HOUR_MS };
 }

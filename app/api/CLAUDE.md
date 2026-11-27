@@ -184,7 +184,11 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   the trends sampler. It pages the explorer's snapshot list since the cursor, then reads each snapshot
   from the network's OWN L0 by ordinal (200 s read budget inside `maxDuration` 300; the prefix read is
   committed, a failed read stops there and resumes next run). The measured span (`sub:…:span`) is what
-  History reads as measured. DED's names come from DED's public API (`/v1/fingerprints/latest`), once a
+  History reads as measured. **A gap is a HOLE, never a restart** (ruling R20): a run that cannot
+  read contiguously from its cursor (the list's `gap`, an ordinal skipped) keeps the span's `from`
+  and records the hours it could not read, `[hour of the old to, end of the hour of the first new
+  record)`, in `sub:…:holes` (field = start ms, value = end ms; `bucket.holeOf`); the read side nulls
+  every bucket overlapping one. DED's names come from DED's public API (`/v1/fingerprints/latest`), once a
   run. Production-only and fail-closed like the trends sampler; no `force-dynamic`, which would bypass
   the `unstable_cache` behind `cachedL0Url`.
   **Back-filling submitters** is `scripts/walk-submitters.ts --net=ded|dor [--from=YYYY-MM-DD]`
@@ -196,7 +200,10 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   contiguously, under the same lock. A day's records are found by seeking (`seekBoundary` + a crafted
   `{hash}` cursor, the trends fill's), since the list pages only from its tip. A read that still fails
   after `retrying` stops the walk at its hour; the state file (`.walk-submitters.<net>.json`,
-  gitignored) resumes it. Run it AFTER the sampler's first run (no span, it refuses). DED's names
+  gitignored) resumes it. Run it AFTER the sampler's first run (no span, it refuses).
+  **`--holes`** walks the holes instead (`walkHoles`): each hole the sampler has moved past, its hours
+  SET to their full tally, then under the lock its days' 1d recomputed and its field deleted in one
+  transaction; a hole the sampler is still inside is left for a later run. DED's names
   for organisations that stopped before the sampler started come from `scripts/seed-ded-names.ts`, a
   one-off read of dagscan's evidence summary merged as source `dagscan` (never over a `ded` name).
 - **`/api/notes`, `/api/notes/request`, `/api/notes/warm`** (2026-10-27) are the AI notes: a few

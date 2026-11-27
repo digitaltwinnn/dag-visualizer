@@ -780,7 +780,7 @@ describe("who submitted a network's data", () => {
     const buckets = row(N, (i) => T0 + i * HOUR) as number[];
     return {
       net: kind === "organisation" ? DED : DOR, kind, unit: kind === "organisation" ? "batches" : "check-ins",
-      tier: "1h", stepMs: HOUR, buckets, measured: { from: T0, to: T0 + N * HOUR },
+      tier: "1h", stepMs: HOUR, buckets, measured: { from: T0, to: T0 + N * HOUR }, holes: [],
       names: {}, series: [], distinct: row(N, () => 0), rangeDistinct: 0, totals: [],
       seenTotal: 0, firstSeenMs: null, palette: [], ...over,
     };

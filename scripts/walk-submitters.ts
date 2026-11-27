@@ -2,6 +2,12 @@
 // the sampler's first run:
 //
 //   npx tsx scripts/walk-submitters.ts --net=ded|dor [--from=YYYY-MM-DD] [--pool=8] [--state=<path>]
+//   npx tsx scripts/walk-submitters.ts --net=ded|dor --holes [--pool=8]
+//
+// `--holes` (ruling R20) walks the HOLES instead: the hours a gap left unread inside the measured span
+// (`sub:mainnet:<net>:holes`), each filled with the same SET discipline, its days' 1d recomputed and
+// its field deleted under the sampler's lock (`walkHoles`). A hole the sampler is still inside is left
+// for a later run; a failed read leaves its hole, and a rerun walks it again (idempotent).
 //
 // A thin CLI over `walkRange` (app/api/submitters/runSubmitters.ts), which carries the write
 // discipline and its tests: oldest hour first from --from up to the measured span's `from` and never
@@ -32,17 +38,20 @@ const iso = (ms: number) => new Date(ms).toISOString().replace(".000Z", "Z");
 interface WalkState { net: string; fromMs: number; nextMs: number }
 
 function usage(msg: string): never {
-  console.error(`${msg}\nusage: npx tsx scripts/walk-submitters.ts --net=ded|dor [--from=YYYY-MM-DD] [--pool=8] [--state=<path>]`);
+  console.error(`${msg}\nusage: npx tsx scripts/walk-submitters.ts --net=ded|dor [--from=YYYY-MM-DD] [--pool=8] [--state=<path>]\n       npx tsx scripts/walk-submitters.ts --net=ded|dor --holes [--pool=8]`);
   process.exit(1);
 }
 
 async function main(): Promise<void> {
   const args = new Map(process.argv.slice(2).map((a) => {
+    if (a === "--holes") return ["holes", "1"] as const;
     const m = /^--([a-z]+)=(.*)$/.exec(a);
     if (!m) usage(`unknown argument: ${a}`);
     return [m[1]!, m[2]!] as const;
   }));
-  for (const k of args.keys()) if (!["net", "from", "pool", "state"].includes(k)) usage(`unknown flag: --${k}`);
+  for (const k of args.keys()) if (!["net", "from", "pool", "state", "holes"].includes(k)) usage(`unknown flag: --${k}`);
+  const holesMode = args.has("holes");
+  if (holesMode && (args.has("from") || args.has("state"))) usage("--holes takes no --from or --state: it walks every hole the store records");
   const which = args.get("net");
   if (which !== "ded" && which !== "dor") usage("--net wants ded or dor");
   const today = Math.floor(Date.now() / DAY) * DAY;
@@ -61,7 +70,7 @@ async function main(): Promise<void> {
   const { writeStore } = await import("../app/api/trends/store");
   const { getJson, pageCurrencySnapshots } = await import("../app/api/trends/explorerPages");
   const { seekBoundary } = await import("../app/api/trends/fillPlan");
-  const { walkRange } = await import("../app/api/submitters/runSubmitters");
+  const { walkHoles, walkRange } = await import("../app/api/submitters/runSubmitters");
   const { subSpanKeyOf } = await import("../app/api/submitters/keys");
   const net = which === "ded" ? DED_ID : DOR_ID;
   const be = HOSTS.be;
@@ -79,11 +88,13 @@ async function main(): Promise<void> {
   const span = await store.hgetall(subSpanKeyOf(net));
   const spanFrom = Number(span?.from ?? NaN);
   if (!Number.isFinite(spanFrom)) { console.error(`${which}: no measured span yet — the sampler must run first`); process.exit(1); }
-  if (fromMs >= spanFrom) { console.log(`${which}: the span already starts at ${iso(spanFrom)}, at or before --from — nothing to walk`); return; }
+  if (!holesMode && fromMs >= spanFrom) { console.log(`${which}: the span already starts at ${iso(spanFrom)}, at or before --from — nothing to walk`); return; }
 
   let resumeMs = fromMs;
   let prev: WalkState | null = null;
-  try { prev = JSON.parse(readFileSync(statePath, "utf8")) as WalkState; } catch { /* a fresh walk */ }
+  if (!holesMode) {
+    try { prev = JSON.parse(readFileSync(statePath, "utf8")) as WalkState; } catch { /* a fresh walk */ }
+  }
   if (prev) {
     if (prev.net !== net || prev.fromMs !== fromMs) { console.error(`${statePath} is a walk of ${prev.net.slice(0, 10)} from ${iso(prev.fromMs)} — rerun with that --from, or delete it to start over`); process.exit(1); }
     resumeMs = prev.nextMs;
@@ -101,27 +112,40 @@ async function main(): Promise<void> {
   const dir = (await retrying(() => getJson(`${HOSTS.directory}/metagraphs/${net}?v=v2`, 10000))) as { data?: { urls?: { l0?: string } } };
   const l0 = dir.data?.urls?.l0?.replace(/\/$/, "");
   if (!l0) throw new Error("the directory lists no L0 url");
-  console.log(`${which}: walking ${iso(resumeMs)} → ${iso(spanFrom)} (span.from) from ${l0}, pool ${pool}`);
 
   type Rec = { ordinal: number; timestamp: string; hash?: string };
-  const res = await walkRange(
-    {
-      store,
-      pool,
-      pageMeta: (id, limit, next) => retrying(() => pageCurrencySnapshots(be, id, limit, next)),
-      fetchSnap: (_id, o) => retrying(() => getJson(`${l0}/snapshots/${o}`, 15000)),
-      cursorAt: async (id, ms) => {
-        const sk = await seekBoundary(
-          async (o) => ((await retrying(() => getJson(`${be}/currency/${id}/snapshots/${o}`, 20000))) as { data?: Rec }).data ?? null,
-          tip,
-          ms,
-        );
-        if (sk.kind === "born-after") return null;
-        if (sk.kind === "all-older") return undefined;
-        if (!sk.record.hash) throw new Error(`record ${sk.record.ordinal} has no hash — cannot seek`);
-        return craftCurrencyCursor(sk.record.hash);
-      },
+  const deps = {
+    store,
+    pool,
+    pageMeta: (id: string, limit: number, next?: string) => retrying(() => pageCurrencySnapshots(be, id, limit, next)),
+    fetchSnap: (_id: string, o: number) => retrying(() => getJson(`${l0}/snapshots/${o}`, 15000)),
+    cursorAt: async (id: string, ms: number) => {
+      const sk = await seekBoundary(
+        async (o) => ((await retrying(() => getJson(`${be}/currency/${id}/snapshots/${o}`, 20000))) as { data?: Rec }).data ?? null,
+        tip,
+        ms,
+      );
+      if (sk.kind === "born-after") return null;
+      if (sk.kind === "all-older") return undefined;
+      if (!sk.record.hash) throw new Error(`record ${sk.record.ordinal} has no hash — cannot seek`);
+      return craftCurrencyCursor(sk.record.hash);
     },
+  };
+
+  if (holesMode) {
+    console.log(`${which}: walking the holes from ${l0}, pool ${pool}`);
+    const res = await walkHoles(deps, net, (p) => console.log(`  hole ${iso(p.hole.from)} → ${iso(p.hole.to)}: ${p.read} snapshots read so far`));
+    if (res.failedAt != null) {
+      console.error(`${which}: stopped — ${res.failedAt < 0 ? "the explorer list" : `L0 snapshot ${res.failedAt}`} would not read; ${res.filled} hole(s) filled, rerun to walk the rest`);
+      process.exit(1);
+    }
+    console.log(`${which}: ${res.filled} hole(s) filled, ${res.left} left (the sampler is still inside one, or it moved), ${res.read} snapshots read`);
+    return;
+  }
+
+  console.log(`${which}: walking ${iso(resumeMs)} → ${iso(spanFrom)} (span.from) from ${l0}, pool ${pool}`);
+  const res = await walkRange(
+    deps,
     net,
     fromMs,
     spanFrom,

@@ -1,7 +1,8 @@
 // The submitters READ side: one range of the `sub:` store family folded into a compact window.
 // Pure — the route hands it the hashes it read. Rule 10 lives here: a bucket is MEASURED only when
-// it lies wholly inside the sampler's measured span [from, to) at its tier; the bucket holding `to`
-// is still being written and is null, like History's partial edges. Outside the span is null, never 0.
+// it lies wholly inside the sampler's measured span [from, to) at its tier and overlaps no HOLE (R20,
+// the hours a gap left unread, `sub:…:holes`); the bucket holding `to` is still being written and is
+// null, like History's partial edges. Outside the span, or in a hole, is null, never 0.
 import { SUBMITTERS, type SubmitterKind } from "@/src/data/submitters";
 import { stepMsOf } from "../trends/keys";
 import { subSlotOf, type SubTier } from "./keys";
@@ -18,6 +19,8 @@ export interface SubmittersWindow {
   /** Bucket start times, epoch ms, ascending. */
   buckets: number[];
   measured: { from: number; to: number } | null;
+  /** The holes (R20) overlapping the range, ascending: inside `measured` yet not measured. */
+  holes: { from: number; to: number }[];
   /** Organisation id → name, only for ids that have one. */
   names: Record<string, string>;
   /** Per organisation (full id); empty for devices. Null outside `measured`, 0 inside where quiet. */
@@ -45,6 +48,8 @@ export interface AssembleInput {
   hashes: Record<string, Record<string, string>>;
   span: Record<string, string> | null;
   names: Record<string, string> | null;
+  /** The holes hash (`subHolesKeyOf`): field = start ms, value = end ms. */
+  holes?: Record<string, string> | null;
   /** Every 1d year hash, for "N seen since <month year>". */
   yearHashes?: Record<string, Record<string, string>>;
 }
@@ -59,6 +64,28 @@ const num = (s: string | undefined): number | null => {
 export function parseSpan(span: Record<string, string> | null): { from: number; to: number } | null {
   const from = num(span?.from), to = num(span?.to);
   return from !== null && to !== null && to > from ? { from, to } : null;
+}
+
+/** The holes hash as spans, ascending; an unreadable field is no hole. */
+export function parseHoles(raw: Record<string, string> | null | undefined): { from: number; to: number }[] {
+  const out: { from: number; to: number }[] = [];
+  for (const [f, v] of Object.entries(raw ?? {})) {
+    const from = num(f), to = num(String(v));
+    if (from !== null && to !== null && to > from) out.push({ from, to });
+  }
+  return out.sort((a, b) => a.from - b.from);
+}
+
+/** THE ONE RULE FOR A MEASURED BUCKET, which the read (`read.ts`) asks too: wholly inside the span
+ *  at its tier and overlapping no hole. */
+export function bucketMeasured(
+  t: number,
+  step: number,
+  measured: { from: number; to: number } | null,
+  holes: readonly { from: number; to: number }[],
+): boolean {
+  if (!measured || t < measured.from || t + step > measured.to) return false;
+  return !holes.some((h) => t < h.to && t + step > h.from);
 }
 
 /** `window=24h`: the 24 whole hours ending at the newest whole measured hour (the current hour when
@@ -99,6 +126,7 @@ export function assembleSubmitters(input: AssembleInput): SubmittersWindow {
   const spec = SUBMITTERS[net];
   const step = stepMsOf(tier);
   const measured = parseSpan(input.span);
+  const holes = parseHoles(input.holes);
   const names = parseNames(input.names);
 
   const buckets: number[] = [];
@@ -107,7 +135,7 @@ export function assembleSubmitters(input: AssembleInput): SubmittersWindow {
   const isOrg = spec.kind === "organisation";
   const sums = new Map<string, number>();
   const perBucket: (Map<string, number> | null)[] = buckets.map((t) => {
-    if (!measured || t < measured.from || t + step > measured.to) return null;
+    if (!bucketMeasured(t, step, measured, holes)) return null;
     const { key, bucket } = subSlotOf(net, tier, t);
     return readBucket(hashes[key], bucket);
   });
@@ -150,7 +178,7 @@ export function assembleSubmitters(input: AssembleInput): SubmittersWindow {
 
   return {
     net, kind: spec.kind, unit: spec.unit, tier, stepMs: step, buckets,
-    measured, names, series,
+    measured, holes: holes.filter((h) => h.from < toMs && h.to > (buckets[0] ?? fromMs)), names, series,
     distinct: perBucket.map((m) => (m ? m.size : null)),
     rangeDistinct: perBucket.some((m) => m) ? union.size : null,
     totals, seenTotal, firstSeenMs,

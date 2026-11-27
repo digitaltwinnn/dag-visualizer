@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { subSlotOf, subField, subSpanKeyOf, subNamesKeyOf, subLockKeyOf } from "./keys";
+import { subSlotOf, subField, subSpanKeyOf, subNamesKeyOf, subLockKeyOf, subHolesKeyOf } from "./keys";
 
 const DED = "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M";
 const T = Date.UTC(2026, 10, 27, 14, 5);
@@ -15,5 +15,6 @@ describe("sub keys", () => {
     expect(subSpanKeyOf(DED)).toBe(`sub:mainnet:${DED}:span`);
     expect(subNamesKeyOf(DED)).toBe(`sub:mainnet:${DED}:names`);
     expect(subLockKeyOf()).toBe("sub:mainnet:lock");
+    expect(subHolesKeyOf(DED)).toBe(`sub:mainnet:${DED}:holes`);
   });
 });

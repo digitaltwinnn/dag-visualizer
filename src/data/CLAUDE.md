@@ -341,8 +341,10 @@ other organisation draws the neutral "Other". The chamber reads the palette from
 surface hovers an organisation on `hoverSubmitter`.
 
 **The honesty rules.** The sampler measures a SPAN (`sub:…:span`, `from`–`to`); a bucket is measured
-only when it lies wholly inside the span at its tier, and everything outside it is NULL — "not measured
-before", never a zero (`app/api/submitters/assemble.test.ts`). A day (1d) is exactly the sum of its
+only when it lies wholly inside the span at its tier and overlaps no HOLE (ruling R20: the hours a gap
+left unread, `sub:…:holes`, until `walk-submitters --holes` fills them), and everything else is NULL —
+"not measured", never a zero (`app/api/submitters/assemble.test.ts`). A gap never restarts the span: the
+history before it stays measured. A day (1d) is exactly the sum of its
 hours (1h); devices are exact unions of ids, never a sum of per-bucket counts (a device seen in two hours
 is one device). The in-progress bucket is null, History's partial-edge rule. A network with no
 submitters row says only what is true by construction — "<network>'s data names no submitter this app

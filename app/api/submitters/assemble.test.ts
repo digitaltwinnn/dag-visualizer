@@ -56,6 +56,26 @@ describe("assembleSubmitters", () => {
     expect(w.totals.map((t) => t.id)).toEqual(["z", "a"]);
   });
 
+  it("nulls every bucket overlapping a hole (R20) and leaves it out of rangeDistinct and totals", () => {
+    const sp = { from: String(T0), to: String(T0 + 4 * H) };
+    const hashes = hashesFor(DED_ID, [[T0, "a", 1], [T0 + H, "b", 5], [T0 + 2 * H, "a", 2]]);
+    const holes = { [String(T0 + H)]: String(T0 + 2 * H) };
+    const w = assembleSubmitters({ net: DED_ID, tier: "1h", fromMs: T0, toMs: T0 + 4 * H, hashes, span: sp, names: null, holes });
+    expect(w.distinct).toEqual([1, null, 1, 0]);
+    expect(w.series.map((x) => x.id)).toEqual(["a"]); // b sent only inside the hole
+    expect(w.series[0]!.points).toEqual([1, null, 2, 0]);
+    expect(w.totals).toEqual([{ id: "a", updates: 3 }]);
+    expect(w.rangeDistinct).toBe(1);
+    expect(w.holes).toEqual([{ from: T0 + H, to: T0 + 2 * H }]);
+    // the daily tier: a day overlapping an hour's hole is not measured either
+    const d = assembleSubmitters({ net: DED_ID, tier: "1d", fromMs: T0, toMs: T0 + 48 * H, hashes: {}, span: { from: String(T0), to: String(T0 + 50 * H) }, names: null, holes });
+    expect(d.distinct).toEqual([null, 0]);
+    // a hole outside the range is not carried; an unreadable field is no hole
+    const far = assembleSubmitters({ net: DED_ID, tier: "1h", fromMs: T0, toMs: T0 + H, hashes: {}, span: sp, names: null, holes: { [String(T0 + 3 * H)]: String(T0 + 4 * H), x: "y" } });
+    expect(far.holes).toEqual([]);
+    expect(far.distinct).toEqual([0]);
+  });
+
   it("is all null with no span; rangeDistinct is null", () => {
     const w = assembleSubmitters({ net: DED_ID, tier: "1h", fromMs: T0, toMs: T0 + 2 * H, hashes: {}, span: null, names: null });
     expect(w.measured).toBeNull();

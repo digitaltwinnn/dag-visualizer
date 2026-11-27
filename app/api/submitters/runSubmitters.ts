@@ -8,9 +8,13 @@
 // THE MEASURED SPAN (`sub:mainnet:<net>:span`, fields `from` / `to` / `cursor`) is what History reads
 // as "measured" (rule 10: a bucket outside it is null, never 0). Its rulings:
 // - R6, CONTIGUITY IS BY ORDINAL, not time: a run whose first record is cursor+1 (and the pager
-//   reports no gap) extends the span to its last record's time (`nextSpan(prev, prev.to, lastMs)`);
-//   any gap restarts the span at the first record read. (Records are always later than `to`, so a
-//   test by time would restart the span every run.)
+//   reports no gap) extends the span to its last record's time (`nextSpan(prev, prev.to, lastMs)`).
+//   (Records are always later than `to`, so a test by time would see a gap every run.)
+// - R20, A GAP IS A HOLE, never a restart: the span keeps its `from` (a restart off an hour edge
+//   erased every walked hour before it and left the walk nothing to rejoin) and `to` moves on; the
+//   hours the gap left unread, `holeOf(prev.to, first record)`, go into `sub:…:holes` in the same
+//   transaction (a hole already stored from the same hour keeps the later end). The read side nulls
+//   every bucket overlapping a hole; `walk-submitters --holes` (`walkHoles`) fills and deletes it.
 // - R7, A FIRST RUN (no cursor stored) starts at the START OF THE PREVIOUS UTC HOUR: it pages
 //   newest-first until a record is older than that boundary, keeps the records at or after it, and
 //   sets `from` to the boundary exactly, so the back-fill walk can end on an hour edge. Not
@@ -38,8 +42,9 @@ import type { MetaRec } from "../trends/bucketing";
 import { listSince, type ChainPage } from "../trends/fetchSince";
 import type { TrendsStore, TrendsWrite } from "../trends/store";
 import { DED_ID } from "@/src/data/submitters";
-import { bucketSubmitters, nextSpan } from "./bucket";
-import { subField, subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
+import { bucketSubmitters, holeOf, nextSpan } from "./bucket";
+import { parseHoles } from "./assemble";
+import { subField, subHolesKeyOf, subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
 import { mergeNames, parseDedLatest } from "./names";
 import { readL0Snapshots } from "./readL0";
 
@@ -130,6 +135,8 @@ interface NetRun {
   read: { rec: MetaRec; tally: Tally }[];
   failedAt: number | null;
   span: { from: number; to: number; cursor: number } | null;
+  /** The hours a gap left unread (R20), or null when the run was contiguous. */
+  hole: { from: number; to: number } | null;
 }
 
 async function runNet(deps: SubmittersDeps, net: string, prevSpan: Record<string, string> | null, deadlineMs: number): Promise<NetRun> {
@@ -151,15 +158,17 @@ async function runNet(deps: SubmittersDeps, net: string, prevSpan: Record<string
   batch = batch.slice(0, deps.maxRecs ?? 4000);
 
   const { read, failedAt } = await readTallies(batch, net, (o) => deps.fetchSnap(net, o), deps.pool ?? 8, () => deps.now() >= deadlineMs);
-  if (!read.length) return { net, read, failedAt, span: null };
+  if (!read.length) return { net, read, failedAt, span: null, hole: null };
 
   const last = read[read.length - 1].rec;
   const lastMs = Date.parse(last.timestamp);
+  const firstMs = Date.parse(read[0].rec.timestamp);
   const span =
     startMs != null ? { from: startMs, to: lastMs }
     : contiguous && prev ? nextSpan(prev, prev.to, lastMs)
-    : nextSpan(null, Date.parse(read[0].rec.timestamp), lastMs);
-  return { net, read, failedAt, span: { ...span, cursor: last.ordinal } };
+    : nextSpan(prev, firstMs, lastMs);
+  const hole = startMs == null && !contiguous && prev ? holeOf(prev.to, firstMs) : null;
+  return { net, read, failedAt, span: { ...span, cursor: last.ordinal }, hole };
 }
 
 export async function runSubmitters(deps: SubmittersDeps): Promise<SubmittersResult> {
@@ -174,7 +183,7 @@ export async function runSubmitters(deps: SubmittersDeps): Promise<SubmittersRes
         try {
           return await runNet(deps, net, await store.hgetall(subSpanKeyOf(net)), deadlineMs);
         } catch {
-          return { net, read: [], failedAt: -1, span: null }; // the list could not be read
+          return { net, read: [], failedAt: -1, span: null, hole: null }; // the list could not be read
         }
       }),
     );
@@ -198,6 +207,11 @@ export async function runSubmitters(deps: SubmittersDeps): Promise<SubmittersRes
     }
     for (const run of runs) {
       if (run.span) writes.push({ key: subSpanKeyOf(run.net), map: run.span, ttlS: null });
+      if (run.hole) {
+        const f = String(run.hole.from);
+        const [had] = await store.hmget(subHolesKeyOf(run.net), [f]);
+        writes.push({ key: subHolesKeyOf(run.net), map: { [f]: Math.max(run.hole.to, had == null ? 0 : Number(had)) }, ttlS: null });
+      }
     }
 
     let names = 0;
@@ -233,7 +247,8 @@ export async function runSubmitters(deps: SubmittersDeps): Promise<SubmittersRes
 // - span.from is lowered to the walk's start only when the walk reached span.from CONTIGUOUSLY (no
 //   failed hour between; a resumed walk passes the original start and `resumeMs`), under the same
 //   lock — the sampler rewrites the span hash every run from what it read. A span.from that moved
-//   meanwhile (the sampler restarted its span after a gap) is left alone: the walk no longer meets it.
+//   meanwhile is left alone: the walk no longer meets it. (Since R20 a gap never moves it: a gap is
+//   a hole, walked by `walkHoles` below.)
 // - A failed read (the caller retries before it fails — the script wraps its reads in `retrying`)
 //   stops the walk at that hour: `nextMs` is where a resume starts, nothing at or after it written.
 
@@ -310,6 +325,20 @@ async function dayWrite(store: TrendsStore, net: string, dayMs: number): Promise
   return { key: d1.key, map, ttlS: null };
 }
 
+/** ONE HOUR OF THE WALK (the back-fill and the holes alike): the hour's records read from L0 and
+ *  the hour's 1h fields SET to its full tally — never an increment, so a rerun writes the same. */
+async function writeHour(deps: WalkDeps, net: string, h: number, hourRecs: MetaRec[]): Promise<{ read: number; failedAt: number | null }> {
+  const got = await readTallies(hourRecs, net, (o) => deps.fetchSnap(net, o), deps.pool ?? 8);
+  if (got.failedAt != null) return { read: 0, failedAt: got.failedAt };
+  const inc = new Map<string, number>();
+  for (const { tally } of got.read) for (const { id, updates } of tally) inc.set(id, (inc.get(id) ?? 0) + updates);
+  if (inc.size) {
+    const { key, bucket } = subSlotOf(net, "1h", h);
+    await deps.store.hset(key, Object.fromEntries([...inc].map(([id, n]) => [subField(bucket, id), n])));
+  }
+  return { read: got.read.length, failedAt: null };
+}
+
 export async function walkRange(
   deps: WalkDeps,
   net: string,
@@ -363,18 +392,12 @@ export async function walkRange(
     for (let h = cur; h < dayEnd; h += HOUR_MS) {
       const hourRecs: MetaRec[] = [];
       while (i < recs.length && Date.parse(recs[i].timestamp) < h + HOUR_MS) hourRecs.push(recs[i++]);
-      const got = await readTallies(hourRecs, net, (o) => deps.fetchSnap(net, o), deps.pool ?? 8);
+      const got = await writeHour(deps, net, h, hourRecs);
       if (got.failedAt != null) {
         if (h > dayMs) await flushDay(dayMs, false);
         return { nextMs: h, failedAt: got.failedAt, lowered: false, read };
       }
-      const inc = new Map<string, number>();
-      for (const { tally } of got.read) for (const { id, updates } of tally) inc.set(id, (inc.get(id) ?? 0) + updates);
-      if (inc.size) {
-        const { key, bucket } = subSlotOf(net, "1h", h);
-        await store.hset(key, Object.fromEntries([...inc].map(([id, n]) => [subField(bucket, id), n])));
-      }
-      read += got.read.length;
+      read += got.read;
       if (hourRecs.length) lastOrdinal = hourRecs[hourRecs.length - 1].ordinal;
       cur = h + HOUR_MS;
     }
@@ -385,4 +408,78 @@ export async function walkRange(
   // Nothing left to walk: a resume that starts on span.from still owes the lowering.
   const lowered = cur === spanFrom && endMs === spanFrom ? await flushDay(Math.floor((spanFrom - 1) / DAY_MS) * DAY_MS, true) : false;
   return { nextMs: cur, failedAt: null, lowered, read };
+}
+
+// ---- THE HOLES WALK (`walk-submitters --holes`, ruling R20) -------------------------------------
+// A gap the sampler could not read across is a HOLE in its span (`sub:…:holes`), every bucket
+// overlapping it null on the read side. This walks each hole's hours with the back-fill's discipline,
+// oldest hole first:
+// - only a hole the sampler has moved PAST (its end at or below the hour holding span.to): the
+//   sampler still increments the hour it is in, and a SET there could lose its later counts. A hole
+//   it is still inside is left for a later run.
+// - each hour SET to its full tally (`writeHour`, idempotent), outside the lock, since no sampler
+//   run writes an hour behind its own `to`;
+// - then, under the sampler's lock and in ONE transaction, every touched day's 1d recomputed from its
+//   1h fields (1d = Σ1h) and the hole's field deleted — only if the field still holds the end walked
+//   (a later gap from the same hour may have pushed it out; that hole is left to walk again).
+// - a failed read stops the walk at that hole, which stays: a rerun walks it again from its start.
+
+export interface HolesResult {
+  /** Holes walked and deleted. */
+  filled: number;
+  /** Holes left: the sampler is still inside one, or its end moved while it was walked. */
+  left: number;
+  /** The ordinal whose read failed (-1: a list read), null when every walkable hole was filled. */
+  failedAt: number | null;
+  /** Snapshots read (and counted). */
+  read: number;
+}
+
+export async function walkHoles(
+  deps: WalkDeps,
+  net: string,
+  onProgress: (p: { hole: { from: number; to: number }; read: number }) => void = () => {},
+): Promise<HolesResult> {
+  const { store } = deps;
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const spanTo = Number((await store.hgetall(subSpanKeyOf(net)))?.to ?? NaN);
+  if (!Number.isFinite(spanTo)) throw new Error(`walkHoles: ${net} has no measured span — the sampler must run first`);
+  const passed = Math.floor(spanTo / HOUR_MS) * HOUR_MS;
+  const holes = parseHoles(await store.hgetall(subHolesKeyOf(net)));
+  let filled = 0, left = 0, read = 0;
+  for (const hole of holes) {
+    if (hole.to > passed || hole.from % HOUR_MS || hole.to % HOUR_MS) { left++; continue; }
+    let recs: MetaRec[];
+    try {
+      recs = await listWindow(deps, net, hole.from, hole.to);
+    } catch {
+      return { filled, left: left + 1, failedAt: -1, read };
+    }
+    let i = 0;
+    const days = new Set<number>();
+    for (let h = hole.from; h < hole.to; h += HOUR_MS) {
+      const hourRecs: MetaRec[] = [];
+      while (i < recs.length && Date.parse(recs[i].timestamp) < h + HOUR_MS) hourRecs.push(recs[i++]);
+      const got = await writeHour(deps, net, h, hourRecs);
+      if (got.failedAt != null) return { filled, left: left + 1, failedAt: got.failedAt, read };
+      read += got.read;
+      days.add(Math.floor(h / DAY_MS) * DAY_MS);
+    }
+    const closed = await withSubmittersLock(store, async () => {
+      const writes: TrendsWrite[] = [];
+      for (const d of days) {
+        const w = await dayWrite(store, net, d);
+        if (w) writes.push(w);
+      }
+      const field = String(hole.from);
+      const [now] = await store.hmget(subHolesKeyOf(net), [field]);
+      const same = now != null && Number(now) === hole.to;
+      if (same) writes.push({ key: subHolesKeyOf(net), map: {}, ttlS: null, hdel: [field] });
+      if (writes.length) await store.applyWrites(writes);
+      return same;
+    }, sleep);
+    if (closed) filled++; else left++;
+    onProgress({ hole, read });
+  }
+  return { filled, left, failedAt: null, read };
 }

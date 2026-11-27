@@ -31,6 +31,13 @@ export function subSpanKeyOf(netId: string): string {
   return `sub:${STORE_NS}:${netId}:span`;
 }
 
+/** THE HOLES (ruling R20): the hours a gap left unmeasured inside the span. Field = a hole's start,
+ *  epoch ms on an hour edge; value = its end, the same. `walk-submitters --holes` fills one and deletes
+ *  its field; until then every bucket overlapping it reads null. */
+export function subHolesKeyOf(netId: string): string {
+  return `sub:${STORE_NS}:${netId}:holes`;
+}
+
 /** Field = submitter id, value = JSON `{ name, source: "ded" | "dagscan", namedAt }`. */
 export function subNamesKeyOf(netId: string): string {
   return `sub:${STORE_NS}:${netId}:names`;

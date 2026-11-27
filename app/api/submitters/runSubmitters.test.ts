@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { runSubmitters, walkRange, type SubmittersDeps, type WalkDeps } from "./runSubmitters";
-import { subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
+import { runSubmitters, walkHoles, walkRange, type SubmittersDeps, type WalkDeps } from "./runSubmitters";
+import { assembleSubmitters } from "./assemble";
+import { subHolesKeyOf, subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
 import { DED_ID } from "@/src/data/submitters";
 import type { MetaRec } from "../trends/bucketing";
 import type { ChainPage } from "../trends/fetchSince";
@@ -27,6 +28,8 @@ function memStore(): TrendsStore & { data: Map<string, Map<string, string>>; loc
         let h = data.get(w.key);
         if (!h) data.set(w.key, (h = new Map()));
         for (const [f, v] of Object.entries(w.map)) h.set(f, String(v));
+        for (const f of w.hdel ?? []) h.delete(f);
+        if (!h.size) data.delete(w.key);
       }
     },
   };
@@ -150,7 +153,7 @@ describe("runSubmitters", () => {
     expect(keys).toEqual([subLockKeyOf()]);
   });
 
-  it("a warm run contiguous by ordinal extends the span; a gap restarts it at the first record read", async () => {
+  it("a warm run contiguous by ordinal extends the span; a gap keeps its from and records a hole", async () => {
     const store = memStore();
     let tip = 1100;
     await runSubmitters(deps(store, { pageMeta: pager(() => tip) }));
@@ -167,9 +170,28 @@ describe("runSubmitters", () => {
     await gapped.hset(subSpanKeyOf(DED_ID), { from: PREV_HOUR - 5 * HOUR, to: PREV_HOUR - 4 * HOUR, cursor: 900 });
     const res = await runSubmitters(deps(gapped));
     expect(res.read[DED_ID]).toBe(130);
-    expect(span(gapped)!.get("from")).toBe(String(tsOf(1000)));
+    // R20: the span KEEPS its from; the gap's hours are a hole, from the hour holding the old `to`
+    // (09:00) to the end of the hour holding the first record read (12:00 → 13:00).
+    expect(span(gapped)!.get("from")).toBe(String(PREV_HOUR - 5 * HOUR));
     expect(span(gapped)!.get("to")).toBe(String(tsOf(1129)));
     expect(span(gapped)!.get("cursor")).toBe("1129");
+    expect(Object.fromEntries(gapped.data.get(subHolesKeyOf(DED_ID))!)).toEqual({ [String(PREV_HOUR - 4 * HOUR)]: String(PREV_HOUR) });
+    expect(gapped.applies).toHaveLength(1); // the hole rides the run's one transaction
+  });
+
+  it("a second gap from the same hour keeps the hole's later end", async () => {
+    const store = memStore();
+    await store.hset(subSpanKeyOf(DED_ID), { from: PREV_HOUR - 5 * HOUR, to: PREV_HOUR - 4 * HOUR, cursor: 900 });
+    await store.hset(subHolesKeyOf(DED_ID), { [String(PREV_HOUR - 4 * HOUR)]: String(PREV_HOUR + 5 * HOUR) });
+    await runSubmitters(deps(store));
+    expect(store.data.get(subHolesKeyOf(DED_ID))!.get(String(PREV_HOUR - 4 * HOUR))).toBe(String(PREV_HOUR + 5 * HOUR));
+  });
+
+  it("a contiguous run writes no hole", async () => {
+    const store = memStore();
+    await runSubmitters(deps(store, { pageMeta: pager(() => 1100) }));
+    await runSubmitters(deps(store));
+    expect(store.data.has(subHolesKeyOf(DED_ID))).toBe(false);
   });
 
   it("maxRecs reads the OLDEST records and leaves the rest, the span staying contiguous", async () => {
@@ -385,5 +407,49 @@ describe("walkRange", () => {
 
   it("refuses without a measured span: the sampler must run first", async () => {
     await expect(walkRange(wdeps(memStore()), DED_ID, D0, SPAN_FROM, progress)).rejects.toThrow(/span/);
+  });
+
+  it("walkHoles fills a hole's hours, recomputes its days, deletes the hole, and its buckets read measured", async () => {
+    const clean = await sampled();
+    await walkRange(wdeps(clean), DED_ID, D0, SPAN_FROM, progress);
+
+    const store = await sampled();
+    await walkRange(wdeps(store), DED_ID, D0, SPAN_FROM, progress);
+    // A gap's hours: D1 05:00 and 06:00 lost from the store, the day's 1d stale, the hole recorded.
+    const k1h = subSlotOf(DED_ID, "1h", D1).key;
+    for (const f of [...store.data.get(k1h)!.keys()]) if (f.startsWith("26-05|") || f.startsWith("26-06|")) store.data.get(k1h)!.delete(f);
+    await store.hset(subSlotOf(DED_ID, "1d", D1).key, { [`11-26|${O1}`]: 1 });
+    await store.hset(subHolesKeyOf(DED_ID), { [String(D1 + 5 * HOUR)]: String(D1 + 7 * HOUR) });
+    const read = (s: ReturnType<typeof memStore>) => assembleSubmitters({
+      net: DED_ID, tier: "1h", fromMs: D1, toMs: D1 + 24 * HOUR,
+      hashes: { [k1h]: Object.fromEntries(s.data.get(k1h)!) },
+      span: Object.fromEntries(span(s)!), names: null,
+      holes: s.data.has(subHolesKeyOf(DED_ID)) ? Object.fromEntries(s.data.get(subHolesKeyOf(DED_ID))!) : null,
+    });
+    expect(read(store).distinct.slice(4, 8)).toEqual([2, null, null, 2]);
+
+    const res = await walkHoles(wdeps(store), DED_ID);
+    expect(res).toEqual({ filled: 1, left: 0, failedAt: null, read: 12 });
+    expect(store.data.has(subHolesKeyOf(DED_ID))).toBe(false);
+    expect(subData(store)).toEqual(subData(clean));
+    expect(field(store, "1d", D1, O1)).toBe(sum1h(store, D1, O1));
+    expect(read(store).distinct.slice(4, 8)).toEqual([2, 2, 2, 2]);
+    expect(store.locked).toBe(false);
+  });
+
+  it("walkHoles leaves a hole the sampler is still inside, and a failed read leaves its hole", async () => {
+    const store = await sampled();
+    await store.hset(subHolesKeyOf(DED_ID), { [String(D2 + 13 * HOUR)]: String(D2 + 15 * HOUR) });
+    let reads = 0;
+    const res = await walkHoles(wdeps(store, { fetchSnap: async (n, o) => { reads++; return walkSnap(n, o); } }), DED_ID);
+    expect(res).toEqual({ filled: 0, left: 1, failedAt: null, read: 0 });
+    expect(reads).toBe(0);
+
+    const bad = await sampled();
+    await bad.hset(subHolesKeyOf(DED_ID), { [String(D1)]: String(D1 + 2 * HOUR) });
+    const r2 = await walkHoles(wdeps(bad, { fetchSnap: async (n, o) => { if (o === 5000 + 144 + 7) throw new Error("L0 502"); return walkSnap(n, o); } }), DED_ID);
+    expect(r2.failedAt).toBe(5000 + 144 + 7);
+    expect(r2.filled).toBe(0);
+    expect(bad.data.get(subHolesKeyOf(DED_ID))!.get(String(D1))).toBe(String(D1 + 2 * HOUR));
   });
 });

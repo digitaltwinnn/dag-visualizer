@@ -66,6 +66,7 @@ const win = (over: Partial<SubmittersWindow>): SubmittersWindow => ({
   stepMs: H,
   buckets: [0, H, 2 * H],
   measured: { from: 0, to: 3 * H },
+  holes: [],
   names: {},
   series: [],
   distinct: [0, 0, 0],

@@ -3,6 +3,7 @@ import { DED_ID } from "@/src/data/submitters";
 
 const calls: string[] = [];
 const fail = { on: false };
+const holes: { value: Record<string, string> | null } = { value: null };
 const NOW = Date.UTC(2026, 10, 27, 10, 20);
 const H = 3600000;
 vi.mock("@/app/api/trends/store", () => ({
@@ -11,6 +12,7 @@ vi.mock("@/app/api/trends/store", () => ({
       calls.push(k);
       if (fail.on) throw new Error("down");
       if (k.endsWith(":span")) return { from: String(Date.UTC(2026, 10, 1)), to: String(Date.UTC(2026, 10, 27, 8, 30)) };
+      if (k.endsWith(":holes")) return holes.value;
       return null;
     },
   }),
@@ -21,7 +23,7 @@ import { GET } from "./route";
 const get = (qs: string) => GET(new Request(`http://x/api/submitters${qs}`));
 
 describe("GET /api/submitters", () => {
-  beforeEach(() => { calls.length = 0; fail.on = false; vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW); });
+  beforeEach(() => { calls.length = 0; fail.on = false; holes.value = null; vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW); });
 
   it("rejects a network without a submitter table and a bad range", async () => {
     expect((await get("?net=USDC&window=24h")).status).toBe(400);
@@ -40,6 +42,15 @@ describe("GET /api/submitters", () => {
     expect(w.buckets[23]).toBe(Date.UTC(2026, 10, 27, 7));
     expect(w.buckets[0]).toBe(Date.UTC(2026, 10, 27, 7) - 23 * H);
     expect(calls).toContain(`sub:mainnet:${DED_ID}:1h:2026-11`);
+  });
+
+  it("reads the holes hash: a bucket in a hole is not measured (R20)", async () => {
+    const from = Date.UTC(2026, 10, 26, 0), to = from + 3 * H;
+    holes.value = { [String(from + H)]: String(from + 2 * H) };
+    const w = await (await get(`?net=${DED_ID}&from=${from}&to=${to}`)).json();
+    expect(calls).toContain(`sub:mainnet:${DED_ID}:holes`);
+    expect(w.distinct).toEqual([0, null, 0]);
+    expect(w.holes).toEqual([{ from: from + H, to: from + 2 * H }]);
   });
 
   it("picks the 1d tier for a range over 30 days", async () => {
