@@ -300,6 +300,17 @@ describe("runSubmitters", () => {
     expect(span(store, DOR_ID)!.get("cursor")).toBe("1129");
   });
 
+  it("a names-hash read that throws costs the run nothing: names are optional", async () => {
+    const store = memStore();
+    const hgetall = store.hgetall.bind(store);
+    store.hgetall = async (k: string) => { if (k === subNamesKeyOf(DED_ID)) throw new Error("upstash 502"); return hgetall(k); };
+    const res = await runSubmitters(deps(store, { dedLatest: async () => ({ data: [{ orgId: O1, orgName: "Open Poker" }] }) }));
+    expect(res.names).toBe(0);
+    expect(store.applies).toHaveLength(1);
+    expect(span(store)!.get("cursor")).toBe("1129");
+    expect(h1(store, PREV_HOUR)!.get(`27-13|${O1}`)).toBe("120");
+  });
+
   it("a names read that fails costs the run nothing", async () => {
     const store = memStore();
     const res = await runSubmitters(deps(store, { dedLatest: async () => { throw new Error("ded down"); } }));
@@ -499,5 +510,21 @@ describe("walkRange", () => {
     const once = [...store.hll].map(([k, v]) => [k, [...v].sort()]);
     await walkRange(wdeps(store, { fetchSnap: dorSnap }), DOR_ID, D0, SPAN_FROM, progress);
     expect([...store.hll].map(([k, v]) => [k, [...v].sort()])).toEqual(once);
+  });
+
+  it("inside the sampler's lock it calls only the raw store (`lockedStore`), so the section cannot outlast the lock", async () => {
+    const raw = await sampled();
+    await raw.hset(subHolesKeyOf(DED_ID), { [String(D1)]: String(D1 + HOUR) });
+    // The script's retrying store: a retry loop inside the lock could outlive LOCK_TTL_S.
+    const inLock = (name: "hgetall" | "hmget" | "applyWrites") => async (...a: unknown[]) => {
+      if (raw.locked) throw new Error(`a retrying ${name} inside the lock`);
+      return (raw[name] as (...x: unknown[]) => Promise<unknown>)(...a);
+    };
+    const retrying = { ...raw, hgetall: inLock("hgetall"), hmget: inLock("hmget"), applyWrites: inLock("applyWrites") } as unknown as TrendsStore;
+    const w = await walkRange(wdeps(retrying, { lockedStore: raw }), DED_ID, D2, SPAN_FROM, progress);
+    expect(w.lowered).toBe(true);
+    const h = await walkHoles(wdeps(retrying, { lockedStore: raw }), DED_ID);
+    expect(h.filled).toBe(1);
+    expect(raw.locked).toBe(false);
   });
 });

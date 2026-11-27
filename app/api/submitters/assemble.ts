@@ -35,7 +35,7 @@ export interface SubmittersWindow {
   estimate: boolean;
   /** The range's per-organisation sums, busiest first; devices give []. */
   totals: { id: string; updates: number }[];
-  /** Organisations ever seen (names hash plus the 1d tier); 0 for devices. */
+  /** Organisations ever seen: the ids the 1d tier holds (a name alone is no sighting); 0 for devices. */
   seenTotal: number;
   /** Earliest 1d bucket any organisation appears in, epoch ms; null when none. */
   firstSeenMs: number | null;
@@ -194,7 +194,9 @@ export function assembleSubmitters(input: AssembleInput): SubmittersWindow {
   let seenTotal = 0, firstSeenMs: number | null = null;
   const allTime = new Map<string, number>();
   {
-    const seen = new Set(Object.keys(input.names ?? {}));
+    // SEEN is what the 1d tier holds: a name seeded for an organisation the walk never reached is a
+    // name, not a sighting.
+    const seen = new Set<string>();
     for (const [key, h] of Object.entries(input.yearHashes ?? {})) {
       const year = Number(key.slice(key.lastIndexOf(":") + 1));
       for (const f of Object.keys(h)) {

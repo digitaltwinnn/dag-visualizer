@@ -54,4 +54,10 @@ describe("mergeNames", () => {
   it("replaces a stored value it cannot read", () => {
     expect(mergeNames({ a: "not json" }, { a: "Open Poker" }, "dagscan", T0).a).toBe(j("Open Poker", "dagscan", T0));
   });
+  it("strips control characters and caps a name at 80 characters: names reach the notes' prompts", () => {
+    expect(mergeNames({}, { a: "Open\u0000 Po\nker\u007f\u009b" }, "ded", T0).a).toBe(j("Open Poker", "ded", T0));
+    expect(JSON.parse(mergeNames({}, { a: "x".repeat(500) }, "ded", T0).a!).name).toHaveLength(80);
+    // nothing left once stripped is no name
+    expect(mergeNames({}, { a: "\u0001\u0002" }, "ded", T0)).toEqual({});
+  });
 });

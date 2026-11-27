@@ -46,11 +46,26 @@ function stored(v: string | undefined): { name: string; source: NameSource } | n
 }
 
 /** The names hash after `seen` (orgId → name) from `source`: every previous key kept, a new or
- *  changed name written as `{ name, source, namedAt: nowMs }`, an unchanged one left byte-identical,
+ *  changed name written as `{ name, source, namedAt: nowMs }` (the name `clean`ed — it reaches the
+ *  notes' prompts — and skipped when nothing is left), an unchanged one left byte-identical,
  *  and a `dagscan` name never written over a `ded` one. */
+/** The longest name kept: a name is a card's label and a note's word, never a paragraph. */
+const NAME_MAX = 80;
+// C0, DEL and C1 controls: a name from DED's API or dagscan goes into the notes' prompts and the cards.
+// eslint-disable-next-line no-control-regex
+const CONTROL_RE = /[\u0000-\u001f\u007f-\u009f]/g;
+
+/** A name as it is stored: control characters removed, white space collapsed, at most NAME_MAX
+ *  characters; "" when nothing is left (no name). */
+function clean(name: string): string {
+  return name.replace(CONTROL_RE, "").replace(/\s+/g, " ").trim().slice(0, NAME_MAX).trim();
+}
+
 export function mergeNames(prev: Record<string, string>, seen: Record<string, string>, source: NameSource, nowMs: number): Record<string, string> {
   const out = { ...prev };
-  for (const [id, name] of Object.entries(seen)) {
+  for (const [id, raw] of Object.entries(seen)) {
+    const name = clean(raw);
+    if (!name) continue;
     const p = stored(prev[id]);
     if (p && p.source === "ded" && source === "dagscan") continue;
     if (p && p.name === name && p.source === source) continue;

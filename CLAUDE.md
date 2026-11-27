@@ -44,10 +44,11 @@ Four views drive the 3D scene:
   blocks, a column with one box per data block (a cL1 block holds transactions, a dL1 block data
   updates — the protocol's own split). The view OPENS on Data blocks (`viewPolicy.DEFAULT_REGISTER`, user 2026-11-23); `/snapshots` still
   names Metagraph snapshots, and the tour's Snapshots stop names it too (its line is that note's).
-  **Who submits a data block** (2026-11-27): on Data blocks each data block's box splits into bands by
-  submitter — a DED block's ORGANISATIONS (named, up to three bands plus Other), a Dor block's DEVICES
-  (counted, never named); `src/data/submitters.ts` is the one table (`submitters.test.ts`), the palette of
-  the seven busiest organisations of all time colours them (`submitterPalette`, the sixth publish channel).
+  **Who submits a data block** (2026-11-27): on Data blocks a DED block's box splits into bands by its
+  ORGANISATIONS (named — four bands when four fit, else three plus Other, `dataMark.dataBoxBands`); a Dor
+  block's box stays one plain box, its DEVICES counted on the Data block card, never named or banded;
+  `src/data/submitters.ts` is the one table (`submitters.test.ts`), the palette of the seven busiest
+  organisations of all time colours them (`submitterPalette`, the sixth publish channel).
   A register is a setting of a view, never a Mode
   (`viewPolicy.registers` lists them; the view switch holds no sixth button), its pages live in ONE map
   (`components/views.ts`' `REGISTER_PAGES`, pinned by `views.test.ts`), the chamber dispatches on ONE
@@ -59,10 +60,12 @@ Four views drive the 3D scene:
   ground that draws each plane's footprint, with a shared time cursor marking one instant on every
   plane at once. The planes are DOM, not WebGL — `TrendChart`, the app's one chart —
   and the bottom band is a scrubbable timeline rather than vitals cells.
-  A DATA network's plane brings a **Data submitters** card (2026-11-27): who sent the range's data
-  blocks — DED's organisations broken down over time, Dor's devices counted — read from the `sub:`
-  key family (`/api/submitters`, its own 1h/1d tiers outside `t:`; `src/data/CLAUDE.md`, "Who submits
-  the data"), measured only inside the sampler's span.
+  The **Data submitters** card always stands in History, under the Range (2026-11-27): who sent the
+  span's data blocks on the network the deck stands on — DED's organisations broken down over time,
+  Dor's devices counted (an estimate, "about N"), every network that names its submitters listed under
+  All, and a sentence for one that names none — read from the `sub:` key family (`/api/submitters`, its
+  own 1h/1d tiers outside `t:`; `src/data/CLAUDE.md`, "Who submits the data"), measured only inside
+  the sampler's span.
 
 **The Briefing** (2026-10-31, `domain/briefing.ts`, `components/Briefing.tsx`,
 `docs/superpowers/specs/2026-10-31-briefing-design.md`): `/` opens on Geography and plays every 3D

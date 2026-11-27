@@ -28,6 +28,18 @@ describe("GET /api/submitters/sample", () => {
     expect(run).not.toHaveBeenCalled();
   });
 
+  it("logs one warning per network that failed, and stays a 200", async () => {
+    vi.stubEnv("CRON_SECRET", "s3cret");
+    run.mockResolvedValueOnce({ read: { [DED_ID]: 0, [DOR_ID]: 3 }, failed: { [DED_ID]: 1062, [DOR_ID]: null }, names: 0 });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const r = await GET(req("Bearer s3cret"));
+    expect(r.status).toBe(200);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]![0])).toContain(DED_ID);
+    expect(String(warn.mock.calls[0]![0])).toContain("1062");
+    warn.mockRestore();
+  });
+
   it("runs the sampler once for DED and Dor with the right bearer", async () => {
     vi.stubEnv("CRON_SECRET", "s3cret");
     const r = await GET(req("Bearer s3cret"));

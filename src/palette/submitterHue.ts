@@ -26,7 +26,8 @@ export const ORG_HUE_GAP = 24;
 
 const dist = (a: number, b: number) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); };
 
-// Whole degrees inside the allowed zones and MIN_HUE_GAP clear of DED's and Dor's hues. Hashing into
+// Whole degrees inside the allowed zones and MIN_HUE_GAP clear of DED's and Dor's hues and of the
+// chamber's core cyan (R14, R17). Hashing into
 // this list (not hashing a hue and snapping) keeps ids spread: a guard-band hash would collapse
 // onto a zone edge.
 let _clear: number[] | null = null;

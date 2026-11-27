@@ -98,13 +98,13 @@ describe("assembleSubmitters", () => {
     expect(w.series).toEqual([]);
   });
 
-  it("counts organisations seen from the names hash and the 1d years, and dates the first", () => {
+  it("counts organisations SEEN from the 1d tier only (a seeded, unwalked name is not seen), and dates the first", () => {
     const w = assembleSubmitters({
       net: DED_ID, tier: "1d", fromMs: T0, toMs: T0 + H, hashes: {}, span: null,
       names: { a: "{}", b: "{}" },
       yearHashes: { "sub:mainnet:x:1d:2026": { "03-05|b": "1", "02-01|c": "2" } },
     });
-    expect(w.seenTotal).toBe(3);
+    expect(w.seenTotal).toBe(2); // b and c; a is only named
     expect(w.firstSeenMs).toBe(Date.UTC(2026, 1, 1));
   });
 });

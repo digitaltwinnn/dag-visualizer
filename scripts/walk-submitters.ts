@@ -82,6 +82,7 @@ async function main(): Promise<void> {
     hgetall: (k: string) => retrying(() => raw.hgetall(k)),
     hmget: (k: string, f: string[]) => retrying(() => raw.hmget(k, f)),
     hset: (k: string, m: Record<string, string | number>) => retrying(() => raw.hset(k, m)),
+    pfadd: (k: string, ids: string[]) => retrying(() => raw.pfadd(k, ids)),
     applyWrites: (w: Parameters<typeof raw.applyWrites>[0]) => retrying(() => raw.applyWrites(w)),
   };
 
@@ -116,6 +117,8 @@ async function main(): Promise<void> {
   type Rec = { ordinal: number; timestamp: string; hash?: string };
   const deps = {
     store,
+    // Inside the sampler's lock, the raw client: no retry loop may outlast the lock's TTL.
+    lockedStore: raw,
     pool,
     pageMeta: (id: string, limit: number, next?: string) => retrying(() => pageCurrencySnapshots(be, id, limit, next)),
     fetchSnap: (_id: string, o: number) => retrying(() => getJson(`${l0}/snapshots/${o}`, 15000)),

@@ -302,11 +302,15 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   instrument for how the model is holding up.
   **Submitter facts** (2026-11-27): a DED or Dor History/Data note also states who submitted — DED's
   organisations (named, with their start/end inside the span, `readSubmitters` through
-  `NoteReads.submitters`) and Dor's active devices (counted, never named). A failed or absent `sub:` read
-  is no submitter data, and the note is written as before; the Data blocks note states no organisation
-  when no names were read. The gate is actor-scoped: a share or a % / multiplier labelled with an
-  organisation is held to the sentence that names that organisation. Its limit is stated: it checks
-  the figure and whose it is, by label, not what the prose claims about a count.
+  `NoteReads.submitters`) and Dor's active devices (counted, never named; over a History span an
+  estimate, its facts labelled "about" and the prompt asking for "about N", R19). A failed or absent
+  `sub:` read is no submitter data, and the note is written as before; the Data blocks note states no
+  organisation when no names were read. The gate is actor-scoped for SHARES AND CHANGES only: a share
+  or a % / multiplier labelled with an organisation is held to the sentence that names that
+  organisation, and the network's own to a sentence that names none; the retry reason says which
+  sentence the figure belongs in, and `SUBMITTER_WORDS` asks for an organisation's share or change in
+  a sentence of its own. A plain count is NOT actor-scoped: the gate checks that the figure is one the
+  facts hold, never whose count the prose says it is.
   **Subject notes** (user, 2026-10-29) are a card's own note: a country, a provider, a node make-up.
   The grammar has ONE home, `notes/keys.ts` — `CC_TAIL_RE`, `ISP_TAIL_RE`, `TYPE_TAIL_RE`,
   `subjectKindOf`, `isSubjectNote`: `cc:XX` (fleet country), `<net>/cc:XX`, `isp:<key>`,
@@ -405,7 +409,7 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   decode. **A deterministic miss (the channel provably isn't in this immutable global) is cached
   like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
   the whole global, an anonymous amplification loop; only transient failures throw and retry.
-- **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, the transfer totals in DAG and each transfer's `{ from, to, amount, fee }` in `transfers`, signature count; hashes paired by index from the explorer record, `""` where it lists none) — never its `tips`, which nothing reads (`decodeBlocks.ts`; cache key `snapshot-exact-v11` — v7 added the rows' data updates, the hashes read apart and cached on success only; v8 re-keys after an undecodable row's data updates became unknown rather than 0, so no cached entry still states the 0; v9 the state's shape and dL1 signers; v10 one summary per data block; v11 an unreadable data block is `unread` and its snapshot's data updates unknown; v12 each data block's submitters — `cachedExact.ts` keeps the history).
+- **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, the transfer totals in DAG and each transfer's `{ from, to, amount, fee }` in `transfers`, signature count; hashes paired by index from the explorer record, `""` where it lists none) — never its `tips`, which nothing reads (`decodeBlocks.ts`; cache key `snapshot-exact-v12` — v7 added the rows' data updates, the hashes read apart and cached on success only; v8 re-keys after an undecodable row's data updates became unknown rather than 0, so no cached entry still states the 0; v9 the state's shape and dL1 signers; v10 one summary per data block; v11 an unreadable data block is `unread` and its snapshot's data updates unknown; v12 each data block's submitters — `cachedExact.ts` keeps the history).
 - **`/api/network/[address]/snapshots/[ordinal]/blocks`** is a metagraph snapshot's blocks, read from the chain's own L0 (`urls.l0` from the directory, 5 min; `network/metaL0.ts`) through the same `decodeBlocks` (cache key `metagraph-snap-blocks-v3`); the snapshots route's address gate (catalog + unlisted), `public, max-age=86400, s-maxage=86400, immutable`, 503 `no-store` on upstream failure (its
   `route.test.ts` and `snapshot/decodeBlocks.test.ts` pin the answer). The ordinal is a number; anything else, `latest` included, is a 400 — the chain's newest snapshot is read nowhere.
 - **`/api/network/unlisted`** lists the UNLISTED chains — the explorer's `/currency` list less every

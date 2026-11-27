@@ -227,11 +227,15 @@ export async function runSubmitters(deps: SubmittersDeps): Promise<SubmittersRes
     if (deps.dedLatest) {
       const seen = parseDedLatest(await deps.dedLatest().catch(() => null));
       if (Object.keys(seen).length) {
-        const prev = (await store.hgetall(subNamesKeyOf(DED_ID))) ?? {};
-        const merged = mergeNames(prev, seen, "ded", deps.now());
-        const changed = Object.fromEntries(Object.entries(merged).filter(([id, v]) => prev[id] !== v));
-        names = Object.keys(changed).length;
-        if (names) writes.push({ key: subNamesKeyOf(DED_ID), map: changed, ttlS: null });
+        // Names are optional: a names hash that cannot be read writes no names and costs the run's
+        // counts nothing (it ran unguarded, and one throw dropped every network's reads).
+        const prev = await store.hgetall(subNamesKeyOf(DED_ID)).then((h) => h ?? {}, () => null);
+        if (prev) {
+          const merged = mergeNames(prev, seen, "ded", deps.now());
+          const changed = Object.fromEntries(Object.entries(merged).filter(([id, v]) => prev[id] !== v));
+          names = Object.keys(changed).length;
+          if (names) writes.push({ key: subNamesKeyOf(DED_ID), map: changed, ttlS: null });
+        }
       }
     }
 
@@ -268,6 +272,11 @@ export interface WalkDeps extends Pick<SubmittersDeps, "store" | "pageMeta" | "f
   cursorAt(net: string, ms: number): Promise<string | undefined | null>;
   /** Waits between lock attempts (default a real timer). */
   sleep?(ms: number): Promise<void>;
+  /** The store calls made WHILE THE SAMPLER'S LOCK IS HELD (default `store`). The script passes the
+   *  raw, non-retrying client here: a retry loop of ~15 minutes inside the section could outlast
+   *  LOCK_TTL_S, let a sampler run in, and lose its counts from the day being recomputed. A failed
+   *  call there fails the walk instead, which a rerun resumes. */
+  lockedStore?: TrendsStore;
 }
 
 export interface WalkResult {
@@ -387,13 +396,14 @@ export async function walkRange(
       return false;
     }
     return withSubmittersLock(store, async () => {
+      const ls = deps.lockedStore ?? store; // no retry loop inside the lock
       const writes: TrendsWrite[] = [];
-      const w = await dayWrite(store, net, dayMs);
+      const w = await dayWrite(ls, net, dayMs);
       if (w) writes.push(w);
-      const now = (await store.hgetall(subSpanKeyOf(net))) ?? {};
+      const now = (await ls.hgetall(subSpanKeyOf(net))) ?? {};
       const lowered = lower && Number(now.from) === spanFrom && fromMs < spanFrom;
       if (lowered) writes.push({ key: subSpanKeyOf(net), map: { from: fromMs }, ttlS: null });
-      if (writes.length) await store.applyWrites(writes);
+      if (writes.length) await ls.applyWrites(writes);
       return lowered;
     }, sleep);
   };
@@ -489,16 +499,17 @@ export async function walkHoles(
       days.add(Math.floor(h / DAY_MS) * DAY_MS);
     }
     const closed = await withSubmittersLock(store, async () => {
+      const ls = deps.lockedStore ?? store; // no retry loop inside the lock
       const writes: TrendsWrite[] = [];
       for (const d of days) {
-        const w = await dayWrite(store, net, d);
+        const w = await dayWrite(ls, net, d);
         if (w) writes.push(w);
       }
       const field = String(hole.from);
-      const [now] = await store.hmget(subHolesKeyOf(net), [field]);
+      const [now] = await ls.hmget(subHolesKeyOf(net), [field]);
       const same = now != null && Number(now) === hole.to;
       if (same) writes.push({ key: subHolesKeyOf(net), map: {}, ttlS: null, hdel: [field] });
-      if (writes.length) await store.applyWrites(writes);
+      if (writes.length) await ls.applyWrites(writes);
       return same;
     }, sleep);
     if (closed) filled++; else left++;
