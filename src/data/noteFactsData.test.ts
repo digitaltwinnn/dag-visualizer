@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { DATA_NOTE_TICKS, dataFacts, type DataTickRead } from "./noteFactsData";
 import type { ChannelSnapRow } from "./types";
+import { DED_ID, DOR_ID } from "./submitters";
 
 // THE DATA BLOCKS' NOTE FACTS (2026-11-07): the live window's exact reads — which networks carried
 // data blocks over the window's minutes, how many, how many updates — stated over the ticks READ.
@@ -68,5 +69,32 @@ describe("dataFacts", () => {
     expect(out.facts[0]).toMatchObject({ label: "Window end, the newest global snapshot", kind: "time", value: end, text: "14:05 UTC" });
     // Unknown end: no fact, never a guessed clock.
     expect(dataFacts({ ticks: [{ ordinal: 1, rows: [row("dor", 2, 30)] }], names, keyOf, endMs: null })!.facts.some((f) => f.kind === "time")).toBe(false);
+  });
+  // WHO SUBMITTED THE DATA (2026-11-27): DED's own note names its organisations, Dor's counts its
+  // devices; every other note, the whole network's included, is unchanged.
+  it("DED's own note states each organisation's batches, named as everywhere; Dor's counts its devices", () => {
+    const blocks = (subs: { id: string; updates: number }[][]): Partial<ChannelSnapRow> => ({ dataBlockRows: subs.map((s) => ({ updates: s.reduce((a, x) => a + x.updates, 0), kinds: [], signers: 1, bytes: 1, digest: "d", submitters: s })) });
+    const subNames = { dag: "DAG", [DED_ID]: "Digital Evidence", [DOR_ID]: "Dor Technologies" };
+    const subKey = (id: string) => (id in subNames ? id : null);
+    const ded = { ...row(DED_ID, 2, 7), ...blocks([[{ id: "op-1", updates: 4 }, { id: "0f3a9b12-x", updates: 1 }], [{ id: "op-1", updates: 2 }]]) } as ChannelSnapRow;
+    const dor = { ...row(DOR_ID, 2, 3), ...blocks([[{ id: "devA", updates: 2 }], [{ id: "devA", updates: 1 }, { id: "devB", updates: 1 }]]) } as ChannelSnapRow;
+    const ticks: DataTickRead[] = [{ ordinal: 1, rows: [ded, dor] }];
+    const submitterNames = { "op-1": "Open Poker" };
+    const one = dataFacts({ ticks, names: subNames, keyOf: subKey, only: DED_ID, submitterNames })!;
+    expect(text(one.facts)).toEqual([
+      "Digital Evidence data blocks: 2",
+      "Digital Evidence data updates: 7",
+      "Open Poker batches in the window: 6",
+      "Org 0f3a9b12 batches in the window: 1",
+    ]);
+    expect(one.names).toEqual(expect.arrayContaining(["Open Poker", "Org 0f3a9b12"]));
+    expect(text(dataFacts({ ticks, names: subNames, keyOf: subKey, only: DOR_ID, submitterNames })!.facts)).toContain("Devices that checked in, in the window: 2");
+    // The whole network's note is unchanged.
+    const all = dataFacts({ ticks, names: subNames, keyOf: subKey, submitterNames })!;
+    expect(all.facts.some((f) => /batches|devices/i.test(f.label))).toBe(false);
+    // A block the decoder could not read makes the counts a floor; a window with no submitter read states none.
+    const unread = { ...ded, dataBlockRows: [...ded.dataBlockRows!, { updates: 0, unread: true as const, kinds: [], signers: 0, bytes: 0, digest: "" }] } as ChannelSnapRow;
+    expect(text(dataFacts({ ticks: [{ ordinal: 1, rows: [unread] }], names: subNames, keyOf: subKey, only: DED_ID, submitterNames })!.facts)).toContain("Open Poker batches in the window, at least: 6");
+    expect(dataFacts({ ticks: [{ ordinal: 1, rows: [row(DED_ID, 2, 7)] }], names: subNames, keyOf: subKey, only: DED_ID })!.facts.some((f) => /batches/.test(f.label))).toBe(false);
   });
 });

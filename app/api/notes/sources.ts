@@ -21,6 +21,9 @@ import { assembleSpan, WINDOWS } from "../trends/assemble";
 import { explorerReader, locateRows, type ChainReader } from "./snapshotAt";
 import { chainReadsOf, cursorKeyOf, geoSitesSlotOf, geoSlotOf, ispNamesKeyOf, slotsInWindow, type Tier } from "../trends/keys";
 import { readStore, type TrendsStore } from "../trends/store";
+import type { SubmittersWindow } from "../submitters/assemble";
+import { readSubmitters } from "../submitters/read";
+import { SUBMITTERS } from "@/src/data/submitters";
 import { CC_TAIL_RE, ISP_TAIL_RE, TYPE_TAIL_RE, isSubjectNote, subjectKindOf, type NoteSpan, type SubjectKind } from "./keys";
 
 // THE SOURCES OF AI NOTES — the impure half of the facts: which stored payloads each view's note
@@ -69,6 +72,9 @@ export interface NoteReads {
   chain?(): ChainReader;
   /** The newest window of exact reads (`dataWindow.ts`). Absent, the data note is not written. */
   dataWindow?(): Promise<DataWindowRead>;
+  /** WHO SUBMITTED A NETWORK'S DATA over [fromMs, toMs) (the `sub:` family, ruling R5), or null for
+   *  a network with no submitter table. Absent, no note states who. */
+  submitters?(net: string, fromMs: number, toMs: number): Promise<SubmittersWindow | null>;
 }
 
 /** ONE TIER over [fromMs, toMs): the tile route's body, at any span. */
@@ -170,6 +176,9 @@ export function storeReads(nowMs: number, store: HashReader = readStore()): Note
         (w) => { if (!w.ticks.length) dataWin = null; return w; },
         (e) => { dataWin = null; throw e; },
       )),
+    // The store itself, never the HTTP route; no all-time palette (`years: false`), which no note reads.
+    submitters: async (net, fromMs, toMs) =>
+      Object.hasOwn(SUBMITTERS, net) ? readSubmitters(once, net, { fromMs, toMs }, nowMs, { years: false }) : null,
   };
 }
 
@@ -383,11 +392,15 @@ async function readTrend(c: Ctx): Promise<Read | null> {
   // The whole daily record, for what a silent span can still say (`trendFacts`): always the unlisted
   // set's, and a network's only when its span is silent, so an active note reads nothing more.
   const silent = trendSilent(subject, cur);
-  const [history, chainReads] = await Promise.all([
+  // WHO SUBMITTED THE DATA, for a network whose updates name it — not in the span facet, which reads
+  // the range's shape and states no move.
+  const subs = !facet && Object.hasOwn(SUBMITTERS, subject) && reads.submitters ? reads.submitters(subject, fromMs, toMs) : null;
+  const [history, chainReads, submitters] = await Promise.all([
     subject === UNLISTED_ID || silent ? reads.span("1d", nowMs - WINDOWS.all.ms, nowMs) : null,
     silent ? reads.chainReads() : null,
+    subs,
   ]);
-  const built = trendFacts({ subject, zoom, span: { fromMs, toMs }, cur, gauges, daily, history, chainReads, shape: facet, names: c.names, blurbs: c.blurbs });
+  const built = trendFacts({ subject, zoom, span: { fromMs, toMs }, cur, gauges, daily, history, chainReads, submitters, shape: facet, names: c.names, blurbs: c.blurbs });
   return {
     built,
     spanFrom: fromMs,
@@ -521,10 +534,17 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
     whole: (subject) => subject === "all",
     async read({ subject, nowMs, reads, names }) {
       if (!reads.dataWindow) return null;
-      const w = await reads.dataWindow();
+      // An organisation's NAME, for a network whose submitters are organisations: the names hash, read
+      // with the last 24 hours of the `sub:` family (the names are the same in every window).
+      const named = SUBMITTERS[subject]?.kind === "organisation" && reads.submitters ? reads.submitters(subject, nowMs - 24 * H, nowMs) : null;
+      const [w, sub] = await Promise.all([reads.dataWindow(), named]);
       // ONE NETWORK'S (2026-11-20): its own data blocks over the same window, and no note when it
       // carried none — a network running no data layer among them (`dataFacts`' `only`).
-      const built = dataFacts({ ticks: w.ticks, names, keyOf: (id) => (isTracked(id) ? currentIdOf(id) : null), endMs: w.toMs, ...(subject === "all" ? {} : { only: subject }) });
+      const built = dataFacts({
+        ticks: w.ticks, names, keyOf: (id) => (isTracked(id) ? currentIdOf(id) : null), endMs: w.toMs,
+        ...(subject === "all" ? {} : { only: subject }),
+        ...(sub ? { submitterNames: sub.names } : {}),
+      });
       const spanFrom = w.fromMs ?? nowMs;
       const spanTo = w.toMs ?? nowMs;
       return { built, spanFrom, spanTo, windows: [["Span length", secondsOf(spanFrom, spanTo)]] };

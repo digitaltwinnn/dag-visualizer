@@ -3,6 +3,8 @@ import type { TrendsWindowData } from "@/src/data/trendWindow";
 import { pickRangeTier } from "@/src/data/trendWindow";
 import { METAGRAPHS } from "@/src/engine/config";
 import type { NoteReads } from "./sources";
+import type { SubmittersWindow } from "../submitters/assemble";
+import type { ChannelSnapRow } from "@/src/data/types";
 
 // The builders are mocked here: these tests pin what `factsFor` READS (the per-view table: tiers
 // and windows) and the INPUT it assembles for each builder. The builders' own behaviour is their
@@ -655,5 +657,65 @@ describe("the block DAG's note", () => {
     const out = (await factsFor("blocks", "all", "hours", NOW, reads))!;
     expect(out.facts.find((f) => f.label.startsWith("DAG blocks"))).toMatchObject({ label: "DAG blocks, at least", value: 0 });
     expect(out.facts.some((f) => /transfers/i.test(f.label))).toBe(false);
+  });
+});
+
+// WHO SUBMITTED THE DATA (2026-11-27, ruling R5): the notes read the `sub:` family through
+// `NoteReads.submitters`, the store itself, never the HTTP route. History's DED and Dor notes read
+// their span; the Data blocks note of DED reads the organisations' names; no other note reads it.
+describe("who submitted the data", () => {
+  const DED = "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M";
+  const DOR = "DAG0CyySf35ftDQDQBnd1bdQ9aPyUdacMghpnCuM";
+  const WINDOW = { net: DED, tag: "sub" } as unknown as SubmittersWindow;
+
+  it("History's DED and Dor notes read their own span and hand it to the builder; no other History note reads it", async () => {
+    const submitters = vi.fn(async () => WINDOW);
+    await factsFor("trend", DED, "7d", NOW, fakeReads({ submitters }));
+    expect(submitters).toHaveBeenCalledWith(DED, NOW - 7 * D, NOW);
+    expect(vi.mocked(trendFacts).mock.calls[0]![0].submitters).toBe(WINDOW);
+    await factsFor("trend", DOR, `r${NOW - 40 * D}-${NOW - 20 * D}`, NOW, fakeReads({ submitters }));
+    expect(submitters).toHaveBeenLastCalledWith(DOR, NOW - 40 * D, NOW - 20 * D);
+    submitters.mockClear();
+    vi.mocked(trendFacts).mockClear();
+    for (const subject of [USDC, "dag", `${DED}/span`]) await factsFor("trend", subject, "7d", NOW, fakeReads({ submitters }));
+    expect(submitters).not.toHaveBeenCalled();
+    for (const [input] of vi.mocked(trendFacts).mock.calls) expect(input.submitters ?? null).toBeNull();
+    // No such read at all: no submitter facts, the note otherwise as before.
+    vi.mocked(trendFacts).mockClear();
+    await factsFor("trend", DED, "7d", NOW, fakeReads());
+    expect(vi.mocked(trendFacts).mock.calls[0]![0].submitters ?? null).toBeNull();
+  });
+
+  it("DED's Data blocks note names its organisations as the names hash gives them; Dor's and the whole network's read no names", async () => {
+    const op = { metaId: DED, ordinal: 1, decoded: true, dataBlocks: 1, dataTxCount: 3, dataBlockRows: [{ updates: 3, kinds: [], signers: 1, bytes: 1, digest: "d", submitters: [{ id: "op-1", updates: 3 }] }] } as unknown as ChannelSnapRow;
+    const dataWindow = async () => ({ ticks: [{ ordinal: 1, rows: [op] }], fromMs: NOW - H, toMs: NOW });
+    const submitters = vi.fn(async () => ({ names: { "op-1": "Open Poker" } }) as unknown as SubmittersWindow);
+    const out = await factsFor("data", DED, "hours", NOW, fakeReads({ dataWindow, submitters }));
+    expect(submitters).toHaveBeenCalledWith(DED, NOW - 24 * H, NOW);
+    expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Open Poker batches in the window", value: 3 }));
+    expect(out!.names).toContain("Open Poker");
+    submitters.mockClear();
+    await factsFor("data", "all", "hours", NOW, fakeReads({ dataWindow, submitters }));
+    await factsFor("data", DOR, "hours", NOW, fakeReads({ dataWindow, submitters }));
+    expect(submitters).not.toHaveBeenCalled();
+  });
+
+  it("storeReads reads the sub: family through the store, at the range's tier, and nothing for a network with no submitter table", async () => {
+    const asked: string[] = [];
+    const store = {
+      async hgetall(key: string) {
+        asked.push(key);
+        return key.endsWith(":span") ? { from: String(NOW - 30 * D), to: String(NOW - H) } : null;
+      },
+    };
+    const reads = storeReads(NOW, store);
+    const w = await reads.submitters!(DED, NOW - 7 * D, NOW);
+    expect(w).toMatchObject({ net: DED, tier: "1h", kind: "organisation" });
+    expect(asked).toEqual(expect.arrayContaining([`sub:mainnet:${DED}:span`, `sub:mainnet:${DED}:names`, `sub:mainnet:${DED}:1h:2026-10`]));
+    expect(asked.some((k) => k.includes(":1d:"))).toBe(false); // the notes need no all-time palette
+    expect((await reads.submitters!(DOR, NOW - 90 * D, NOW))!.tier).toBe("1d");
+    asked.length = 0;
+    expect(await reads.submitters!(USDC, NOW - 7 * D, NOW)).toBeNull();
+    expect(asked).toEqual([]);
   });
 });
