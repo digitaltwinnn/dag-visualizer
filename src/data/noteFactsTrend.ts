@@ -1,4 +1,4 @@
-import { chainReadThrough, changeShare, fact, gaugeChange, networksAnchored, type ChainReads } from "@/src/data/noteFacts";
+import { chainReadThrough, changeFact, fact, moveOf, gaugeChange, networksAnchored, type ChainReads } from "@/src/data/noteFacts";
 import { NOTABLE_CAPS, rangeNotableCap, NOTABLE_FLOOR, notableDays, rangeExtremes } from "@/src/data/notableDays";
 import type { Fact, NotableDay } from "@/src/data/noteTypes";
 import { formatDag, globalSeries, lastSeen, METRIC_ORDER, metricLabel, metricSeries, spanAverage, trimCounterEdges, TREND_METRICS, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
@@ -464,10 +464,12 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
       if (level && Number.isFinite(day.level)) facts.push(fact(`Notable day ${n} ${what}, ${level}`, read(day.level), kind, format));
       // HOW FAR THE DAY STOOD FROM IT, as a fact (user, 2026-11-03: a figure and its change, in the
       // model's own words rather than appended by code). A count only: a gap is said against the normal
-      // spacing. Capped at tenfold like `withChangeFacts`, where a percentage stops reading as a change.
+      // spacing. Written as `withChangeFacts` writes one: a percentage, from tenfold a multiple (`moveOf`).
       const counted = day.kind === "high" || day.kind === "low" || day.kind === "peak" || day.kind === "trough";
-      const pct = counted && day.level > 0 ? Math.round((day.value / day.level - 1) * 100) : 0;
-      if (level && pct !== 0 && pct < 1000) facts.push(changeShare(`Notable day ${n} ${what}`, `the ${level}`, pct));
+      const change = counted && level && day.level > 0
+        ? changeFact(`Notable day ${n} ${what}`, `the ${level}`, moveOf(fact("", day.level, "count"), fact("", day.value, "count")))
+        : null;
+      if (change) facts.push(change);
       if (dag && (day.kind === "first" || day.kind === "last") && day.networkId && blurbOf[day.networkId]) {
         const line = `${nameOf(day.networkId)} is: ${blurbOf[day.networkId]}`;
         if (!blurbs.includes(line)) blurbs.push(line);

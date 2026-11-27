@@ -1,4 +1,4 @@
-import { factsBlock, pairChange, withChangeFacts } from "@/src/data/noteFacts";
+import { factsBlock, moveOf, withChangeFacts } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { namesSubject } from "@/src/data/noteChanges";
 import { LINE_MAX } from "@/src/engine/domain/briefing";
@@ -185,8 +185,7 @@ function styleSlips(text: string, facts: readonly Fact[]): string[] {
   for (const from of facts) {
     if (from.pair?.end !== "from" || said.has(from.text)) continue;
     const to = facts.find((f) => f.pair?.key === from.pair!.key && f.pair.end === "to");
-    const pct = to ? pairChange(from, to) : 0;
-    const hasChange = to != null && pct !== 0 && to.value !== 0 && pct < 1000;
+    const hasChange = to != null && moveOf(from, to) != null;
     const elsewhere = facts.some((f) => f !== from && f.pair?.end !== "from" && f.text === from.text);
     const esc = from.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     if (hasChange && !elsewhere && new RegExp(`(?<![\\d.,])${esc}(?![\\d]|[.,]\\d)`).test(text)) {
@@ -214,12 +213,14 @@ function styleSlips(text: string, facts: readonly Fact[]): string[] {
   for (const to of facts) {
     if (to.pair?.end !== "to") continue;
     const from = facts.find((f) => f.pair?.key === to.pair!.key && f.pair.end === "from");
-    const pct = from ? pairChange(from, to) : 0;
-    if (pct) moves.set(`${Math.abs(pct)}%`, [...(moves.get(`${Math.abs(pct)}%`) ?? []), to.text]);
+    const move = from ? moveOf(from, to) : null;
+    const words = move ? ("times" in move ? `${move.times}x` : `${Math.abs(move.pct)}%`) : null;
+    if (words) moves.set(words, [...(moves.get(words) ?? []), to.text]);
   }
-  for (const [pct, nows] of moves) {
+  for (const [change, nows] of moves) {
     const has = (t: string) => new RegExp(`(?<![\\d.,])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\d]|[.,]\\d)`).test(text);
-    if (has(pct) && !nows.some(has)) out.push(`"${pct}": give the current figure beside its change, as "<what> fell ${pct} to <current figure>"`);
+    const verb = change.endsWith("x") ? "rose" : "fell";
+    if (has(change) && !nows.some(has)) out.push(`"${change}": give the current figure beside its change, as "<what> ${verb} ${change} to <current figure>"`);
   }
   return out;
 }

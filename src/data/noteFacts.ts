@@ -229,24 +229,52 @@ export function changeShare(label: string, against: string, pct: number): Fact {
   return { ...fact(`${label}, change against ${against}, ${move}`, Math.abs(pct) / 100, "share"), move };
 }
 
+/** A RISE OF TENFOLD OR MORE IS A MULTIPLE (user, 2026-11-27: "can't you say 10x?"): "rose 11x to
+ *  868", where "up 1,037%" reads as a number to decode. From `MULTIPLE_FROM` times the earlier
+ *  figure; at `MULTIPLE_MAX` times and beyond the earlier figure was almost nothing (live
+ *  2026-11-03: "up 3551600%") and no change is stated, so the note gives where it stands. A fall
+ *  stays a percentage: it never passes 100%. */
+export const MULTIPLE_FROM = 10;
+export const MULTIPLE_MAX = 100;
+
+/** How a pair's move is written: a whole percentage, a whole multiple (`MULTIPLE_FROM`), or null
+ *  where there is none to state — it rounds to nothing, it stopped (a current figure of 0: the
+ *  prompt's quiet rule says it), or it grew from almost nothing (`MULTIPLE_MAX`). */
+export function moveOf(from: Fact, to: Fact): { pct: number } | { times: number } | null {
+  const pct = pairChange(from, to);
+  if (pct === 0 || to.value === 0) return null;
+  const times = to.value / from.value;
+  if (times >= MULTIPLE_MAX) return null;
+  return times >= MULTIPLE_FROM ? { times: Math.round(times) } : { pct };
+}
+
+/** ONE MULTIPLE FACT, `changeShare`'s sibling for a rise of tenfold or more: a ratio, so the gate
+ *  backs "11x" or "11 times" with it, written as the note should write it. */
+export function changeMultiple(label: string, against: string, times: number): Fact {
+  return { ...fact(`${label}, change against ${against}, up`, times, "ratio"), text: `${times}x`, move: "up" };
+}
+
+/** The one change fact a move gets (`moveOf`), or null. */
+export function changeFact(label: string, against: string, move: ReturnType<typeof moveOf>): Fact | null {
+  if (!move) return null;
+  return "times" in move ? changeMultiple(label, against, move.times) : changeShare(label, against, move.pct);
+}
+
 /** HOW FAR EACH MEASURED CHANGE MOVED, AS A FACT (user, 2026-11-03: "from x to y, up z% can be
  *  shortened by saying just the current value and its increase", and the wording belongs in the
  *  prompt, never in code rewriting the model's answer). For every pair (`Fact.pair`) whose ends
  *  differ by a rounded percent or more, one `share` fact: the change, labelled with the current
  *  figure's own label, what it is measured against and its direction, so the model can write
  *  "fell 6% to 66" without arithmetic and the gate backs the 6% like any other figure. A pair that
- *  rounds to no change gets none: it held. Nor does one that stopped (a current figure of 0: the
- *  prompt's quiet rule says it) or grew more than tenfold from almost nothing (live 2026-11-03:
- *  "up 3551600%"): a percentage there says nothing a reader can use, so the note gives where it
- *  stands. */
+ *  rounds to no change gets none: it held. Nor does one that stopped or grew from almost nothing
+ *  (`moveOf`); a rise of tenfold or more is a multiple (`changeMultiple`). */
 export function withChangeFacts(facts: readonly Fact[]): Fact[] {
   const out = [...facts];
   for (const to of facts) {
     if (to.pair?.end !== "to") continue;
     const from = facts.find((f) => f.pair?.key === to.pair!.key && f.pair.end === "from");
-    const pct = from ? pairChange(from, to) : 0;
-    if (!from || pct === 0 || to.value === 0 || pct >= 1000) continue;
-    out.push(changeShare(to.label, againstWords(from.label, to.label), pct));
+    const change = from && changeFact(to.label, againstWords(from.label, to.label), moveOf(from, to));
+    if (change) out.push(change);
   }
   return out;
 }
