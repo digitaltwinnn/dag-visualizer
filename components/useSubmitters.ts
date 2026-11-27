@@ -12,6 +12,23 @@ import { useEffect, useState } from "react";
 export type SubmittersQuery = { net: string; fromMs: number; toMs: number } | { net: string; window: "24h" };
 export type SubmittersState = { data: SubmittersWindow | null; error: boolean };
 
+// State is KEYED BY URL: the URL carries the network, so a stale answer from another url would show
+// one network's organisations under another. Pure steps, so the rule is testable without a render.
+export type Keyed = SubmittersState & { url: string | null };
+
+/** What a load outcome does to the state for `url`: success replaces; failure keeps only `url`'s own
+ *  last data (this url's prior state or its cache entry), never another url's. */
+export function settle(prev: Keyed, url: string, v: SubmittersWindow | null, cached: SubmittersWindow | null): Keyed {
+  if (v) return { url, data: v, error: false };
+  return { url, data: (prev.url === url ? prev.data : null) ?? cached, error: true };
+}
+
+/** What the hook returns for `url`: its own state, else its cache entry, never another url's data. */
+export function view(state: Keyed, url: string | null, cached: SubmittersWindow | null): SubmittersState {
+  if (!url) return { data: null, error: false };
+  return state.url === url ? { data: state.data, error: state.error } : { data: cached, error: false };
+}
+
 interface Slot { at: number; data: SubmittersWindow }
 const cache = new Map<string, Slot>();
 const inflight = new Map<string, Promise<SubmittersWindow | null>>();
@@ -49,10 +66,10 @@ function fresh(url: string): SubmittersWindow | null {
 export default function useSubmitters(q: SubmittersQuery | null, who: string): SubmittersState {
   const url = q ? submittersUrl(q) : null;
   useFeedRead(["api-submitters"], who, url != null);
-  const [state, setState] = useState<SubmittersState>(() => ({ data: url ? (cache.get(url)?.data ?? null) : null, error: false }));
+  const [state, setState] = useState<Keyed>(() => ({ url, data: url ? (cache.get(url)?.data ?? null) : null, error: false }));
   useEffect(() => {
     if (!url) {
-      setState({ data: null, error: false });
+      setState({ url: null, data: null, error: false });
       return;
     }
     touchPoll("api-submitters");
@@ -60,7 +77,7 @@ export default function useSubmitters(q: SubmittersQuery | null, who: string): S
     const pull = () => {
       const hit = fresh(url);
       if (hit) {
-        setState({ data: hit, error: false });
+        setState({ url, data: hit, error: false });
         return;
       }
       let p = inflight.get(url);
@@ -70,7 +87,7 @@ export default function useSubmitters(q: SubmittersQuery | null, who: string): S
       }
       p.then((v) => {
         if (dead) return;
-        setState((prev) => (v ? { data: v, error: false } : { data: prev.data ?? cache.get(url)?.data ?? null, error: true }));
+        setState((prev) => settle(prev, url, v, cache.get(url)?.data ?? null));
       });
     };
     pull();
@@ -80,5 +97,5 @@ export default function useSubmitters(q: SubmittersQuery | null, who: string): S
       clearInterval(t);
     };
   }, [url]);
-  return url ? state : { data: null, error: false };
+  return view(state, url, url ? (cache.get(url)?.data ?? null) : null);
 }
