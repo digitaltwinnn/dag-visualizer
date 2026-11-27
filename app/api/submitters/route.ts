@@ -50,6 +50,6 @@ export async function GET(req: Request) {
       { headers: CACHE },
     );
   } catch {
-    return NextResponse.json({ error: "submitters store unavailable" }, { status: 503 });
+    return NextResponse.json({ error: "submitters store unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 }
