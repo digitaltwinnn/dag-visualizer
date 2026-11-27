@@ -23,6 +23,19 @@ export function parseDedLatest(body: unknown): Record<string, string> {
   return out;
 }
 
+/** orgId → name from dagscan's evidence summary `{ orgs: [{ orgId, name, … }] }` (the one-off
+ *  seed, `scripts/seed-ded-names.ts`); an entry without both is skipped. */
+export function parseDagscanSummary(body: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!isObj(body) || !Array.isArray(body.orgs)) return out;
+  for (const e of body.orgs) {
+    if (!isObj(e)) continue;
+    const id = text(e.orgId), name = text(e.name);
+    if (id && name) out[id] = name;
+  }
+  return out;
+}
+
 function stored(v: string | undefined): { name: string; source: NameSource } | null {
   if (v == null) return null;
   try {

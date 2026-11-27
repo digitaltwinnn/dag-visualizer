@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runSubmitters, type SubmittersDeps } from "./runSubmitters";
+import { runSubmitters, walkRange, type SubmittersDeps, type WalkDeps } from "./runSubmitters";
 import { subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
 import { DED_ID } from "@/src/data/submitters";
 import type { MetaRec } from "../trends/bucketing";
@@ -248,5 +248,140 @@ describe("runSubmitters", () => {
     const res = await runSubmitters(deps(store, { dedLatest: async () => { throw new Error("ded down"); } }));
     expect(res.names).toBe(0);
     expect(span(store)!.get("cursor")).toBe("1129");
+  });
+});
+
+// THE BACK-FILL WALK (`walkRange`, `scripts/walk-submitters.ts`): oldest hour first up to the
+// sampler's span.from, SETS not increments, each day's 1d recomputed from its stored 1h fields.
+describe("walkRange", () => {
+  const DAY = 24 * HOUR;
+  const D0 = Date.UTC(2026, 10, 25), D1 = D0 + DAY, D2 = D1 + DAY;
+  /** One record every 10 minutes from D0 00:00 to D2 14:00 (ordinals 5000 … 5372). */
+  const W: MetaRec[] = Array.from({ length: 373 }, (_, i) => ({ ordinal: 5000 + i, timestamp: new Date(D0 + i * 10 * MIN).toISOString() }));
+  const wTs = (o: number) => Date.parse(W[o - 5000].timestamp);
+  const NOW_W = D2 + 14 * HOUR + 10 * MIN;
+  const SPAN_FROM = D2 + 13 * HOUR; // the sampler's first run: the start of the previous hour
+
+  const wPager = async (_id: string, limit: number, next?: string): Promise<ChainPage<MetaRec>> => {
+    const all = W.slice().reverse();
+    const off = next ? Number(next) : 0;
+    return { data: all.slice(off, off + limit), next: off + limit < all.length ? String(off + limit) : undefined };
+  };
+  /** An inclusive cursor ON the oldest record at/after `ms`; undefined: all older; null: none older. */
+  const cursorAt = async (_net: string, ms: number): Promise<string | undefined | null> => {
+    if (Date.parse(W[0].timestamp) >= ms) return null;
+    const nf = W.slice().reverse();
+    const firstOlder = nf.findIndex((r) => Date.parse(r.timestamp) < ms);
+    return firstOlder === 0 ? undefined : String(firstOlder - 1);
+  };
+  /** The walk never reads a record the sampler owns: such a read fails the walk. */
+  const walkSnap = async (_net: string, o: number) => {
+    if (wTs(o) >= SPAN_FROM) throw new Error(`read a sampler record: ${o}`);
+    return root(o);
+  };
+  const wdeps = (store: TrendsStore, over: Partial<WalkDeps> = {}): WalkDeps => ({
+    store, pageMeta: wPager, cursorAt, fetchSnap: walkSnap, pool: 3, sleep: async () => {}, ...over,
+  });
+  async function sampled() {
+    const store = memStore();
+    await runSubmitters({ store, nets: [DED_ID], pageMeta: wPager, fetchSnap: async (_n, o) => root(o), now: () => NOW_W });
+    return store;
+  }
+  const field = (s: ReturnType<typeof memStore>, tier: "1h" | "1d", ts: number, id: string) => {
+    const { key, bucket } = subSlotOf(DED_ID, tier, ts);
+    return s.data.get(key)?.get(`${bucket}|${id}`);
+  };
+  const sum1h = (s: ReturnType<typeof memStore>, day: number, id: string) => {
+    let t = 0;
+    for (let h = 0; h < 24; h++) t += Number(field(s, "1h", day + h * HOUR, id) ?? 0);
+    return String(t);
+  };
+  const progress = () => {};
+
+  it("writes each hour as a SET of its tally, never reads or writes an hour the sampler owns, and a rerun changes nothing", async () => {
+    const store = await sampled();
+    expect(span(store)!.get("from")).toBe(String(SPAN_FROM));
+    const samplerHours = [13, 14].map((h) => [field(store, "1h", D2 + h * HOUR, "o1"), field(store, "1h", D2 + h * HOUR, "o2")]);
+    expect(samplerHours).toEqual([["12", "3"], ["2", undefined]]); // 14:00 is ordinal 5372, even
+
+    const days: number[] = [];
+    const res = await walkRange(wdeps(store), DED_ID, D0, SPAN_FROM, (p) => days.push(p.tsMs));
+    expect(res.failedAt).toBeNull();
+    expect(res.nextMs).toBe(SPAN_FROM);
+    expect(res.read).toBe(2 * 144 + 13 * 6);
+    expect(days).toEqual([D1, D2, SPAN_FROM]); // progress once a day
+    // 6 records an hour: 12 batches by o1, 3 by o2 (odd ordinals).
+    expect(field(store, "1h", D0, "o1")).toBe("12");
+    expect(field(store, "1h", D0, "o2")).toBe("3");
+    expect(field(store, "1h", D2 + 12 * HOUR, "o1")).toBe("12");
+    // The sampler's hours untouched.
+    expect([13, 14].map((h) => [field(store, "1h", D2 + h * HOUR, "o1"), field(store, "1h", D2 + h * HOUR, "o2")])).toEqual(samplerHours);
+    // 1d = Σ1h, the boundary day's from ALL its hours (the sampler's included).
+    for (const d of [D0, D1, D2]) for (const id of ["o1", "o2"]) expect(field(store, "1d", d, id)).toBe(sum1h(store, d, id));
+    expect(field(store, "1d", D0, "o1")).toBe("288");
+    expect(field(store, "1d", D2, "o1")).toBe(String(85 * 2));
+
+    const once = subData(store);
+    await walkRange(wdeps(store), DED_ID, D0, SPAN_FROM, progress);
+    expect(subData(store)).toEqual(once);
+  });
+
+  it("a walk stopped by a failed read leaves 1d = Σ1h, and resumed at its hour equals one uninterrupted walk", async () => {
+    const clean = await sampled();
+    await walkRange(wdeps(clean), DED_ID, D0, SPAN_FROM, progress);
+
+    const store = await sampled();
+    const BAD = 5000 + 144 + 5 * 6 + 2; // D1 05:20
+    const res = await walkRange(wdeps(store, { fetchSnap: async (n, o) => { if (o === BAD) throw new Error("L0 502"); return walkSnap(n, o); } }), DED_ID, D0, SPAN_FROM, progress);
+    expect(res.failedAt).toBe(BAD);
+    expect(res.nextMs).toBe(D1 + 5 * HOUR);
+    expect(res.lowered).toBe(false);
+    expect(span(store)!.get("from")).toBe(String(SPAN_FROM));
+    expect(field(store, "1h", D1 + 5 * HOUR, "o1")).toBeUndefined(); // the failed hour is not written
+    expect(field(store, "1d", D1, "o1")).toBe(sum1h(store, D1, "o1"));
+    expect(field(store, "1d", D1, "o1")).toBe(String(5 * 12));
+
+    const res2 = await walkRange(wdeps(store), DED_ID, D0, SPAN_FROM, progress, res.nextMs);
+    expect(res2.failedAt).toBeNull();
+    expect(res2.lowered).toBe(true);
+    expect(subData(store)).toEqual(subData(clean));
+    expect(span(store)).toEqual(span(clean));
+  });
+
+  it("span.from moves to the walk's start only once the walk reaches it; to and cursor stay the sampler's", async () => {
+    const store = await sampled();
+    const before = new Map(span(store)!);
+    const short = await walkRange(wdeps(store), DED_ID, D0, D1, progress);
+    expect(short.lowered).toBe(false);
+    expect(span(store)).toEqual(before);
+
+    const full = await walkRange(wdeps(store), DED_ID, D0, SPAN_FROM, progress);
+    expect(full.lowered).toBe(true);
+    expect(span(store)!.get("from")).toBe(String(D0));
+    expect(span(store)!.get("to")).toBe(before.get("to"));
+    expect(span(store)!.get("cursor")).toBe(before.get("cursor"));
+  });
+
+  it("never walks past span.from, whatever toMs asks", async () => {
+    const store = await sampled();
+    const res = await walkRange(wdeps(store), DED_ID, D0, NOW_W, progress);
+    expect(res.failedAt).toBeNull(); // walkSnap would have failed on a sampler record
+    expect(res.nextMs).toBe(SPAN_FROM);
+    expect(res.lowered).toBe(true);
+  });
+
+  it("recomputes the boundary day and lowers the span under the sampler's lock, waiting for it", async () => {
+    const store = await sampled();
+    store.locked = true;
+    let waits = 0;
+    const res = await walkRange(wdeps(store, { sleep: async () => { waits++; store.locked = false; } }), DED_ID, D2, SPAN_FROM, progress);
+    expect(waits).toBe(1);
+    expect(res.lowered).toBe(true);
+    expect(store.locked).toBe(false);
+    expect(field(store, "1d", D2, "o1")).toBe(sum1h(store, D2, "o1"));
+  });
+
+  it("refuses without a measured span: the sampler must run first", async () => {
+    await expect(walkRange(wdeps(memStore()), DED_ID, D0, SPAN_FROM, progress)).rejects.toThrow(/span/);
   });
 });

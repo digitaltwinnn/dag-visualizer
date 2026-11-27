@@ -39,7 +39,7 @@ import { listSince, type ChainPage } from "../trends/fetchSince";
 import type { TrendsStore, TrendsWrite } from "../trends/store";
 import { DED_ID } from "@/src/data/submitters";
 import { bucketSubmitters, nextSpan } from "./bucket";
-import { subLockKeyOf, subNamesKeyOf, subSpanKeyOf } from "./keys";
+import { subField, subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
 import { mergeNames, parseDedLatest } from "./names";
 import { readL0Snapshots } from "./readL0";
 
@@ -94,9 +94,40 @@ async function listFromHour(page: (limit: number, next?: string) => Promise<Chai
   return all.filter((r) => Date.parse(r.timestamp) >= boundaryMs).reverse();
 }
 
+type Tally = { id: string; updates: number }[];
+
+/** The records' snapshots read from L0 (`readL0Snapshots`' contiguous prefix), each summed into its
+ *  submitters' updates. A snapshot that cannot be decoded ends the prefix like a failed read. The
+ *  sampler and the back-fill walk count through this one door. */
+async function readTallies(
+  recs: MetaRec[],
+  net: string,
+  fetchSnap: (ordinal: number) => Promise<unknown>,
+  pool: number,
+  shouldStop?: () => boolean,
+): Promise<{ read: { rec: MetaRec; tally: Tally }[]; failedAt: number | null }> {
+  const got = await readL0Snapshots(recs, fetchSnap, pool, shouldStop);
+  let failedAt = got.failedAt;
+  const read: { rec: MetaRec; tally: Tally }[] = [];
+  for (const { rec, root } of got.read) {
+    let tally: Map<string, number>;
+    try {
+      tally = new Map();
+      for (const row of decodeSnapshotRoot(root, net).dataBlockRows) {
+        for (const s of row.submitters ?? []) tally.set(s.id, (tally.get(s.id) ?? 0) + s.updates);
+      }
+    } catch {
+      failedAt = rec.ordinal;
+      break;
+    }
+    read.push({ rec, tally: [...tally].map(([id, updates]) => ({ id, updates })) });
+  }
+  return { read, failedAt };
+}
+
 interface NetRun {
   net: string;
-  read: { rec: MetaRec; tally: { id: string; updates: number }[] }[];
+  read: { rec: MetaRec; tally: Tally }[];
   failedAt: number | null;
   span: { from: number; to: number; cursor: number } | null;
 }
@@ -119,22 +150,7 @@ async function runNet(deps: SubmittersDeps, net: string, prevSpan: Record<string
   }
   batch = batch.slice(0, deps.maxRecs ?? 4000);
 
-  const got = await readL0Snapshots(batch, (o) => deps.fetchSnap(net, o), deps.pool ?? 8, () => deps.now() >= deadlineMs);
-  let failedAt = got.failedAt;
-  const read: NetRun["read"] = [];
-  for (const { rec, root } of got.read) {
-    let tally: Map<string, number>;
-    try {
-      tally = new Map();
-      for (const row of decodeSnapshotRoot(root, net).dataBlockRows) {
-        for (const s of row.submitters ?? []) tally.set(s.id, (tally.get(s.id) ?? 0) + s.updates);
-      }
-    } catch {
-      failedAt = rec.ordinal; // a snapshot we cannot decode ends the prefix like a failed read
-      break;
-    }
-    read.push({ rec, tally: [...tally].map(([id, updates]) => ({ id, updates })) });
-  }
+  const { read, failedAt } = await readTallies(batch, net, (o) => deps.fetchSnap(net, o), deps.pool ?? 8, () => deps.now() >= deadlineMs);
   if (!read.length) return { net, read, failedAt, span: null };
 
   const last = read[read.length - 1].rec;
@@ -201,4 +217,172 @@ export async function runSubmitters(deps: SubmittersDeps): Promise<SubmittersRes
   } finally {
     await store.releaseLock(subLockKeyOf());
   }
+}
+
+// ---- THE BACK-FILL WALK (`scripts/walk-submitters.ts`) ------------------------------------------
+// The sampler measures forward from its first run; the walk measures the hours BEFORE it, oldest
+// first, and hands them to the sampler's span. Its write discipline:
+// - It never reads or writes an hour at or after span.from: the sampler owns those. The walk ends on
+//   the hour edge at or below span.from, whatever `toMs` asks.
+// - An hour is written as a SET of that hour's full tally (`hset`), never an increment, so a rerun
+//   (or a resume over an hour already written) writes the same values: idempotent.
+// - After each day it walked (and where it stops), the day's 1d fields are SET to the sum of ALL its
+//   1h fields read back from the store — the 1d = Σ1h invariant (`bucket.ts`), including, on the
+//   boundary day, the sampler's own hours. That day's read-and-set runs under the sampler's lock,
+//   or a sampler run between the read and the write would be lost from the day.
+// - span.from is lowered to the walk's start only when the walk reached span.from CONTIGUOUSLY (no
+//   failed hour between; a resumed walk passes the original start and `resumeMs`), under the same
+//   lock — the sampler rewrites the span hash every run from what it read. A span.from that moved
+//   meanwhile (the sampler restarted its span after a gap) is left alone: the walk no longer meets it.
+// - A failed read (the caller retries before it fails — the script wraps its reads in `retrying`)
+//   stops the walk at that hour: `nextMs` is where a resume starts, nothing at or after it written.
+
+export interface WalkDeps extends Pick<SubmittersDeps, "store" | "pageMeta" | "fetchSnap" | "pool"> {
+  /** A `pageMeta` cursor landing ON the oldest record at/after `ms` (inclusive, the crafted
+   *  `{hash}` cursor); undefined when every record is older (page from the tip); null when none is. */
+  cursorAt(net: string, ms: number): Promise<string | undefined | null>;
+  /** Waits between lock attempts (default a real timer). */
+  sleep?(ms: number): Promise<void>;
+}
+
+export interface WalkResult {
+  /** The walk's frontier: every hour before it is written; a resume starts here. */
+  nextMs: number;
+  /** The ordinal whose read failed (-1: a list read), null when the walk ran to its end. */
+  failedAt: number | null;
+  /** Whether span.from was lowered to the walk's start. */
+  lowered: boolean;
+  /** Snapshots read (and counted) this walk. */
+  read: number;
+}
+
+const DAY_MS = 24 * HOUR_MS;
+const WALK_PAGE = 1000;
+const LOCK_WAIT_MS = 15000;
+const LOCK_TRIES = 80; // 20 minutes — many sampler runs' worth
+
+/** Runs `fn` holding the sampler's lock, waiting for a run that holds it. */
+export async function withSubmittersLock<T>(store: TrendsStore, fn: () => Promise<T>, sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms))): Promise<T> {
+  for (let i = 0; !(await store.acquireLock(subLockKeyOf(), LOCK_TTL_S)); i++) {
+    if (i >= LOCK_TRIES) throw new Error("the submitters sampler's lock stayed held");
+    await sleep(LOCK_WAIT_MS);
+  }
+  try {
+    return await fn();
+  } finally {
+    await store.releaseLock(subLockKeyOf());
+  }
+}
+
+/** The records with `a ≤ ts < b`, oldest first: paged newest-first from the cursor at `b`. */
+async function listWindow(deps: WalkDeps, net: string, a: number, b: number): Promise<MetaRec[]> {
+  const seed = await deps.cursorAt(net, b);
+  if (seed === null) return [];
+  const out: MetaRec[] = [];
+  let res = await deps.pageMeta(net, WALK_PAGE, seed);
+  for (;;) {
+    for (const r of res.data) {
+      const t = Date.parse(r.timestamp);
+      if (t >= a && t < b) out.push(r);
+    }
+    const oldest = res.data[res.data.length - 1];
+    if (!oldest || Date.parse(oldest.timestamp) < a || !res.next) break;
+    res = await deps.pageMeta(net, WALK_PAGE, res.next);
+  }
+  return out.reverse();
+}
+
+/** The day's 1d fields as the sum of every 1h field of that day in the store. */
+async function dayWrite(store: TrendsStore, net: string, dayMs: number): Promise<TrendsWrite | null> {
+  const h1 = subSlotOf(net, "1h", dayMs);
+  const day = h1.bucket.slice(0, 2); // the "DD" of "DD-HH"
+  const sums = new Map<string, number>();
+  for (const [f, v] of Object.entries((await store.hgetall(h1.key)) ?? {})) {
+    const bar = f.indexOf("|"); // split on the bar, never a prefix match (the read route's rule)
+    if (bar < 0 || f.slice(0, bar).split("-")[0] !== day) continue;
+    const id = f.slice(bar + 1);
+    if (id) sums.set(id, (sums.get(id) ?? 0) + Number(v));
+  }
+  if (!sums.size) return null;
+  const d1 = subSlotOf(net, "1d", dayMs);
+  const map: Record<string, number> = {};
+  for (const [id, n] of sums) map[subField(d1.bucket, id)] = n;
+  return { key: d1.key, map, ttlS: null };
+}
+
+export async function walkRange(
+  deps: WalkDeps,
+  net: string,
+  fromMs: number,
+  toMs: number,
+  onProgress: (p: { ordinal: number; tsMs: number; read: number }) => void,
+  resumeMs: number = fromMs,
+): Promise<WalkResult> {
+  const { store } = deps;
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  if (fromMs % HOUR_MS || resumeMs % HOUR_MS) throw new Error("walkRange: from and resume must be hour edges");
+  const spanFrom = Number((await store.hgetall(subSpanKeyOf(net)))?.from ?? NaN);
+  if (!Number.isFinite(spanFrom)) throw new Error(`walkRange: ${net} has no measured span — the sampler must run first`);
+  const endMs = Math.min(Math.floor(toMs / HOUR_MS) * HOUR_MS, Math.floor(spanFrom / HOUR_MS) * HOUR_MS);
+  const samplerDay = Math.floor(spanFrom / DAY_MS) * DAY_MS;
+
+  // A day's 1d recompute; the boundary day's (plus, when the walk reached span.from, the lowering)
+  // under the sampler's lock, in one transaction.
+  const flushDay = async (dayMs: number, lower: boolean): Promise<boolean> => {
+    if (dayMs !== samplerDay && !lower) {
+      const w = await dayWrite(store, net, dayMs);
+      if (w) await store.applyWrites([w]);
+      return false;
+    }
+    return withSubmittersLock(store, async () => {
+      const writes: TrendsWrite[] = [];
+      const w = await dayWrite(store, net, dayMs);
+      if (w) writes.push(w);
+      const now = (await store.hgetall(subSpanKeyOf(net))) ?? {};
+      const lowered = lower && Number(now.from) === spanFrom && fromMs < spanFrom;
+      if (lowered) writes.push({ key: subSpanKeyOf(net), map: { from: fromMs }, ttlS: null });
+      if (writes.length) await store.applyWrites(writes);
+      return lowered;
+    }, sleep);
+  };
+
+  let cur = Math.max(resumeMs, fromMs);
+  let read = 0;
+  let lastOrdinal = -1;
+  while (cur < endMs) {
+    const dayMs = Math.floor(cur / DAY_MS) * DAY_MS;
+    const dayEnd = Math.min(dayMs + DAY_MS, endMs);
+    let recs: MetaRec[];
+    try {
+      recs = await listWindow(deps, net, cur, dayEnd);
+    } catch {
+      if (cur > dayMs) await flushDay(dayMs, false);
+      return { nextMs: cur, failedAt: -1, lowered: false, read };
+    }
+    let i = 0;
+    for (let h = cur; h < dayEnd; h += HOUR_MS) {
+      const hourRecs: MetaRec[] = [];
+      while (i < recs.length && Date.parse(recs[i].timestamp) < h + HOUR_MS) hourRecs.push(recs[i++]);
+      const got = await readTallies(hourRecs, net, (o) => deps.fetchSnap(net, o), deps.pool ?? 8);
+      if (got.failedAt != null) {
+        if (h > dayMs) await flushDay(dayMs, false);
+        return { nextMs: h, failedAt: got.failedAt, lowered: false, read };
+      }
+      const inc = new Map<string, number>();
+      for (const { tally } of got.read) for (const { id, updates } of tally) inc.set(id, (inc.get(id) ?? 0) + updates);
+      if (inc.size) {
+        const { key, bucket } = subSlotOf(net, "1h", h);
+        await store.hset(key, Object.fromEntries([...inc].map(([id, n]) => [subField(bucket, id), n])));
+      }
+      read += got.read.length;
+      if (hourRecs.length) lastOrdinal = hourRecs[hourRecs.length - 1].ordinal;
+      cur = h + HOUR_MS;
+    }
+    const lowered = await flushDay(dayMs, cur === spanFrom);
+    onProgress({ ordinal: lastOrdinal, tsMs: cur, read });
+    if (cur === spanFrom) return { nextMs: cur, failedAt: null, lowered, read };
+  }
+  // Nothing left to walk: a resume that starts on span.from still owes the lowering.
+  const lowered = cur === spanFrom && endMs === spanFrom ? await flushDay(Math.floor((spanFrom - 1) / DAY_MS) * DAY_MS, true) : false;
+  return { nextMs: cur, failedAt: null, lowered, read };
 }

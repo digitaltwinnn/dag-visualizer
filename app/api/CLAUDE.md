@@ -179,6 +179,18 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   History reads as measured. DED's names come from DED's public API (`/v1/fingerprints/latest`), once a
   run. Production-only and fail-closed like the trends sampler; no `force-dynamic`, which would bypass
   the `unstable_cache` behind `cachedL0Url`.
+  **Back-filling submitters** is `scripts/walk-submitters.ts --net=ded|dor [--from=YYYY-MM-DD]`
+  (defaults: DED 2025-09-15, Dor today − 90 days), a thin CLI over `walkRange` (`runSubmitters.ts`,
+  where the discipline is tested): oldest hour first up to the span's `from` and NEVER past it — the
+  sampler owns those hours; each hour written as a SET of its full tally, so a rerun is idempotent;
+  each day's 1d recomputed from ALL its stored 1h fields (1d = Σ1h, the boundary day's sampler hours
+  included, under the sampler's lock); `from` lowered to the walk's start only once the walk reaches it
+  contiguously, under the same lock. A day's records are found by seeking (`seekBoundary` + a crafted
+  `{hash}` cursor, the trends fill's), since the list pages only from its tip. A read that still fails
+  after `retrying` stops the walk at its hour; the state file (`.walk-submitters.<net>.json`,
+  gitignored) resumes it. Run it AFTER the sampler's first run (no span, it refuses). DED's names
+  for organisations that stopped before the sampler started come from `scripts/seed-ded-names.ts`, a
+  one-off read of dagscan's evidence summary merged as source `dagscan` (never over a `ded` name).
 - **`/api/notes`, `/api/notes/request`, `/api/notes/warm`** (2026-10-27) are the AI notes: a few
   sentences a paid model (the Constellation Gate, `GATE_API_KEY`, `GATE_MODEL`, default `z-ai/glm-5-3-flash` with thinking held low, `gate.ts`) writes about the
   figures a view is showing. Notes live in

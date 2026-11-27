@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mergeNames, parseDedLatest } from "./names";
+import { mergeNames, parseDagscanSummary, parseDedLatest } from "./names";
 
 const T0 = Date.UTC(2026, 10, 27, 14, 0);
 const T1 = T0 + 3600000;
@@ -13,6 +13,16 @@ describe("parseDedLatest", () => {
     expect(parseDedLatest(null)).toEqual({});
     expect(parseDedLatest({ data: "no" })).toEqual({});
     expect(parseDedLatest({ data: [null, 3, { orgId: "", orgName: "Blank" }, { orgId: "a", orgName: "" }] })).toEqual({});
+  });
+});
+
+describe("parseDagscanSummary", () => {
+  it("maps orgs[].orgId to orgs[].name and skips an entry without both", () => {
+    expect(parseDagscanSummary({ orgs: [{ orgId: "c98", name: "Open Poker", batches24h: 1 }, { orgId: "x" }, { name: "Nameless" }, 7] })).toEqual({ c98: "Open Poker" });
+  });
+  it("answers nothing for a body of another shape", () => {
+    expect(parseDagscanSummary(null)).toEqual({});
+    expect(parseDagscanSummary({ orgs: "no" })).toEqual({});
   });
 });
 
