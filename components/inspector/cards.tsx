@@ -25,7 +25,7 @@ import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveReach, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName } from "@/components/useNodeNames";
 import { POLL } from "@/src/engine/config";
-import { cap, Desc, foldLabel, StatusMark, RoleChips, IdentityDot, metaKindWord, Fact, FactGroup, Foot, FootRow, LayerWho, ScheduleTable, partShade, Lead, Empty, QualifierChip, LayerCells, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
+import { cap, Desc, foldLabel, StatusMark, RoleChips, IdentityDot, metaKindWord, Fact, FactGroup, Foot, FootRow, LayerWho, ScheduleTable, partShade, Lead, Empty, QualifierChip, LayerCells, Door, SectionLabel, shareWords, activeSubmitterRows, UnitMarks, TableHead, TABLE_ROW, CUT_ROW, figWidth, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { netKeyOf, pickNetId } from "@/src/engine/domain/pickActions";
@@ -35,6 +35,10 @@ import FollowControl from "@/components/FollowControl";
 import { NODE_ID_GLYPHS, networkMark } from "@/components/explorer/nodeRow";
 import { IDENT_INK } from "@/components/identInk";
 import { useFeedRead } from "@/components/useFeedRead";
+import useSubmitters from "@/components/useSubmitters";
+import { SUBMITTERS } from "@/src/data/submitters";
+import { submitterHudCss } from "@/src/palette/submitterHue";
+import { utcMonthYear } from "@/src/util/localTime";
 import SubjectNote from "@/components/notes/SubjectNote";
 import { countryNoteReq, providerNoteReq, typeNoteReq } from "@/components/notes/subjectNote";
 import { useNoteScopeNetwork } from "@/components/notes/useAiNote";
@@ -506,6 +510,60 @@ function ArchivalAcquiring() {
   );
 }
 
+// WHO SUBMITTED THE LAST 24 HOURS (2026-11-27): a network that names its data's submitters carries
+// them on its dossier, in every view (user: last 24 hours always). Digital Evidence's organisations
+// are a ScheduleGroup under Online nodes — named rows in the History card's row pieces (CUT_ROW,
+// UnitMarks, TableHead) — and Dor's devices, counted and never named, are one Fact. Not yet read is
+// the card's stars, not measured is its dash, a failed read says nothing (rule 10: never a 0).
+// Its own component so the hook (and its fetch) exists only for a network with a `SUBMITTERS` row.
+function ActiveSubmitters({ id }: { id: string }) {
+  const { data, error } = useSubmitters({ net: id, window: "24h" }, "MetaCard");
+  const org = SUBMITTERS[id]!.kind === "organisation";
+  const label = org ? "Active organisations" : "Active devices";
+  const count = data?.rangeDistinct ?? null;
+  const rows = useMemo(() => (data && org && count != null ? activeSubmitterRows(data) : []), [data, org, count]);
+  if (!data && error) return null; // a failed read says nothing
+  if (!data)
+    return (
+      <div className="mt-1">
+        <Fact label={label}><NodeStars count={3} /></Fact>
+      </div>
+    );
+  return (
+    <div className="mt-1">
+      {org && rows.length > 0 ? (
+        <>
+          <ScheduleGroup label={label} value={<b className="font-mono font-bold">{count!.toLocaleString()}</b>}>
+            <div className="flex flex-col text-label" style={figWidth(rows.map((r) => r.updates.toLocaleString()))}>
+              <TableHead name="Name" figure="Batches" />
+              {rows.map((r) => {
+                const color = submitterHudCss(r.id, data.palette);
+                return (
+                  <div key={r.id} className={cn(CUT_ROW, TABLE_ROW)}>
+                    <span className="min-w-0 inline-flex items-center gap-1.5">
+                      <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full flex-none" style={{ background: color }} />
+                      <span className="min-w-0 truncate text-foreground-dim">{r.label}</span>
+                    </span>
+                    <UnitMarks count={0} color={color} units={false} frac={r.share} />
+                    <span className="font-mono tabular-nums text-right text-foreground">{r.updates.toLocaleString()}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </ScheduleGroup>
+          {data.seenTotal > 0 && (
+            <p className="m-0 mt-1 text-label text-muted-foreground tabular-nums">
+              {`${data.seenTotal.toLocaleString()} seen${data.firstSeenMs != null ? ` since ${utcMonthYear(data.firstSeenMs)}` : ""}`}
+            </p>
+          )}
+        </>
+      ) : (
+        <Fact label={label}>{count != null ? <b className="font-mono font-bold">{count.toLocaleString()}</b> : <Empty why="Not measured over the last 24 hours" />}</Fact>
+      )}
+    </div>
+  );
+}
+
 // The metagraph context pane (top-right "context" slot): identity only — description,
 // make-up rows, website. Its live/economic counterpart is the top-bar vitals (filter-aware
 // "live activity"), so the dossier stays a stable identity card.
@@ -663,6 +721,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           )}
         </>
       )}
+      {Object.hasOwn(SUBMITTERS, cfg.id) && <ActiveSubmitters id={cfg.id} />}
       {/* The ZERO-FLEET archival reading — the DAG dossier always lands here (its roster
           isn't `nodes`), and a catalog metagraph whose live fleet reads 0 keeps its census
           data too (review find, 2026-09-11: the old fleet-gated block silently dropped a

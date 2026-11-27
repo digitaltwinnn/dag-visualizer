@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { metaKindWord, shareWords, countable } from "./parts";
+import { metaKindWord, shareWords, countable, activeSubmitterRows } from "./parts";
 
 // The lead sentences state a share in words, so rounding must never make them false.
 describe("shareWords", () => {
@@ -39,5 +39,21 @@ describe("metaKindWord — the one qualifier the Metagraph head's pill shows", (
   });
   it("has no word for an unknown type: the eyebrow already says metagraph", () => {
     expect(metaKindWord("x", [])).toBeNull();
+  });
+});
+
+// THE METAGRAPH CARD'S ACTIVE ORGANISATIONS (2026-11-27): the last 24 hours' organisations, busiest
+// first, each its share of the window's batches; an unnamed one reads "Org <first 8 of id>".
+describe("activeSubmitterRows", () => {
+  const w = (totals: { id: string; updates: number }[], names: Record<string, string> = {}) => ({ totals, names }) as never;
+  it("keeps the busiest-first order and takes each share of the window total", () => {
+    const rows = activeSubmitterRows(w([{ id: "aaaaaaaa11", updates: 3 }, { id: "bbbbbbbb22", updates: 1 }], { aaaaaaaa11: "Acme" }));
+    expect(rows).toEqual([
+      { id: "aaaaaaaa11", label: "Acme", updates: 3, share: 0.75 },
+      { id: "bbbbbbbb22", label: "Org bbbbbbbb", updates: 1, share: 0.25 },
+    ]);
+  });
+  it("has no rows, and no NaN share, for an empty window", () => {
+    expect(activeSubmitterRows(w([]))).toEqual([]);
   });
 });

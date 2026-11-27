@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
-import { bucketStamp, rangeDays, recordStamp, stampParts, titleStampParts, utcDayKey, utcStamp } from "./localTime";
+import { bucketStamp, rangeDays, recordStamp, stampParts, titleStampParts, utcDayKey, utcMonthYear, utcStamp } from "./localTime";
 
 // ONE RULE FOR EVERY DATE THE APP WRITES (user, 2026-10-07 — "so any figure shown with days will be
 // UTC right? … if a user shares a screenshot it should be the same for other users. If we show a
@@ -93,5 +93,12 @@ describe("titleStampParts — the title's date over its clock", () => {
   });
   it("carries the year only when it is not the current one", () => {
     expect(titleStampParts(Date.UTC(2025, 8, 14, 14, 4), { now: Date.UTC(2026, 9, 7) }).date).toBe("Sep 14, 2025");
+  });
+});
+
+describe("utcMonthYear — a day-only label is a UTC day", () => {
+  it("names the UTC month whatever the reader's zone", () => {
+    expect(utcMonthYear(Date.UTC(2026, 10, 1, 0, 30))).toBe("Nov 2026");
+    expect(utcMonthYear(Date.UTC(2026, 9, 31, 23, 59))).toBe("Oct 2026");
   });
 });

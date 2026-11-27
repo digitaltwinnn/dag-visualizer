@@ -21,6 +21,11 @@ export function bucketStamp(ms: number, stepMs: number, opts: { year?: boolean }
   return new Date(ms).toLocaleString(undefined, { year, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
 }
 
+/** A month and year as a UTC day-only label ("Nov 2026"): the same for every reader. */
+export function utcMonthYear(ms: number): string {
+  return new Date(ms).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+}
+
 /** One sealed record, to the SECOND (the raw layer's rung: a batching network seals dozens inside
  *  one minute), in local time with its zone. */
 export function recordStamp(ms: number): string {

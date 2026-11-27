@@ -538,6 +538,15 @@ policy row, `viewPolicy.metagraphCard`** (PR review, 2026-10-19 — it had becom
 `mode === "geo"` compares): `railCards.metagraphCardNetwork` resolves it, and the card's × and
 the slot's hint read the same row.
 
+**The Metagraph card names who submitted the last 24 hours, for a network with a `SUBMITTERS` row**
+(2026-11-27; `ActiveSubmitters` in `inspector/cards.tsx`, the same in every view — last 24 hours
+always). Digital Evidence's organisations are a `ScheduleGroup` under Online nodes (header count =
+`rangeDistinct`, rows = the History card's own `CUT_ROW`/`UnitMarks`/`TableHead` pieces through
+`activeSubmitterRows`, then "N seen since Mon YYYY" in a UTC month); Dor's devices are one "Active
+devices" Fact, counted, never named. Not yet read is the stars, unmeasured is the dash, a failed read
+says nothing (rule 10); `useSubmitters` is called only inside that component, so no other network
+fetches.
+
 **The node card states the same facts in every view** (user, 2026-11-23; `GeoLiveNode`): place,
 host and ASN no longer yield to a committed country or provider card. A folded entry shows only its
 name, so under the pile rule the node's city and ASN were on screen nowhere. It is the one subject
