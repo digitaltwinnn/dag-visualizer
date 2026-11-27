@@ -56,6 +56,14 @@ import type { Fact } from "@/src/data/noteTypes";
 // Germany 33, down from 173" passes on the fleet's pair), and a current figure two pairs share
 // satisfies either ("Germany has 19 nodes, the US 33, down from 66" with both at 33). Adjacency
 // still costs some honest forms a retry: ends coordinated ("from 67 and 58 to 33 and 27").
+//
+// WHO MOVED (`actors`, 2026-11-27): inside one network's note, the names of who did the moving —
+// Digital Evidence's organisations. A `%` or `x` from a share or a change fact labelled with an actor
+// stands only in a sentence naming that actor ("Gate AI's batches rose 100%" on Open Poker's change
+// fails), and a sentence naming an actor cites only that actor's shares and changes, so a sentence
+// that also states the network's own change beside it is asked again. Plain COUNTS are not scoped:
+// "Gate AI sent 96 a day" on Open Poker's 96 passes, the gate's standing limit for counts. With no
+// actors (every other note) nothing here applies.
 
 export type NoteCheck = { ok: true } | { ok: false; reasons: string[] };
 
@@ -355,6 +363,11 @@ export interface CheckOptions {
    *  label carries this name. Absent for the whole network (`all` / `dag`), whose own ratios are
    *  the unattributed ones. */
   subject?: string;
+  /** ACTORS (2026-11-27): names, inside a network's note, of who did something — Digital Evidence's
+   *  organisations. A `%` or `x` from a share or a change fact whose label names an actor is backed
+   *  only in a sentence naming that actor, and a sentence naming an actor backs its `%` and `x` only
+   *  by facts labelled with it. Absent or empty, nothing changes. */
+  actors?: readonly string[];
 }
 
 export function checkNote(
@@ -384,9 +397,19 @@ export function checkNote(
   if (parts.length > maxSentences) reasons.push(`${parts.length} sentences, at most ${maxSentences}`);
 
   const ratios = facts.filter((f) => f.kind === "ratio");
+  const actors = opts?.actors?.filter((a) => a.trim()) ?? [];
   for (const sentence of parts) {
     // Names first: the ratio words below are held to the networks the sentence names.
     const named = names.filter((n) => hasName(sentence, n));
+    // WHO MOVED (`actors`): a share or a change is one actor's, and only a sentence naming it may cite it.
+    const actorsNamed = actors.filter((a) => hasName(sentence, a));
+    const factsHere = actors.length
+      ? facts.filter((f) => {
+          if (f.kind !== "share" && !f.move) return true;
+          const of = actors.filter((a) => hasName(f.label, a));
+          return actorsNamed.length ? of.some((a) => actorsNamed.includes(a)) : of.length === 0;
+        })
+      : facts;
     let s = stripNames(sentence).replace(LAYER_RE, " ");
     for (const re of dates) s = s.replace(re, " ");
 
@@ -404,13 +427,13 @@ export function checkNote(
     const toks = sharedUnits(digits, tokens(digits));
     // Every number to a CURRENT fact (any fact but a pair's `from` end); one that only a `from` end
     // backs is a past value, and its neighbour must be its pair's `to` end (R60, R63).
-    const current = facts.filter((f) => f.pair?.end !== "from");
+    const current = factsHere.filter((f) => f.pair?.end !== "from");
     const isCurrent = toks.map((t) => backed(t, current, own, dir));
-    const isPast = toks.map((t, k) => !isCurrent[k] && facts.some((f) => f.pair?.end === "from" && says(t, f, own, dir)));
+    const isPast = toks.map((t, k) => !isCurrent[k] && factsHere.some((f) => f.pair?.end === "from" && says(t, f, own, dir)));
     toks.forEach((t, k) => {
       if (isCurrent[k]) return;
       if (!isPast[k]) return void reasons.push(`"${t.raw}" is not backed by any measured fact`);
-      const why = pastReason(k, digits, toks, isPast, facts, own, dir);
+      const why = pastReason(k, digits, toks, isPast, factsHere, own, dir);
       if (why) reasons.push(why);
     });
     for (const m of s.matchAll(MOVED_BY_RE)) {

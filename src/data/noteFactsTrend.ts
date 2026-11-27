@@ -106,6 +106,9 @@ export interface TrendFacts {
   names: string[];
   /** "<name> is: <blurb>" lines for the networks a first / last day on the hypergraph names. */
   blurbs: string[];
+  /** The organisations the facts name (`submitterFacts`): the gate's ACTORS (`CheckOptions.actors`),
+   *  so a share or a change is said only of the organisation it belongs to. Absent when none. */
+  actors?: string[];
 }
 
 const TOP_NETWORKS = 3;
@@ -576,5 +579,6 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
   }
 
   if (unlisted) blurbs.push(UNLISTED_SET_BLURB);
-  return { facts, days, names: [...new Set([...Object.values(catalog), ...mentioned])], blurbs };
+  const actors = subs?.names ?? [];
+  return { facts, days, names: [...new Set([...Object.values(catalog), ...mentioned])], blurbs, ...(actors.length ? { actors } : {}) };
 }

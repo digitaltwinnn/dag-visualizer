@@ -59,7 +59,9 @@ export interface DataFactsInput {
   /** ONE NETWORK'S NOTE (catalog id, 2026-11-20): its own data blocks alone — no whole-network totals,
    *  no count of networks — and null when it carried none over the window (no note about nothing). */
   only?: string;
-  /** Organisation id → name (the `sub:` family's names hash), for the organisations `only` names. */
+  /** Organisation id → name (the `sub:` family's names hash), for the organisations `only` names.
+   *  Absent (not read), no organisation is stated: "Org <id>" is a label only where the hash was
+   *  read and holds no name. An empty hash is a read. */
   submitterNames?: Record<string, string>;
 }
 
@@ -83,13 +85,14 @@ function submitterFacts(input: DataFactsInput, read: DataTickRead[], id: string,
   if (!known) return { facts: [], names: [] };
   const least = floor ? ", at least" : "";
   if (spec.kind === "device") return { facts: [fact(`Devices that checked in, in the window${least}`, by.size, "count")], names: [] };
-  const names = input.submitterNames ?? {};
+  const names = input.submitterNames;
+  if (!names) return { facts: [], names: [] };
   const ranked = [...by].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
   const labels = ranked.map(([sid]) => submitterLabel(sid, names));
   return { facts: ranked.map(([, n], i) => fact(`${labels[i]} ${spec.unit} in the window${least}`, n, "count")), names: labels };
 }
 
-export function dataFacts(input: DataFactsInput): { facts: Fact[]; names: string[]; lead: NoteLead } | null {
+export function dataFacts(input: DataFactsInput): { facts: Fact[]; names: string[]; lead: NoteLead; actors?: string[] } | null {
   const read = input.ticks.filter((t) => t.rows != null);
   if (!read.length) return null;
   const facts: Fact[] = [];
@@ -137,5 +140,7 @@ export function dataFacts(input: DataFactsInput): { facts: Fact[]; names: string
   if (ids.length && !only) facts.push(fact("Networks that carried data blocks", ids.length, "count"));
   const subs = only && Object.hasOwn(SUBMITTERS, only) ? submitterFacts(input, read, only, by.get(only)!.floor) : null;
   if (subs) facts.push(...subs.facts);
-  return { facts, names: [...Object.values(input.names), ...(subs?.names ?? [])], lead: { kind: "now" } };
+  // The organisations named are the gate's actors (`CheckOptions.actors`), as History's are.
+  const actors = subs?.names ?? [];
+  return { facts, names: [...Object.values(input.names), ...actors], lead: { kind: "now" }, ...(actors.length ? { actors } : {}) };
 }

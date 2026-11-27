@@ -173,6 +173,29 @@ describe("generateNote", () => {
     expect(await lockFree()).toBe(true);
   });
 
+  // WHO MOVED (2026-11-27): the organisations the facts name reach the gate as its actors, so a change
+  // is said only of the organisation it belongs to.
+  it("holds a change to the organisation it belongs to: the facts' actors reach the gate", async () => {
+    const actorFacts: NoteFacts = {
+      ...FACTS,
+      facts: [
+        fact("Open Poker batches, per day, at the start of the span", 48, "count", undefined, { key: "Open Poker batches, per day", end: "from" }),
+        fact("Open Poker batches, per day, at the end of the span", 96, "count", undefined, { key: "Open Poker batches, per day", end: "to" }),
+        fact("Span length", 604_800, "duration"),
+      ],
+      names: ["Digital Evidence", "Open Poker", "Gate AI"],
+      label: "Digital Evidence",
+      subjectName: "Digital Evidence",
+      actors: ["Open Poker", "Gate AI"],
+    };
+    const wrong = "NOTE: Over the last 7 days, Gate AI's batches rose 100% to 96 per day.";
+    const d = deps({ facts: async () => structuredClone(actorFacts), answers: [wrong, wrong] });
+    expect(await generateNote(REQ, d, "read")).toEqual({ state: "unavailable" });
+    store = memoryNotesStore(); // the failure above holds its key for 15 minutes
+    const right = deps({ facts: async () => structuredClone(actorFacts), answers: ["NOTE: Over the last 7 days, Open Poker's batches rose 100% to 96 per day."] });
+    expect((await generateNote(REQ, right, "read")).state).toBe("ok");
+  });
+
   it("a Gate error: unavailable, its kind counted, the lock released", async () => {
     const d = deps({ chat: async () => { throw new GateError("rate"); } });
     expect(await generateNote(REQ, d, "read")).toEqual({ state: "unavailable" });

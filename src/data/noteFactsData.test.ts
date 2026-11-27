@@ -88,6 +88,14 @@ describe("dataFacts", () => {
       "Org 0f3a9b12 batches in the window: 1",
     ]);
     expect(one.names).toEqual(expect.arrayContaining(["Open Poker", "Org 0f3a9b12"]));
+    expect(one.actors).toEqual(["Open Poker", "Org 0f3a9b12"]);
+    // No names read: no organisation is stated ("Org op-1" is no label any surface shows); an empty
+    // hash is a read, and Dor's count needs none.
+    const unnamed = dataFacts({ ticks, names: subNames, keyOf: subKey, only: DED_ID })!;
+    expect(unnamed.facts.some((f) => /batches/.test(f.label))).toBe(false);
+    expect(unnamed.actors).toBeUndefined();
+    expect(text(dataFacts({ ticks, names: subNames, keyOf: subKey, only: DED_ID, submitterNames: {} })!.facts)).toContain("Org op-1 batches in the window: 6");
+    expect(text(dataFacts({ ticks, names: subNames, keyOf: subKey, only: DOR_ID })!.facts)).toContain("Devices that checked in, in the window: 2");
     expect(text(dataFacts({ ticks, names: subNames, keyOf: subKey, only: DOR_ID, submitterNames })!.facts)).toContain("Devices that checked in, in the window: 2");
     // The whole network's note is unchanged.
     const all = dataFacts({ ticks, names: subNames, keyOf: subKey, submitterNames })!;

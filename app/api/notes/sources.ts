@@ -293,6 +293,8 @@ interface Built {
   lead?: NoteLead;
   /** Geography's provider notes: the provider as the facts spell it, the label's to name it by. */
   subjectName?: string;
+  /** The organisations the facts name: the gate's actors (`CheckOptions.actors`). */
+  actors?: string[];
 }
 
 interface Read {
@@ -350,6 +352,17 @@ const TREND_PILLS: Record<TrendPill, { tier: Tier; ms: number; daily: boolean }>
 const LEAD_IN_MS = 30 * D;
 const isPill = (span: string): span is TrendPill => span in TREND_PILLS;
 
+/** A FAILED `sub:` READ IS NO SUBMITTER DATA, never a failed note (ruling R5): the note is written
+ *  as it was before the family existed, without who submitted, rather than going `unavailable`. A
+ *  pass that hits it stores the note without organisation or device facts until its next due
+ *  rewrite. */
+function submittersOrNone(read: Promise<SubmittersWindow | null>, net: string): Promise<SubmittersWindow | null> {
+  return read.catch((e: unknown) => {
+    console.warn(`[notes] submitters read failed for ${net}, writing the note without it: ${e instanceof Error ? e.message : String(e)}`);
+    return null;
+  });
+}
+
 async function readTrend(c: Ctx): Promise<Read | null> {
   const { span, nowMs, reads } = c;
   // THE SPAN FACET reads the base network's facts in their `shape`: no notable days to caption.
@@ -394,7 +407,7 @@ async function readTrend(c: Ctx): Promise<Read | null> {
   const silent = trendSilent(subject, cur);
   // WHO SUBMITTED THE DATA, for a network whose updates name it — not in the span facet, which reads
   // the range's shape and states no move.
-  const subs = !facet && Object.hasOwn(SUBMITTERS, subject) && reads.submitters ? reads.submitters(subject, fromMs, toMs) : null;
+  const subs = !facet && Object.hasOwn(SUBMITTERS, subject) && reads.submitters ? submittersOrNone(reads.submitters(subject, fromMs, toMs), subject) : null;
   const [history, chainReads, submitters] = await Promise.all([
     subject === UNLISTED_ID || silent ? reads.span("1d", nowMs - WINDOWS.all.ms, nowMs) : null,
     silent ? reads.chainReads() : null,
@@ -536,7 +549,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
       if (!reads.dataWindow) return null;
       // An organisation's NAME, for a network whose submitters are organisations: the names hash, read
       // with the last 24 hours of the `sub:` family (the names are the same in every window).
-      const named = SUBMITTERS[subject]?.kind === "organisation" && reads.submitters ? reads.submitters(subject, nowMs - 24 * H, nowMs) : null;
+      const named = SUBMITTERS[subject]?.kind === "organisation" && reads.submitters ? submittersOrNone(reads.submitters(subject, nowMs - 24 * H, nowMs), subject) : null;
       const [w, sub] = await Promise.all([reads.dataWindow(), named]);
       // ONE NETWORK'S (2026-11-20): its own data blocks over the same window, and no note when it
       // carried none — a network running no data layer among them (`dataFacts`' `only`).
@@ -601,6 +614,9 @@ export interface NoteFacts {
   driftKeys?: Record<string, string>;
   /** Snapshots only (R71): "change" when a pair moved, else "now" — the prompt's question follows. */
   lead?: NoteLead;
+  /** The organisations the facts name (History's and the Data blocks' DED notes): the gate's
+   *  ACTORS, so a share or a change is said only of the organisation it belongs to. */
+  actors?: string[];
 }
 
 /** THE FACTS FOR ONE NOTE: that view's reads, its builder, and the span's length. Null when the
@@ -641,5 +657,6 @@ export async function factsFor(
     ...(built.setKey != null ? { setKey: built.setKey } : {}),
     ...(built.driftKeys != null ? { driftKeys: built.driftKeys } : {}),
     ...(built.lead != null ? { lead: built.lead } : {}),
+    ...(built.actors?.length ? { actors: built.actors } : {}),
   };
 }

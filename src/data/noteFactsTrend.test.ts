@@ -826,8 +826,11 @@ describe("who submitted a network's data", () => {
     const r = trendFacts(input({ ...weekOf(DED), submitters: dedWin() }))!;
     const facts = withChangeFacts(r.facts);
     expect(find({ ...r, facts }, /^Open Poker batches, per day, at the end of the span, change against/)[0]).toMatchObject({ text: "100%", move: "up" });
-    const opts = { subject: "Digital Evidence" };
+    // The organisations are the gate's actors: a change or share is said only of its own.
+    expect(r.actors).toEqual(["Open Poker", "Gate AI", "Org 0f3a9b12", "Acme"]);
+    const opts = { subject: "Digital Evidence", actors: r.actors };
     expect(checkNote("Open Poker's batches rose 100% to 96 per day over the week.", facts, r.names, opts)).toEqual({ ok: true });
+    expect(checkNote("Gate AI's batches rose 100% to 96 per day over the week.", facts, r.names, opts).ok).toBe(false);
     expect(checkNote("Open Poker doubled its batches over the week.", facts, r.names, opts)).toEqual({ ok: true });
     // Acme sent batches in the range, but the facts hold no move of Acme's.
     expect(checkNote("Acme doubled its batches over the week.", facts, r.names, opts).ok).toBe(false);
@@ -868,5 +871,6 @@ describe("who submitted a network's data", () => {
     expect(strip(trendFacts(input({ ...weekOf("usdc"), submitters: dedWin() })))).toEqual(strip(trendFacts(input(weekOf("usdc")))));
     expect(strip(trendFacts(input({ submitters: dedWin() })))).toEqual(strip(trendFacts(input())));
     expect(trendFacts(input({ submitters: dedWin() }))!.names).not.toContain("Open Poker");
+    expect(trendFacts(input({ submitters: dedWin() }))!.actors).toBeUndefined();
   });
 });

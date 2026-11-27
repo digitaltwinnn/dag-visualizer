@@ -700,6 +700,27 @@ describe("who submitted the data", () => {
     expect(submitters).not.toHaveBeenCalled();
   });
 
+  it("a failed sub: read is no submitter data, never a failed note: both notes are still built, without it (R5)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const submitters = vi.fn(async () => { throw new Error("store down"); });
+    expect(await factsFor("trend", DED, "7d", NOW, fakeReads({ submitters }))).not.toBeNull();
+    expect(vi.mocked(trendFacts).mock.calls.at(-1)![0].submitters).toBeNull();
+    const op = { metaId: DED, ordinal: 1, decoded: true, dataBlocks: 1, dataTxCount: 3, dataBlockRows: [{ updates: 3, kinds: [], signers: 1, bytes: 1, digest: "d", submitters: [{ id: "op-1", updates: 3 }] }] } as unknown as ChannelSnapRow;
+    const dataWindow = async () => ({ ticks: [{ ordinal: 1, rows: [op] }], fromMs: NOW - H, toMs: NOW });
+    const out = await factsFor("data", DED, "hours", NOW, fakeReads({ dataWindow, submitters }));
+    expect(out!.facts.some((f) => f.label === "Digital Evidence data blocks")).toBe(true);
+    expect(out!.facts.some((f) => /batches/.test(f.label))).toBe(false); // no names read, no organisation
+    expect(warn).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
+  });
+
+  it("carries the organisations the facts name to the gate as its actors", async () => {
+    vi.mocked(trendFacts).mockReturnValue({ facts: [FACT], days: [], names: ["Open Poker"], blurbs: [], actors: ["Open Poker"] });
+    expect((await factsFor("trend", DED, "7d", NOW, fakeReads()))!.actors).toEqual(["Open Poker"]);
+    vi.mocked(trendFacts).mockReturnValue({ facts: [FACT], days: [], names: [], blurbs: [] });
+    expect((await factsFor("trend", USDC, "7d", NOW, fakeReads()))!.actors).toBeUndefined();
+  });
+
   it("storeReads reads the sub: family through the store, at the range's tier, and nothing for a network with no submitter table", async () => {
     const asked: string[] = [];
     const store = {
