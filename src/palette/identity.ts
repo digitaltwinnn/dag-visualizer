@@ -128,6 +128,15 @@ function resolve(id: string): IdentityHue | null {
   return resolved;
 }
 
+/** Every catalog network's identity hue (the known() map's) plus the DAG's own — the set an
+ *  organisation hue keeps clear of (submitterHue.ts). */
+export function networkHueDegs(): number[] {
+  const out = [...known().values()].map((e) => e.hueDeg);
+  const dag = resolve("dag");
+  if (dag) out.push(dag.hueDeg);
+  return out;
+}
+
 export function identityHudHex(id: string): string { return resolve(id)?.hudHex ?? CORE_HEX; }
 
 // CSS-deferred HUD colour: the value never encodes L/C at all, so a theme switch retints every
