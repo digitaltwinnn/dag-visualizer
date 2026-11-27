@@ -5,7 +5,7 @@
 // null, like History's partial edges. Outside the span, or in a hole, is null, never 0.
 import { SUBMITTERS, type SubmitterKind } from "@/src/data/submitters";
 import { stepMsOf } from "../trends/keys";
-import { subSlotOf, type SubTier } from "./keys";
+import { subHllKeyOf, subSlotOf, type SubTier } from "./keys";
 
 /** How many organisations carry a hue of their own (the palette); every other one reads neutral. */
 export const ORG_PALETTE_MAX = 7;
@@ -25,10 +25,14 @@ export interface SubmittersWindow {
   names: Record<string, string>;
   /** Per organisation (full id); empty for devices. Null outside `measured`, 0 inside where quiet. */
   series: { id: string; points: (number | null)[] }[];
-  /** Submitters per bucket, both kinds; null outside `measured`. */
+  /** Submitters per bucket, both kinds; null outside `measured`. Devices: the bucket's HLL count. */
   distinct: (number | null)[];
-  /** Distinct ids across the measured part of the range; null when none of it is measured. */
+  /** Distinct ids across the measured part of the range; null when none of it is measured. Devices:
+   *  PFCOUNT over every measured bucket's HLL key — the union, never a sum. */
   rangeDistinct: number | null;
+  /** True for devices (R19): `distinct` and `rangeDistinct` are HyperLogLog ESTIMATES (~0.81%
+   *  standard error), which every surface states as "about N"; organisations are exact. */
+  estimate: boolean;
   /** The range's per-organisation sums, busiest first; devices give []. */
   totals: { id: string; updates: number }[];
   /** Organisations ever seen (names hash plus the 1d tier); 0 for devices. */
@@ -50,6 +54,8 @@ export interface AssembleInput {
   names: Record<string, string> | null;
   /** The holes hash (`subHolesKeyOf`): field = start ms, value = end ms. */
   holes?: Record<string, string> | null;
+  /** Devices (R19): PFCOUNT of each measured bucket's HLL key (`measuredHllKeys`), and of their union. */
+  devices?: { counts: Record<string, number>; union: number } | null;
   /** Every 1d year hash, for "N seen since <month year>". */
   yearHashes?: Record<string, Record<string, string>>;
 }
@@ -86,6 +92,26 @@ export function bucketMeasured(
 ): boolean {
   if (!measured || t < measured.from || t + step > measured.to) return false;
   return !holes.some((h) => t < h.to && t + step > h.from);
+}
+
+/** THE HLL KEYS A DEVICE RANGE COUNTS (R19): one per MEASURED bucket (`bucketMeasured`), so the
+ *  union is taken over exactly what the window reads as measured. The read asks PFCOUNT of each and
+ *  of all of them; no device id ever leaves the store. */
+export function measuredHllKeys(
+  net: string,
+  tier: SubTier,
+  fromMs: number,
+  toMs: number,
+  span: Record<string, string> | null,
+  holesRaw: Record<string, string> | null | undefined,
+): string[] {
+  const step = stepMsOf(tier);
+  const measured = parseSpan(span), holes = parseHoles(holesRaw);
+  const out: string[] = [];
+  for (let t = Math.floor(fromMs / step) * step; t < toMs; t += step) {
+    if (bucketMeasured(t, step, measured, holes)) out.push(subHllKeyOf(net, tier, t));
+  }
+  return out;
 }
 
 /** `window=24h`: the 24 whole hours ending at the newest whole measured hour (the current hour when
@@ -133,32 +159,41 @@ export function assembleSubmitters(input: AssembleInput): SubmittersWindow {
   for (let t = Math.floor(fromMs / step) * step; t < toMs; t += step) buckets.push(t);
 
   const isOrg = spec.kind === "organisation";
+  const isMeasured = buckets.map((t) => bucketMeasured(t, step, measured, holes));
+  const anyMeasured = isMeasured.some(Boolean);
+
+  // DEVICES (R19): each bucket's HLL count, and the union's, as the read counted them.
+  if (!isOrg) {
+    const counts = input.devices?.counts ?? null;
+    return {
+      net, kind: spec.kind, unit: spec.unit, tier, stepMs: step, buckets,
+      measured, holes: holes.filter((h) => h.from < toMs && h.to > (buckets[0] ?? fromMs)), names, series: [],
+      distinct: buckets.map((t, i) => (isMeasured[i] && counts ? (counts[subHllKeyOf(net, tier, t)] ?? 0) : null)),
+      rangeDistinct: anyMeasured && input.devices ? input.devices.union : null,
+      estimate: true,
+      totals: [], seenTotal: 0, firstSeenMs: null, palette: [],
+    };
+  }
+
   const sums = new Map<string, number>();
-  const perBucket: (Map<string, number> | null)[] = buckets.map((t) => {
-    if (!bucketMeasured(t, step, measured, holes)) return null;
+  const perBucket: (Map<string, number> | null)[] = buckets.map((t, i) => {
+    if (!isMeasured[i]) return null;
     const { key, bucket } = subSlotOf(net, tier, t);
     return readBucket(hashes[key], bucket);
   });
-
-  const union = new Set<string>();
   for (const m of perBucket) {
     if (!m) continue;
-    for (const [id, n] of m) {
-      union.add(id);
-      if (isOrg) sums.set(id, (sums.get(id) ?? 0) + n);
-    }
+    for (const [id, n] of m) sums.set(id, (sums.get(id) ?? 0) + n);
   }
   const ids = [...sums.keys()];
-  const series = isOrg
-    ? ids.map((id) => ({ id, points: perBucket.map((m) => (m ? (m.get(id) ?? 0) : null)) }))
-    : [];
+  const series = ids.map((id) => ({ id, points: perBucket.map((m) => (m ? (m.get(id) ?? 0) : null)) }));
   const totals = [...sums].map(([id, updates]) => ({ id, updates }))
     .sort((a, b) => b.updates - a.updates || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   series.sort((a, b) => totals.findIndex((t) => t.id === a.id) - totals.findIndex((t) => t.id === b.id));
 
   let seenTotal = 0, firstSeenMs: number | null = null;
   const allTime = new Map<string, number>();
-  if (isOrg) {
+  {
     const seen = new Set(Object.keys(input.names ?? {}));
     for (const [key, h] of Object.entries(input.yearHashes ?? {})) {
       const year = Number(key.slice(key.lastIndexOf(":") + 1));
@@ -180,7 +215,8 @@ export function assembleSubmitters(input: AssembleInput): SubmittersWindow {
     net, kind: spec.kind, unit: spec.unit, tier, stepMs: step, buckets,
     measured, holes: holes.filter((h) => h.from < toMs && h.to > (buckets[0] ?? fromMs)), names, series,
     distinct: perBucket.map((m) => (m ? m.size : null)),
-    rangeDistinct: perBucket.some((m) => m) ? union.size : null,
+    rangeDistinct: anyMeasured ? sums.size : null,
+    estimate: false,
     totals, seenTotal, firstSeenMs,
     palette: [...allTime].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
       .slice(0, ORG_PALETTE_MAX).map(([id]) => id),

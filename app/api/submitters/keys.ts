@@ -19,6 +19,17 @@ export function subSlotOf(netId: string, tier: SubTier, tsMs: number): { key: st
   return { key: `sub:${STORE_NS}:${netId}:1d:${y}`, bucket: `${mo}-${da}` };
 }
 
+/** DOR'S DEVICES ARE A HYPERLOGLOG (ruling R19): one HLL key per network per UTC hour
+ *  (`sub:mainnet:<net>:hll:1h:YYYY-MM-DD-HH`) and per UTC day (`…:hll:1d:YYYY-MM-DD`), PFADDed with the
+ *  bucket's device ids. Measured, one hour of Dor holds ~1,400 distinct devices, ≈1M per-device fields
+ *  in a month hash; an HLL is ~12 KB at most and its count carries ~0.81% standard error. */
+export function subHllKeyOf(netId: string, tier: SubTier, tsMs: number): string {
+  const step = stepMsOf(tier);
+  const d = new Date(Math.floor(tsMs / step) * step);
+  const day = `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`;
+  return `sub:${STORE_NS}:${netId}:hll:${tier}:${tier === "1h" ? `${day}-${p2(d.getUTCHours())}` : day}`;
+}
+
 /** `<bucket>|<submitter>`. Submitter ids never hold `|`: `src/data/submitters.ts` counts only a DED UUID
  *  or a hex Dor id (cut to 16 chars), so the throw below is a guard, never a reachable stall. */
 export function subField(bucket: string, submitter: string): string {

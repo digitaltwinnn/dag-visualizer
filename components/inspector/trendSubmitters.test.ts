@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { DED_ID, DOR_ID, SUBMITTERS } from "@/src/data/submitters";
 import type { SubmittersWindow } from "@/app/api/submitters/assemble";
-import { submittersCardState, submittersScope, querySpan, organisationChart, measuredFloor, noSubmitterLine, BAND_MAX } from "@/components/inspector/trendSubmitters";
+import { submittersCardState, submittersScope, querySpan, organisationChart, measuredFloor, noSubmitterLine, countWords, BAND_MAX } from "@/components/inspector/trendSubmitters";
 
 const USDC = "DAG0S16WDgdAvh8VvroR6MWLdjmHYdzAF5S181xh";
 const carries = (id: string) => Object.hasOwn(SUBMITTERS, id);
@@ -26,6 +26,16 @@ describe("noSubmitterLine — a network with no SUBMITTERS row (R21)", () => {
   it("says what is true by construction, never what the chain carried", () => {
     expect(noSubmitterLine("USDC.dag")).toBe("USDC.dag's data names no submitter this app reads, so there is no one to show");
     expect(noSubmitterLine("USDC.dag")).not.toMatch(/carried|data blocks/);
+  });
+});
+
+describe("countWords — a count as the cards say it; an HLL estimate says \"about\" (R19)", () => {
+  it("names organisations exactly and devices as an estimate", () => {
+    expect(countWords(5, "organisation", false)).toBe("5 organisations");
+    expect(countWords(1, "organisation", false)).toBe("1 organisation");
+    expect(countWords(1438, "device", true)).toBe("about 1,438 devices");
+    expect(countWords(1, "device", true)).toBe("about 1 device");
+    expect(countWords(3, "device", false)).toBe("3 devices"); // an exact count (a block's own ids) says no "about"
   });
 });
 
@@ -67,6 +77,7 @@ const win = (over: Partial<SubmittersWindow>): SubmittersWindow => ({
   buckets: [0, H, 2 * H],
   measured: { from: 0, to: 3 * H },
   holes: [],
+  estimate: false,
   names: {},
   series: [],
   distinct: [0, 0, 0],

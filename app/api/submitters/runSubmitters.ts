@@ -41,10 +41,10 @@ import { decodeSnapshotRoot } from "../snapshot/decodeChannel";
 import type { MetaRec } from "../trends/bucketing";
 import { listSince, type ChainPage } from "../trends/fetchSince";
 import type { TrendsStore, TrendsWrite } from "../trends/store";
-import { DED_ID } from "@/src/data/submitters";
-import { bucketSubmitters, holeOf, nextSpan } from "./bucket";
+import { DED_ID, SUBMITTERS } from "@/src/data/submitters";
+import { bucketDevices, bucketSubmitters, holeOf, nextSpan } from "./bucket";
 import { parseHoles } from "./assemble";
-import { subField, subHolesKeyOf, subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
+import { subField, subHllKeyOf, subHolesKeyOf, subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
 import { mergeNames, parseDedLatest } from "./names";
 import { readL0Snapshots } from "./readL0";
 
@@ -100,6 +100,9 @@ async function listFromHour(page: (limit: number, next?: string) => Promise<Chai
 }
 
 type Tally = { id: string; updates: number }[];
+
+/** Whether a network's submitters are DEVICES, counted in HyperLogLogs (R19), not fields. */
+const isDevices = (net: string): boolean => Object.hasOwn(SUBMITTERS, net) && SUBMITTERS[net]!.kind === "device";
 
 /** The records' snapshots read from L0 (`readL0Snapshots`' contiguous prefix), each summed into its
  *  submitters' updates. A snapshot that cannot be decoded ends the prefix like a failed read. The
@@ -189,14 +192,20 @@ export async function runSubmitters(deps: SubmittersDeps): Promise<SubmittersRes
     );
 
     const inc = new Map<string, Map<string, number>>();
+    const devices = new Map<string, Set<string>>();
     const writes: TrendsWrite[] = [];
     for (const run of runs) {
       read[run.net] = run.read.length;
       failed[run.net] = run.failedAt;
+      const dev = isDevices(run.net);
       for (const { rec, tally } of run.read) {
-        if (tally.length) bucketSubmitters(inc, run.net, Date.parse(rec.timestamp), tally);
+        if (!tally.length) continue;
+        if (dev) bucketDevices(devices, run.net, Date.parse(rec.timestamp), tally);
+        else bucketSubmitters(inc, run.net, Date.parse(rec.timestamp), tally);
       }
     }
+    // Dor's devices (R19): PFADD needs no read of the stored value, and rides the same transaction.
+    for (const [key, ids] of devices) if (ids.size) writes.push({ key, map: {}, ttlS: null, pfadd: [...ids] });
     for (const [key, fields] of inc) {
       if (!fields.size) continue;
       const names = [...fields.keys()];
@@ -239,7 +248,8 @@ export async function runSubmitters(deps: SubmittersDeps): Promise<SubmittersRes
 // - It never reads or writes an hour at or after span.from: the sampler owns those. The walk ends on
 //   the hour edge at or below span.from, whatever `toMs` asks.
 // - An hour is written as a SET of that hour's full tally (`hset`), never an increment, so a rerun
-//   (or a resume over an hour already written) writes the same values: idempotent.
+//   (or a resume over an hour already written) writes the same values: idempotent. Dor's devices are
+//   PFADDed into the hour's and the day's HyperLogLog instead (R19), idempotent by nature.
 // - After each day it walked (and where it stops), the day's 1d fields are SET to the sum of ALL its
 //   1h fields read back from the store — the 1d = Σ1h invariant (`bucket.ts`), including, on the
 //   boundary day, the sampler's own hours. That day's read-and-set runs under the sampler's lock,
@@ -307,8 +317,10 @@ async function listWindow(deps: WalkDeps, net: string, a: number, b: number): Pr
   return out.reverse();
 }
 
-/** The day's 1d fields as the sum of every 1h field of that day in the store. */
+/** The day's 1d fields as the sum of every 1h field of that day in the store — organisations only:
+ *  a device day is its HLL, PFADDed with every hour's ids (R19), so it has nothing to recompute. */
 async function dayWrite(store: TrendsStore, net: string, dayMs: number): Promise<TrendsWrite | null> {
+  if (isDevices(net)) return null;
   const h1 = subSlotOf(net, "1h", dayMs);
   const day = h1.bucket.slice(0, 2); // the "DD" of "DD-HH"
   const sums = new Map<string, number>();
@@ -330,6 +342,17 @@ async function dayWrite(store: TrendsStore, net: string, dayMs: number): Promise
 async function writeHour(deps: WalkDeps, net: string, h: number, hourRecs: MetaRec[]): Promise<{ read: number; failedAt: number | null }> {
   const got = await readTallies(hourRecs, net, (o) => deps.fetchSnap(net, o), deps.pool ?? 8);
   if (got.failedAt != null) return { read: 0, failedAt: got.failedAt };
+  if (isDevices(net)) {
+    // Dor (R19): the hour's devices PFADDed into the hour's AND the day's HLL — idempotent by nature,
+    // so the day stays the union of its hours with no recompute.
+    const ids = new Set<string>();
+    for (const { tally } of got.read) for (const { id } of tally) ids.add(id);
+    if (ids.size) {
+      await deps.store.pfadd(subHllKeyOf(net, "1h", h), [...ids]);
+      await deps.store.pfadd(subHllKeyOf(net, "1d", h), [...ids]);
+    }
+    return { read: got.read.length, failedAt: null };
+  }
   const inc = new Map<string, number>();
   for (const { tally } of got.read) for (const { id, updates } of tally) inc.set(id, (inc.get(id) ?? 0) + updates);
   if (inc.size) {

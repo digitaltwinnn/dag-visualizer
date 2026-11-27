@@ -229,8 +229,11 @@ function submitterFacts(w: SubmittersWindow, perDay: boolean): { facts: Fact[]; 
   const whole = distinct.every((v) => v != null);
   const late = first > LATE_START * distinct.length;
   if (w.kind === "device") {
-    if (w.rangeDistinct != null) facts.push(fact(`Active devices, this span${whole ? "" : ", at least"}`, w.rangeDistinct, "count"));
-    const label = `Active devices in ${w.stepMs >= DAY_MS ? "a day" : "an hour"}`;
+    // Dor's counts are HyperLogLog ESTIMATES (R19): every device fact says "about", and the prompt
+    // (`SUBMITTER_WORDS`) asks the model to write it so.
+    const about = w.estimate ? ", about" : "";
+    if (w.rangeDistinct != null) facts.push(fact(`Active devices, this span${about}${whole ? "" : ", at least"}`, w.rangeDistinct, "count"));
+    const label = `Active devices in ${w.stepMs >= DAY_MS ? "a day" : "an hour"}${about}`;
     const ch = gaugeChange(distinct);
     if (!ch) return { facts, names: [] };
     if (late) {

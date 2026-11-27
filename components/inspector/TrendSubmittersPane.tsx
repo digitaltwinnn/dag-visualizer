@@ -6,7 +6,7 @@ import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import TrendChart from "@/components/docs/TrendChart";
 import { CUT_ROW, Fact, FactGroup, Lead, SectionLabel, TABLE_ROW, TableHead, UnitMarks, figWidth, shareWords } from "@/components/inspector/parts";
-import { measuredFloor, noSubmitterLine, organisationChart, querySpan, submittersCardState, submittersScope } from "@/components/inspector/trendSubmitters";
+import { countWords, measuredFloor, noSubmitterLine, organisationChart, querySpan, submittersCardState, submittersScope } from "@/components/inspector/trendSubmitters";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import useSubmitters from "@/components/useSubmitters";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
@@ -41,7 +41,6 @@ const WHO = "Data submitters card";
 const DAY_MS = 86_400_000;
 const NETS = Object.keys(SUBMITTERS);
 const carriesData = (id: string) => Object.hasOwn(SUBMITTERS, id);
-const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 /** The unit word the chart's head carries, at the window's own tier. */
 const perStep = (stepMs: number) => (stepMs >= DAY_MS ? " per day" : " per hour");
 
@@ -97,13 +96,14 @@ export default function TrendSubmittersPane({ collapsed, onToggle }: { collapsed
 /** One network's organisations or devices over the span. */
 function WindowBody({ org, data, error, hue }: { org: boolean; data: SubmittersWindow | null; error: boolean; hue: string }) {
   const chart = useMemo(() => (data && data.kind === "organisation" ? organisationChart(data, hue) : null), [data, hue]);
-  const deviceLines = useMemo(() => (data && data.kind === "device" ? [{ label: "Devices", points: data.distinct, hue }] : null), [data, hue]);
+  // Dor's counts are HyperLogLog estimates (R19): the line and its figure say "about".
+  const deviceLines = useMemo(() => (data && data.kind === "device" ? [{ label: "Devices (about)", points: data.distinct, hue }] : null), [data, hue]);
   const floor = data ? measuredFloor(data, (ms) => bucketStamp(ms, data.stepMs)) : null;
   const note = data ? (data.measured ? undefined : "not measured yet") : error ? "read failed" : "acquiring…";
   return (
     <>
       <TrendChart
-        name={org ? "Batches" : "Devices"}
+        name={org ? "Batches" : "Devices (about)"}
         unit={data ? perStep(data.stepMs) : undefined}
         lines={chart?.lines ?? deviceLines ?? []}
         stack={chart?.stack}
@@ -145,8 +145,9 @@ function WindowBody({ org, data, error, hue }: { org: boolean; data: SubmittersW
               <span className="tabular-nums">{`${data.rangeDistinct.toLocaleString()} active of ${data.seenTotal.toLocaleString()} seen`}</span>
             </Fact>
           ) : (
-            // One sentence — the devices are counted, never named, so there is nothing to label.
-            <p className="text-label text-foreground-dim tabular-nums">{`${plural(data.rangeDistinct, "device", "devices")} checked in`}</p>
+            // One sentence — the devices are counted, never named, so there is nothing to label; an
+            // estimate, so it says "about" (R19).
+            <p className="text-label text-foreground-dim tabular-nums">{`${countWords(data.rangeDistinct, "device", data.estimate)} checked in`}</p>
           )}
         </FactGroup>
       )}
@@ -182,9 +183,7 @@ function NetworkRow({ id, q, on, interactive, pair }: { id: string; q: { fromMs:
   const count = data?.rangeDistinct;
   const figure =
     count != null
-      ? SUBMITTERS[id]!.kind === "organisation"
-        ? plural(count, "organisation", "organisations")
-        : plural(count, "device", "devices")
+      ? countWords(count, SUBMITTERS[id]!.kind, data!.estimate)
       : data
         ? "not measured"
         : error

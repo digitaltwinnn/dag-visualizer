@@ -1,17 +1,27 @@
 import { describe, it, expect } from "vitest";
 import { runSubmitters, walkHoles, walkRange, type SubmittersDeps, type WalkDeps } from "./runSubmitters";
 import { assembleSubmitters } from "./assemble";
-import { subHolesKeyOf, subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
-import { DED_ID } from "@/src/data/submitters";
+import { subHllKeyOf, subHolesKeyOf, subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
+import { DED_ID, DOR_ID } from "@/src/data/submitters";
 import type { MetaRec } from "../trends/bucketing";
 import type { ChainPage } from "../trends/fetchSince";
 import type { TrendsStore, TrendsWrite } from "../trends/store";
 
-// In-memory TrendsStore (runSample.test.ts's), counting transactions.
-function memStore(): TrendsStore & { data: Map<string, Map<string, string>>; locked: boolean; applies: TrendsWrite[][] } {
+// In-memory TrendsStore (runSample.test.ts's), counting transactions. A HyperLogLog is an exact Set
+// here: PFCOUNT's ~0.81% error is the store's, not the sampler's.
+function memStore(): TrendsStore & { data: Map<string, Map<string, string>>; hll: Map<string, Set<string>>; locked: boolean; applies: TrendsWrite[][] } {
   const data = new Map<string, Map<string, string>>();
+  const hll = new Map<string, Set<string>>();
+  const add = (key: string, ids: readonly string[]) => {
+    let h = hll.get(key);
+    if (!h) hll.set(key, (h = new Set()));
+    for (const id of ids) h.add(id);
+  };
   const s = {
-    data, locked: false, applies: [] as TrendsWrite[][],
+    data, hll, locked: false, applies: [] as TrendsWrite[][],
+    async pfadd(key: string, ids: string[]) { add(key, ids); },
+    async pfcount(keys: string[]) { return new Set(keys.flatMap((k) => [...(hll.get(k) ?? [])])).size; },
+    async pfcountEach(keys: string[]) { return keys.map((k) => hll.get(k)?.size ?? 0); },
     async hgetall(key: string) { const h = data.get(key); return h ? Object.fromEntries(h) : null; },
     async hmget(key: string, fields: string[]) { const h = data.get(key); return fields.map((f) => h?.get(f) ?? null); },
     async hset(key: string, map: Record<string, string | number>) {
@@ -30,6 +40,7 @@ function memStore(): TrendsStore & { data: Map<string, Map<string, string>>; loc
         for (const [f, v] of Object.entries(w.map)) h.set(f, String(v));
         for (const f of w.hdel ?? []) h.delete(f);
         if (!h.size) data.delete(w.key);
+        if (w.pfadd?.length) add(w.key, w.pfadd);
       }
     },
   };
@@ -58,6 +69,15 @@ function root(ordinal: number): Record<string, unknown> {
   return { value: { ordinal, dataApplication: { blocks: [Array.from(Buffer.from(JSON.stringify(blk)))] } }, proofs: [] };
 }
 
+/** Dor: every record carries one data block of two check-ins, by devices `ordinal % 5` and
+ *  `(ordinal + 1) % 5` — hex ids, cut to 16 characters by `submitters.ts`. */
+const dev = (k: number) => String(k).padEnd(40, "f");
+function dorRoot(ordinal: number): Record<string, unknown> {
+  const updates = [{ publicId: dev(ordinal % 5) }, { publicId: dev((ordinal + 1) % 5) }];
+  const blk = { proofs: [], value: { updates: updates.map((v) => ({ value: v })) } };
+  return { value: { ordinal, dataApplication: { blocks: [Array.from(Buffer.from(JSON.stringify(blk)))] } }, proofs: [] };
+}
+
 /** A newest-first pager over the chain's records up to `tip`; `next` is an offset. */
 function pager(tip: () => number) {
   return async (_id: string, limit: number, next?: string): Promise<ChainPage<MetaRec>> => {
@@ -79,7 +99,7 @@ function deps(store: TrendsStore, over: Partial<SubmittersDeps> = {}): Submitter
   };
 }
 
-const span = (s: ReturnType<typeof memStore>) => s.data.get(subSpanKeyOf(DED_ID));
+const span = (s: ReturnType<typeof memStore>, net = DED_ID) => s.data.get(subSpanKeyOf(net));
 const h1 = (s: ReturnType<typeof memStore>, ts: number) => s.data.get(subSlotOf(DED_ID, "1h", ts).key);
 const subData = (s: ReturnType<typeof memStore>) =>
   [...s.data].filter(([k]) => k.includes(":1h:") || k.includes(":1d:")).map(([k, h]) => [k, Object.fromEntries([...h].sort())]);
@@ -267,6 +287,19 @@ describe("runSubmitters", () => {
     expect(JSON.parse(String(w.map.o2))).toEqual({ name: "Gate AI", source: "ded", namedAt: NOW });
   });
 
+  it("Dor: device ids go into the hour's and the day's HyperLogLog in the one transaction, never into fields (R19)", async () => {
+    const store = memStore();
+    const res = await runSubmitters(deps(store, { nets: [DOR_ID], fetchSnap: async (_n, o) => dorRoot(o) }));
+    expect(res.read[DOR_ID]).toBe(70);
+    expect(store.applies).toHaveLength(1);
+    expect(store.applies[0].filter((w) => w.pfadd).map((w) => w.key).sort()).toEqual(
+      [subHllKeyOf(DOR_ID, "1d", NOW), subHllKeyOf(DOR_ID, "1h", PREV_HOUR), subHllKeyOf(DOR_ID, "1h", NOW)].sort(),
+    );
+    expect(await store.pfcountEach([subHllKeyOf(DOR_ID, "1h", PREV_HOUR), subHllKeyOf(DOR_ID, "1d", NOW)])).toEqual([5, 5]);
+    expect([...store.data.keys()].filter((k) => k.includes(":1h:") || k.includes(":1d:"))).toEqual([]);
+    expect(span(store, DOR_ID)!.get("cursor")).toBe("1129");
+  });
+
   it("a names read that fails costs the run nothing", async () => {
     const store = memStore();
     const res = await runSubmitters(deps(store, { dedLatest: async () => { throw new Error("ded down"); } }));
@@ -451,5 +484,20 @@ describe("walkRange", () => {
     expect(r2.failedAt).toBe(5000 + 144 + 7);
     expect(r2.filled).toBe(0);
     expect(bad.data.get(subHolesKeyOf(DED_ID))!.get(String(D1))).toBe(String(D1 + 2 * HOUR));
+  });
+
+  it("Dor: the walk PFADDs each hour's devices into the hour's and the day's HLL, idempotent, with no fields (R19)", async () => {
+    const dorSnap = async (_n: string, o: number) => { if (wTs(o) >= SPAN_FROM) throw new Error(`read a sampler record: ${o}`); return dorRoot(o); };
+    const store = memStore();
+    await runSubmitters({ store, nets: [DOR_ID], pageMeta: wPager, fetchSnap: async (_n, o) => dorRoot(o), now: () => NOW_W });
+    const res = await walkRange(wdeps(store, { fetchSnap: dorSnap }), DOR_ID, D0, SPAN_FROM, progress);
+    expect(res.failedAt).toBeNull();
+    expect(res.lowered).toBe(true);
+    expect(await store.pfcount([subHllKeyOf(DOR_ID, "1h", D0)])).toBe(5);
+    expect(await store.pfcount([subHllKeyOf(DOR_ID, "1d", D1)])).toBe(5);
+    expect([...store.data.keys()].filter((k) => k.includes(":1h:") || k.includes(":1d:"))).toEqual([]);
+    const once = [...store.hll].map(([k, v]) => [k, [...v].sort()]);
+    await walkRange(wdeps(store, { fetchSnap: dorSnap }), DOR_ID, D0, SPAN_FROM, progress);
+    expect([...store.hll].map(([k, v]) => [k, [...v].sort()])).toEqual(once);
   });
 });

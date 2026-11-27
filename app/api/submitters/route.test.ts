@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DED_ID } from "@/src/data/submitters";
+import { DED_ID, DOR_ID } from "@/src/data/submitters";
 
 const calls: string[] = [];
 const fail = { on: false };
@@ -15,6 +15,8 @@ vi.mock("@/app/api/trends/store", () => ({
       if (k.endsWith(":holes")) return holes.value;
       return null;
     },
+    pfcount: async (keys: string[]) => { calls.push(`pfcount:${keys.length}`); return 42; },
+    pfcountEach: async (keys: string[]) => { calls.push(`pfcountEach:${keys.length}`); return keys.map(() => 9); },
   }),
 }));
 
@@ -51,6 +53,14 @@ describe("GET /api/submitters", () => {
     expect(calls).toContain(`sub:mainnet:${DED_ID}:holes`);
     expect(w.distinct).toEqual([0, null, 0]);
     expect(w.holes).toEqual([{ from: from + H, to: from + 2 * H }]);
+  });
+
+  it("Dor: counts its HyperLogLogs over the measured buckets, reads no device field, and says it is an estimate (R19)", async () => {
+    const from = Date.UTC(2026, 10, 26, 0), to = from + 3 * H;
+    const w = await (await get(`?net=${DOR_ID}&from=${from}&to=${to}`)).json();
+    expect(w).toMatchObject({ kind: "device", estimate: true, rangeDistinct: 42, distinct: [9, 9, 9] });
+    expect(calls).toEqual(expect.arrayContaining(["pfcount:3", "pfcountEach:3"]));
+    expect(calls.some((k) => /:1[hd]:/.test(k) && !k.includes(":hll:"))).toBe(false);
   });
 
   it("picks the 1d tier for a range over 30 days", async () => {

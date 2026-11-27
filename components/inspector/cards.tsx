@@ -558,7 +558,8 @@ function ActiveSubmitters({ id }: { id: string }) {
           )}
         </>
       ) : (
-        <Fact label={label}>{count != null ? <b className="font-mono font-bold">{count.toLocaleString()}</b> : <Empty why="Not measured over the last 24 hours" />}</Fact>
+        // Dor's count is a HyperLogLog estimate (R19), so it reads "about N".
+        <Fact label={label}>{count != null ? <b className="font-mono font-bold">{`${data.estimate ? "about " : ""}${count.toLocaleString()}`}</b> : <Empty why="Not measured over the last 24 hours" />}</Fact>
       )}
     </div>
   );

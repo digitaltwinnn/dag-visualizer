@@ -780,7 +780,7 @@ describe("who submitted a network's data", () => {
     const buckets = row(N, (i) => T0 + i * HOUR) as number[];
     return {
       net: kind === "organisation" ? DED : DOR, kind, unit: kind === "organisation" ? "batches" : "check-ins",
-      tier: "1h", stepMs: HOUR, buckets, measured: { from: T0, to: T0 + N * HOUR }, holes: [],
+      tier: "1h", stepMs: HOUR, buckets, measured: { from: T0, to: T0 + N * HOUR }, holes: [], estimate: kind === "device",
       names: {}, series: [], distinct: row(N, () => 0), rangeDistinct: 0, totals: [],
       seenTotal: 0, firstSeenMs: null, palette: [], ...over,
     };
@@ -853,14 +853,17 @@ describe("who submitted a network's data", () => {
     expect(find(r, /^Open Poker, share of the span's measured batches$/)).toHaveLength(1);
   });
 
-  it("Dor's devices are counted over the range and read start to end, never named", () => {
+  it("Dor's devices are counted over the range and read start to end, never named, and labelled ABOUT: an estimate (R19)", () => {
     const distinct = row(N, (i) => (i < N / 2 ? 10 : 20));
     const r = trendFacts(input({ ...weekOf(DOR), submitters: subWin("device", { distinct, rangeDistinct: 40 }) }))!;
-    expect(find(r, /^Active devices, this span$/)[0]).toMatchObject({ value: 40, kind: "count" });
-    expect(pairsOf(r.facts).get("Active devices in an hour")).toEqual(["Active devices in an hour, at the start of the span", 10, "Active devices in an hour, at the end of the span", 20]);
+    expect(find(r, /^Active devices, this span, about$/)[0]).toMatchObject({ value: 40, kind: "count" });
+    expect(pairsOf(r.facts).get("Active devices in an hour, about")).toEqual(["Active devices in an hour, about, at the start of the span", 10, "Active devices in an hour, about, at the end of the span", 20]);
+    expect(r.facts.filter((f) => /devices/i.test(f.label)).every((f) => /\babout\b/.test(f.label))).toBe(true);
+    // The gate takes the estimate as the model is asked to write it: "about N".
+    expect(checkNote("Dor saw about 40 active devices this span.", r.facts, r.names)).toEqual({ ok: true });
     // Part of the range unmeasured: the count is a floor.
     const part = trendFacts(input({ ...weekOf(DOR), submitters: subWin("device", { distinct: distinct.map((v, i) => (i < 20 ? null : v)), rangeDistinct: 40 }) }))!;
-    expect(find(part, /^Active devices, this span, at least$/)[0]!.value).toBe(40);
+    expect(find(part, /^Active devices, this span, about, at least$/)[0]!.value).toBe(40);
   });
 
   it("changes nothing without a window, for another network, or for the whole network", () => {

@@ -1,6 +1,6 @@
 import type { TrendBand, TrendLine } from "@/components/docs/TrendChart";
 import type { SubmittersWindow } from "@/app/api/submitters/assemble";
-import { SUBMITTERS, submitterLabel } from "@/src/data/submitters";
+import { SUBMITTERS, submitterLabel, type SubmitterKind } from "@/src/data/submitters";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
 import { submitterHudCss } from "@/src/palette/submitterHue";
 
@@ -30,6 +30,14 @@ export function submittersCardState(scope: string | null, carriesData: (id: stri
  *  which nothing here measures (rule 10). */
 export function noSubmitterLine(network: string): string {
   return `${network}'s data names no submitter this app reads, so there is no one to show`;
+}
+
+/** A COUNT OF SUBMITTERS AS THE CARDS SAY IT: "5 organisations", "about 1,438 devices". An
+ *  `estimate` (Dor's HyperLogLog counts, R19 — `SubmittersWindow.estimate`) says "about", so an
+ *  estimate is never shown as exact (rule 10); one block's own ids are exact and pass false. */
+export function countWords(n: number, kind: SubmitterKind, estimate: boolean): string {
+  const noun = kind === "organisation" ? (n === 1 ? "organisation" : "organisations") : n === 1 ? "device" : "devices";
+  return `${estimate ? "about " : ""}${n.toLocaleString()} ${noun}`;
 }
 
 /** THE NETWORK THE DECK STANDS ON (`trendStack.cardNetwork`, the rule the Range card's lead reads),

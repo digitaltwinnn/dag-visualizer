@@ -728,13 +728,19 @@ describe("who submitted the data", () => {
         asked.push(key);
         return key.endsWith(":span") ? { from: String(NOW - 30 * D), to: String(NOW - H) } : null;
       },
+      async pfcount(keys: string[]) { asked.push(`pfcount:${keys.length}`); return 7; },
+      async pfcountEach(keys: string[]) { return keys.map(() => 3); },
     };
     const reads = storeReads(NOW, store);
     const w = await reads.submitters!(DED, NOW - 7 * D, NOW);
     expect(w).toMatchObject({ net: DED, tier: "1h", kind: "organisation" });
     expect(asked).toEqual(expect.arrayContaining([`sub:mainnet:${DED}:span`, `sub:mainnet:${DED}:names`, `sub:mainnet:${DED}:1h:2026-10`]));
     expect(asked.some((k) => k.includes(":1d:"))).toBe(false); // the notes need no all-time palette
-    expect((await reads.submitters!(DOR, NOW - 90 * D, NOW))!.tier).toBe("1d");
+    asked.length = 0;
+    const dor = (await reads.submitters!(DOR, NOW - 90 * D, NOW))!;
+    expect(dor.tier).toBe("1d");
+    expect(dor).toMatchObject({ estimate: true, rangeDistinct: 7 }); // Dor (R19): PFCOUNT, no device field read
+    expect(asked.some((k) => k.includes(":1d:") || k.includes(":1h:"))).toBe(false);
     asked.length = 0;
     expect(await reads.submitters!(USDC, NOW - 7 * D, NOW)).toBeNull();
     expect(asked).toEqual([]);

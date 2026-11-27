@@ -264,6 +264,8 @@ describe("who submitted the data", () => {
   it("is one line in History's and the Data blocks' prompts, and in no other view's", () => {
     expect(SUBMITTER_WORDS).toMatch(/organisation is named exactly as the facts name it/);
     expect(SUBMITTER_WORDS).toMatch(/device is never named/);
+    // Dor's device counts are estimates (R19): the model says "about" before them.
+    expect(SUBMITTER_WORDS).toMatch(/device count the facts label "about" is an estimate: write "about" before it/);
     for (const label of ["Digital Evidence", DATA_WHOLE]) expect(PROMPTS.data.system(label)).toContain(SUBMITTER_WORDS);
     expect(PROMPTS.trend.system("Digital Evidence")).toContain(SUBMITTER_WORDS);
     for (const v of ["hyper", "geo", "ledger", "blocks"] as const) expect(PROMPTS[v].system("x")).not.toContain(SUBMITTER_WORDS);

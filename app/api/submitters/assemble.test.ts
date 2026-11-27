@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DED_ID, DOR_ID } from "@/src/data/submitters";
-import { assembleSubmitters, windowRange24h, ORG_PALETTE_MAX } from "./assemble";
-import { subField, subSlotOf } from "./keys";
+import { assembleSubmitters, measuredHllKeys, windowRange24h, ORG_PALETTE_MAX } from "./assemble";
+import { subField, subHllKeyOf, subSlotOf } from "./keys";
 
 const H = 3600000;
 const T0 = Date.UTC(2026, 10, 10, 0); // an hour boundary
@@ -31,17 +31,31 @@ describe("assembleSubmitters", () => {
     expect(w.measured).toEqual({ from: T0 + 2 * H, to: T0 + 5 * H + 1800000 });
   });
 
-  it("counts Dor devices exactly as a union, with no series or totals", () => {
-    const hashes = hashesFor(DOR_ID, [[T0, "a", 1], [T0, "b", 4], [T0 + H, "b", 1], [T0 + H, "c", 1]]);
+  it("counts Dor devices from their HyperLogLogs: a bucket its key's count, the range the union's (R19)", () => {
+    const k0 = subHllKeyOf(DOR_ID, "1h", T0), k1 = subHllKeyOf(DOR_ID, "1h", T0 + H);
     const w = assembleSubmitters({
-      net: DOR_ID, tier: "1h", fromMs: T0, toMs: T0 + 2 * H, hashes,
-      span: { from: String(T0), to: String(T0 + 2 * H) }, names: null,
+      net: DOR_ID, tier: "1h", fromMs: T0, toMs: T0 + 3 * H, hashes: {},
+      span: { from: String(T0), to: String(T0 + 2 * H + 1) }, names: null,
+      devices: { counts: { [k0]: 2 }, union: 3 },
     });
     expect(w.kind).toBe("device");
-    expect(w.distinct).toEqual([2, 2]);
+    expect(w.estimate).toBe(true);
+    expect(w.distinct).toEqual([2, 0, null]); // k1 holds no device (PFCOUNT 0); the third is in progress
     expect(w.rangeDistinct).toBe(3);
     expect(w.series).toEqual([]);
     expect(w.totals).toEqual([]);
+    expect(k1).not.toBe(k0);
+    // nothing measured: no count, even with a union handed in
+    const none = assembleSubmitters({ net: DOR_ID, tier: "1h", fromMs: T0, toMs: T0 + H, hashes: {}, span: null, names: null, devices: { counts: {}, union: 9 } });
+    expect(none.rangeDistinct).toBeNull();
+    // an organisation window is exact
+    expect(assembleSubmitters({ net: DED_ID, tier: "1h", fromMs: T0, toMs: T0 + H, hashes: {}, span: null, names: null }).estimate).toBe(false);
+  });
+
+  it("measuredHllKeys: the HLL keys of the measured buckets only, the set the union is counted over", () => {
+    const sp = { from: String(T0), to: String(T0 + 3 * H + 1) };
+    const keys = measuredHllKeys(DOR_ID, "1h", T0 - H, T0 + 4 * H, sp, { [String(T0 + H)]: String(T0 + 2 * H) });
+    expect(keys).toEqual([subHllKeyOf(DOR_ID, "1h", T0), subHllKeyOf(DOR_ID, "1h", T0 + 2 * H)]);
   });
 
   it("carries only the label map in names, and an unnamed organisation is still in series and totals", () => {

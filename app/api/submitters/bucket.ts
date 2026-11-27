@@ -1,10 +1,9 @@
-import { subField, subSlotOf, type SubTier } from "./keys";
+import { subField, subHllKeyOf, subSlotOf, type SubTier } from "./keys";
 
 const TIERS: SubTier[] = ["1h", "1d"];
 
-/** Adds a tally into BOTH tiers' fields. Invariant: a day's 1d fields equal the sum (and, for
- *  devices, the union) of its 1h fields. A device's field value is its check-ins; distinctness
- *  is read from field presence. */
+/** Adds an ORGANISATION tally into BOTH tiers' fields. Invariant: a day's 1d fields equal the sum of
+ *  its 1h fields (`bucket.test.ts`, and the walk's recompute in `runSubmitters.test.ts`). */
 export function bucketSubmitters(
   inc: Map<string, Map<string, number>>,
   netId: string,
@@ -19,6 +18,22 @@ export function bucketSubmitters(
       const f = subField(bucket, id);
       fields.set(f, (fields.get(f) ?? 0) + updates);
     }
+  }
+}
+
+/** Adds a DEVICE tally's ids to BOTH tiers' HyperLogLog keys (R19, `subHllKeyOf`): a set to PFADD,
+ *  never a field. PFADD is idempotent, so the day's HLL is the union of its hours by construction. */
+export function bucketDevices(
+  adds: Map<string, Set<string>>,
+  netId: string,
+  tsMs: number,
+  tally: { id: string; updates: number }[],
+): void {
+  for (const tier of TIERS) {
+    const key = subHllKeyOf(netId, tier, tsMs);
+    let ids = adds.get(key);
+    if (!ids) adds.set(key, (ids = new Set()));
+    for (const { id } of tally) ids.add(id);
   }
 }
 

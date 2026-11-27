@@ -1,17 +1,25 @@
 // The Upstash client behind ONE narrow interface, so runSample tests against an in-memory
 // fake and the command budget stays auditable here. REST + per-call pipelining is the
-// Upstash usage contract (spec): no TCP pooling, hashes + EXPIRE only.
+// Upstash usage contract (spec): no TCP pooling, hashes + EXPIRE only — and, for the submitters
+// family alone, Dor's HyperLogLogs (PFADD / PFCOUNT, ruling R19).
 import { Redis } from "@upstash/redis";
 
 /** One key's writes in a transaction: `map` HSET, then `hdel` fields deleted (the submitters' holes,
- *  `walkHoles`), then the EXPIRE. */
-export interface TrendsWrite { key: string; map: Record<string, number | string>; ttlS: number | null; hdel?: string[] }
+ *  `walkHoles`), then `pfadd` elements added to the key as a HyperLogLog (Dor's devices, R19), then the
+ *  EXPIRE. A key is a hash or an HLL, never both. */
+export interface TrendsWrite { key: string; map: Record<string, number | string>; ttlS: number | null; hdel?: string[]; pfadd?: string[] }
 
 export interface TrendsStore {
   hgetall(key: string): Promise<Record<string, string> | null>;
   hmget(key: string, fields: string[]): Promise<(string | null)[]>;
   hset(key: string, map: Record<string, string | number>): Promise<void>;
   expire(key: string, s: number): Promise<void>;
+  /** PFADD: `ids` into the HyperLogLog at `key` (idempotent — re-adding an id changes nothing). */
+  pfadd(key: string, ids: string[]): Promise<void>;
+  /** PFCOUNT over `keys`: the estimated distinct count of their UNION (~0.81% standard error). */
+  pfcount(keys: string[]): Promise<number>;
+  /** PFCOUNT of each key on its own, in one pipelined request (a 30-day hourly read is 720 keys). */
+  pfcountEach(keys: string[]): Promise<number[]>;
   acquireLock(key: string, ttlS: number): Promise<boolean>;
   releaseLock(key: string): Promise<void>;
   /** Every HSET (+ EXPIRE) for this run, the cursor included, as ONE Upstash MULTI/EXEC —
@@ -44,6 +52,20 @@ function wrap(r: Redis): TrendsStore {
     async expire(key, s) {
       await r.expire(key, s);
     },
+    async pfadd(key, ids) {
+      if (ids.length) await r.pfadd(key, ...ids);
+    },
+    async pfcount(keys) {
+      if (!keys.length) return 0;
+      const [first, ...rest] = keys;
+      return r.pfcount(first!, ...rest);
+    },
+    async pfcountEach(keys) {
+      if (!keys.length) return [];
+      const p = r.pipeline(); // reads only: a pipeline, not a transaction
+      for (const k of keys) p.pfcount(k);
+      return (await p.exec()) as number[];
+    },
     async acquireLock(key, ttlS) {
       return (await r.set(key, "1", { nx: true, ex: ttlS })) === "OK";
     },
@@ -61,6 +83,7 @@ function wrap(r: Redis): TrendsStore {
       for (const w of writes) {
         if (Object.keys(w.map).length) tx.hset(w.key, w.map);
         if (w.hdel?.length) tx.hdel(w.key, ...w.hdel);
+        if (w.pfadd?.length) tx.pfadd(w.key, ...w.pfadd);
         if (w.ttlS != null) tx.expire(w.key, w.ttlS);
       }
       await tx.exec();

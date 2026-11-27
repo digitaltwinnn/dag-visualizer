@@ -171,7 +171,9 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
 - **`/api/submitters`** (2026-11-27) is the READ route for who sent a network's data blocks: `?net=` (DED or
   Dor, anything else 400) with either `window=24h` (the 24 whole hours ending at the newest whole
   measured hour) or `from`/`to` epoch ms (within ten years). Answers a `SubmittersWindow` (`assemble.ts`):
-  per-bucket organisation tallies (or Dor's exact device unions), the names hash, the busiest-of-all-time
+  per-bucket organisation tallies (or Dor's device counts, HyperLogLog ESTIMATES — `estimate: true`,
+  ~0.81% standard error, R19: PFCOUNT of each measured bucket's `…:hll:1h|1d:…` key and of their
+  union, so no device id leaves the store), the names hash, the busiest-of-all-time
   `palette`, and the measured span — a bucket outside it is null. Same idiom as `/api/trends`: reading
   searchParams keeps it per-request, `public, s-maxage=300, stale-while-revalidate=600`, the read-only
   token, 503 `no-store` when the store is down. Which hashes a range reads is `readSubmitters`
@@ -179,7 +181,9 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
 - **`/api/submitters/sample`** (2026-11-27) is the Vercel-Cron sampler (quarter-hourly at 3,18,33,48,
   `CRON_SECRET` auth) for WHO SUBMITS a data block: Digital Evidence's organisations (`orgId`) and Dor's
   devices (`publicId`), the two networks in `src/data/submitters.ts`. Its own key family `sub:mainnet:`
-  (1h and 1d tiers, `app/api/submitters/keys.ts`) — outside `t:` on purpose: a rebuild wipes `t:`, and
+  (1h and 1d tiers, `app/api/submitters/keys.ts`; Dor's devices are HyperLogLog keys per UTC hour and
+  day, PFADDed in the run's one transaction, R19 — one hour of Dor is ~1,400 devices, too many to keep a
+  field each) — outside `t:` on purpose: a rebuild wipes `t:`, and
   per-organisation series would ride every History payload. Its own lock and cursor, so it never waits on
   the trends sampler. It pages the explorer's snapshot list since the cursor, then reads each snapshot
   from the network's OWN L0 by ordinal (200 s read budget inside `maxDuration` 300; the prefix read is
@@ -194,7 +198,8 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   **Back-filling submitters** is `scripts/walk-submitters.ts --net=ded|dor [--from=YYYY-MM-DD]`
   (defaults: DED 2025-09-15, Dor today − 90 days), a thin CLI over `walkRange` (`runSubmitters.ts`,
   where the discipline is tested): oldest hour first up to the span's `from` and NEVER past it — the
-  sampler owns those hours; each hour written as a SET of its full tally, so a rerun is idempotent;
+  sampler owns those hours; each hour written as a SET of its full tally (Dor's: a PFADD into the hour's
+  and the day's HLL, idempotent by nature), so a rerun is idempotent;
   each day's 1d recomputed from ALL its stored 1h fields (1d = Σ1h, the boundary day's sampler hours
   included, under the sampler's lock); `from` lowered to the walk's start only once the walk reaches it
   contiguously, under the same lock. A day's records are found by seeking (`seekBoundary` + a crafted

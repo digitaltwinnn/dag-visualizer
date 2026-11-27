@@ -326,8 +326,17 @@ Digital Evidence's updates are `MetagraphBatchMessage`s carrying an `orgId` — 
 answers null: absent is absent, never a guess (rule 10). An update naming no submitter is not counted;
 the block's other figures never depend on it.
 
-**Dor is counted, not named.** A device id is stored truncated to `DEVICE_ID_LEN` and only ever counted
-(a union of ids), never given a name, a colour or a breakdown — a device is not a party anyone can name.
+**Dor is counted, not named.** A device id is cut to `DEVICE_ID_LEN` and only ever counted, never given
+a name, a colour or a breakdown — a device is not a party anyone can name. **The count over time is an
+ESTIMATE** (ruling R19, 2026-11-27): measured, one hour of Dor holds ~1,400 distinct devices, which as
+per-device hash fields came to ~1M fields per month hash. So the sampler and the walk PFADD each
+bucket's ids into a HyperLogLog per UTC hour and per UTC day (`sub:mainnet:<DOR>:hll:1h:YYYY-MM-DD-HH`,
+`…:hll:1d:YYYY-MM-DD`, `keys.subHllKeyOf`); a bucket's count is PFCOUNT of its key and a range's is
+PFCOUNT over every measured bucket's key — the UNION, a device seen in two hours one device — with
+Redis's ~0.81% standard error. No device id leaves the store. Every surface says so: the window
+carries `estimate: true`, and History's line and "about N devices checked in", the Metagraph card's
+"Active devices" and the notes' device facts all read "about N". One data block's own "Checked in by
+N devices" is exact (its ids are in hand), and so is the Data blocks note's count over the live window.
 DED's organisations are named from DED's own public API (`/v1/fingerprints/latest`, read each sampler
 run) and, for organisations that stopped before the sampler started, a one-off seed from dagscan's
 evidence summary (`scripts/seed-ded-names.ts`, never over a name DED gave). An organisation without a
@@ -344,9 +353,10 @@ surface hovers an organisation on `hoverSubmitter`.
 only when it lies wholly inside the span at its tier and overlaps no HOLE (ruling R20: the hours a gap
 left unread, `sub:…:holes`, until `walk-submitters --holes` fills them), and everything else is NULL —
 "not measured", never a zero (`app/api/submitters/assemble.test.ts`). A gap never restarts the span: the
-history before it stays measured. A day (1d) is exactly the sum of its
-hours (1h); devices are exact unions of ids, never a sum of per-bucket counts (a device seen in two hours
-is one device). The in-progress bucket is null, History's partial-edge rule. A network with no
+history before it stays measured. An organisation's day (1d) is exactly the sum of its hours (1h): the
+sampler adds both tiers in one transaction (`bucket.test.ts`) and the walk recomputes each day it
+touched from its stored hours (`runSubmitters.test.ts`, "1d = Σ1h"). A device day is its own HLL, the
+union of its hours by construction, never a sum of per-bucket counts. The in-progress bucket is null, History's partial-edge rule. A network with no
 submitters row says only what is true by construction — "<network>'s data names no submitter this app
 reads, so there is no one to show" (`trendSubmitters.noSubmitterLine`, R21) — never what its chain carried
 in a range, which nothing here measures.
