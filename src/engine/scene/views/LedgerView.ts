@@ -91,8 +91,7 @@ import type { ViewPolicy } from "../../domain/viewPolicy";
 type LedgerRegister = ViewPolicy["registers"][number];
 import { fmtKB } from "@/src/util/format"; // the HUD's own size vocabulary — one formatter, so scene and cards can't disagree
 import { SUBMITTERS } from "@/src/data/submitters";
-import { UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
-import { submitterSceneHex } from "@/src/palette/submitterHue";
+import { SUBMITTER_NEUTRAL_HEX_BY_THEME, submitterSceneHex } from "@/src/palette/submitterHue";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
 import { ByteBar, SEED_W } from "../objects/ByteBar";
 import { LiveEdge } from "../objects/LiveEdge";
@@ -710,7 +709,7 @@ export class LedgerView implements SceneView {
     this._dataMarkMesh.count = 0;
     this.group.add(this._dataMarkMesh);
     this._liftMist = new LiftMist(this.group, META_TRAIL_MAX, DATA_MARK.foot, TILE_D * DATA_MARK.lift, this._paper);
-    this._restCol.setHex(UNLISTED_SCENE_HEX_BY_THEME[this._paper ? "light" : "dark"]);
+    this._restCol.setHex(SUBMITTER_NEUTRAL_HEX_BY_THEME[this._paper ? "light" : "dark"]);
   }
 
   private _laneColor(id: string): THREE.Color {
@@ -1710,7 +1709,7 @@ export class LedgerView implements SceneView {
   /** Every interned organisation's scene ink, and the remainder's, for this palette and ground. */
   private _resolveOrgCols(): void {
     const theme = this._paper ? "light" : "dark";
-    this._restCol.setHex(UNLISTED_SCENE_HEX_BY_THEME[theme]);
+    this._restCol.setHex(SUBMITTER_NEUTRAL_HEX_BY_THEME[theme]);
     for (let i = 0; i < this._orgIds.length; i++) this._orgCols[i].set(submitterSceneHex(this._orgIds[i], this._palette, theme));
   }
 

@@ -48,3 +48,19 @@ describe("string forms", () => {
     expect(submitterSceneHex("eighth", REAL, "light")).toBe("#5a6478");
   });
 });
+
+describe("SUBMITTER_NEUTRAL_HEX_BY_THEME — the palette's own neutral (rule 1)", () => {
+  it("is the chamber's neutral tone, one per ground, and the outside-the-palette scene colour", async () => {
+    const { SUBMITTER_NEUTRAL_HEX_BY_THEME } = await import("./submitterHue");
+    expect(SUBMITTER_NEUTRAL_HEX_BY_THEME).toEqual({ dark: 0x8a96b8, light: 0x5a6478 });
+    const hex = (n: number) => "#" + n.toString(16).padStart(6, "0");
+    expect(submitterSceneHex("zz", REAL, "dark")).toBe(hex(SUBMITTER_NEUTRAL_HEX_BY_THEME.dark));
+    expect(submitterSceneHex("zz", REAL, "light")).toBe(hex(SUBMITTER_NEUTRAL_HEX_BY_THEME.light));
+  });
+  it("is what the palette and the chamber import, never `src/data/unlisted` (which reaches the store)", async () => {
+    const { readFileSync } = await import("node:fs");
+    for (const f of ["src/palette/submitterHue.ts", "src/engine/scene/views/LedgerView.ts"]) {
+      expect(readFileSync(f, "utf8")).not.toMatch(/from "@\/src\/data\/unlisted"/);
+    }
+  });
+});

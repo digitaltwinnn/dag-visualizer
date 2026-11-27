@@ -11,9 +11,15 @@ import { oklchToHex } from "./palette";
 import { inAllowedZone } from "./brand";
 import { COLORS } from "@/src/engine/config";
 import { hexToHueDeg, identityHueDeg, SCENE_L, SCENE_C, SCENE_L_LIGHT, SCENE_C_LIGHT } from "./identity";
-import { UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
 import { DED_ID, DOR_ID } from "@/src/data/submitters";
 import type { Theme } from "@/src/theme/resolve";
+
+/** THE NEUTRAL an organisation outside the palette draws in the scene, one resolved hex per ground —
+ *  the chamber's own neutral tone (the same values as the unlisted network's scene grey), held HERE so
+ *  the palette and the scene take it from `src/palette/` alone: `src/data/unlisted.ts` imports the
+ *  network accessors, and through them the store and NetworkData, which a scene module may not reach
+ *  (rule 1, `layerBoundaries.test.ts`). */
+export const SUBMITTER_NEUTRAL_HEX_BY_THEME: Readonly<Record<Theme, number>> = { dark: 0x8a96b8, light: 0x5a6478 };
 
 export const MIN_HUE_GAP = 18;
 export const ORG_HUE_GAP = 24;
@@ -91,10 +97,10 @@ export function submitterHudCss(id: string, palette: readonly string[]): string 
 
 const _scene = new Map<string, string>();
 const hex6 = (n: number) => "#" + n.toString(16).padStart(6, "0");
-/** The scene colour; the chamber's neutral (the unlisted network's) outside the palette. */
+/** The scene colour; the palette's neutral (`SUBMITTER_NEUTRAL_HEX_BY_THEME`) outside the palette. */
 export function submitterSceneHex(id: string, palette: readonly string[], theme: Theme = "dark"): string {
   const h = submitterHue(id, palette);
-  if (h === null) return hex6(UNLISTED_SCENE_HEX_BY_THEME[theme]);
+  if (h === null) return hex6(SUBMITTER_NEUTRAL_HEX_BY_THEME[theme]);
   const key = `${theme}:${h}`;
   const hit = _scene.get(key);
   if (hit) return hit;
