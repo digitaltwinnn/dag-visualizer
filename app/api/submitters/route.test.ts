@@ -34,15 +34,18 @@ describe("GET /api/submitters", () => {
     expect((await get(`?net=${DED_ID}&from=x&to=5`)).status).toBe(400);
   });
 
-  it("window=24h reads the 1h hashes under the measured hours and sets the cache header", async () => {
+  it("window=24h reads the 24 whole hours ending at the current hour, and sets the cache header", async () => {
     const r = await get(`?net=${DED_ID}&window=24h`);
     expect(r.status).toBe(200);
     expect(r.headers.get("Cache-Control")).toBe("public, s-maxage=300, stale-while-revalidate=600");
     const w = await r.json();
     expect(w.tier).toBe("1h");
     expect(w.buckets).toHaveLength(24);
-    expect(w.buckets[23]).toBe(Date.UTC(2026, 10, 27, 7));
-    expect(w.buckets[0]).toBe(Date.UTC(2026, 10, 27, 7) - 23 * H);
+    // NOW is 10:20 and the span ends 08:30: the window is anchored at now (09:00 the last whole
+    // hour), so the hours after the span read as not measured, never yesterday's figures.
+    expect(w.buckets[23]).toBe(Date.UTC(2026, 10, 27, 9));
+    expect(w.buckets[0]).toBe(Date.UTC(2026, 10, 27, 9) - 23 * H);
+    expect(w.distinct.slice(-2)).toEqual([null, null]);
     expect(calls).toContain(`sub:mainnet:${DED_ID}:1h:2026-11`);
   });
 

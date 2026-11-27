@@ -48,6 +48,7 @@ export function submittersScope(filter: string, focus: string | null, front: str
 }
 
 const H = 3_600_000;
+const DAY_MS = 86_400_000;
 /** The span on screen as the read route is asked it, both ends moved UP to whole hours (the store's
  *  finest tier): a trailing window ends at the clock, and an unsnapped end would be a new URL — a new
  *  fetch — on every render. Moving both ends the same way keeps the length, so the 30-day window
@@ -105,12 +106,30 @@ export function organisationChart(w: SubmittersWindow, totalHue: string): { line
   return { lines: [{ label: "Batches", points: total, hue: totalHue }], stack, shares };
 }
 
-/** THE LINE UNDER THE CHART WHEN THE RANGE REACHES BEFORE MEASURING (rule 10): nothing measured at
- *  all, or the first measured bucket named in `stamp`'s words (`localTime.bucketStamp` at the
- *  window's own step — a UTC day at the daily tier). Null when the range starts inside the span. */
+/** THE LINE UNDER THE CHART (rule 10): every way a bucket of the range is not measured is SAID, never
+ *  left as an empty plot. In order:
+ *  - nothing measured at all — "Not measured yet";
+ *  - the range runs more than a bucket past where the sampler's span ends (a stalled sampler, or a
+ *    range wholly after it) — "Not measured since <stamp of the span's end>";
+ *  - the range is the bucket still being written (the 1h pill: one in-progress bucket, always null) —
+ *    "Measured by the hour; this hour is still being read.";
+ *  - the range starts before the span — "Not measured before <first measured bucket>", named in
+ *    `stamp`'s words (`localTime.bucketStamp` at the window's own step — a UTC day at the daily tier);
+ *  - a hole inside it (R20, the hours a gap left unread) — "Part of this range is not measured".
+ *  Null when the range is measured throughout. */
 export function measuredFloor(w: SubmittersWindow, stamp: (ms: number) => string): string | null {
   if (!w.measured) return "Not measured yet";
-  if (!w.buckets.length || w.distinct[0] != null) return null;
-  const first = w.buckets.find((_, i) => w.distinct[i] != null) ?? Math.ceil(w.measured.from / w.stepMs) * w.stepMs;
-  return first > w.buckets[0]! ? `Not measured before ${stamp(first)}` : null;
+  if (!w.buckets.length) return null;
+  const step = w.stepMs;
+  const first = w.buckets[0]!, last = w.buckets[w.buckets.length - 1]!;
+  const writing = Math.floor(w.measured.to / step) * step; // the bucket the sampler is still writing
+  if (last > writing + step) return `Not measured since ${stamp(w.measured.to)}`;
+  if (first >= writing && w.distinct.every((v) => v == null)) {
+    return step >= DAY_MS ? "Measured by the day; this day is still being read." : "Measured by the hour; this hour is still being read.";
+  }
+  if (first < w.measured.from) {
+    const from = w.buckets.find((t, i) => t >= w.measured!.from && w.distinct[i] != null) ?? Math.ceil(w.measured.from / step) * step;
+    return `Not measured before ${stamp(from)}`;
+  }
+  return w.holes.length ? "Part of this range is not measured" : null;
 }

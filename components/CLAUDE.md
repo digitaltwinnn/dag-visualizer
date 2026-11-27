@@ -517,9 +517,12 @@ Digital Evidence draws the span's TOTAL batches per bucket with its organisation
 partition it (ruling R4 — the top five palette members by the span's totals in their own hue,
 `TrendBand.hue`, every other one "Other (n)" in the neutral), the bands' share table as its key (the
 chart's own legend is off — `TrendChart legend`) and "N active of M seen"; Dor its devices per bucket
-and "N devices checked in", never named. A bucket outside the sampler's measured span is null and the
-line under the chart says "Not measured before <first measured bucket>" (`bucketStamp` at the
-window's step), or "not measured yet" in the plot when nothing is. The read asks the span with both
+and "N devices checked in", never named. A bucket outside the sampler's measured span (or in a hole, R20) is null,
+and the line under the chart says every way a bucket is not measured (`measuredFloor`): "Not measured
+since <stamp>" when the range runs past where the sampler stopped, "Measured by the hour; this hour is
+still being read." on the 1h pill (its one bucket is the one being written), "Not measured before
+<first measured bucket>" (`bucketStamp` at the window's step), "Part of this range is not measured"
+over a hole, or "not measured yet" in the plot when nothing is. The read asks the span with both
 ends moved up to the hour (`querySpan`) — a stable URL that keeps the window's length, so 30 days
 stay hourly. Because it always stands under the Range, the lane's subject run ends on it, so its next
 ghost is the Range's (`CHILD_OF.trend.submitters`, the span's first moment), and with no note and

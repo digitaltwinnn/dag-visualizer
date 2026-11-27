@@ -114,12 +114,12 @@ export function measuredHllKeys(
   return out;
 }
 
-/** `window=24h`: the 24 whole hours ending at the newest whole measured hour (the current hour when
- *  nothing is measured, all null). */
-export function windowRange24h(span: Record<string, string> | null, nowMs: number): { fromMs: number; toMs: number } {
+/** `window=24h`: the 24 whole hours ending at the CURRENT hour (rule 10, final review 2026-11-27): it
+ *  was anchored at the span's end, so a stalled sampler showed days-old figures as "the last 24 hours";
+ *  anchored at now, the hours the sampler missed read as not measured. */
+export function windowRange24h(nowMs: number): { fromMs: number; toMs: number } {
   const H = stepMsOf("1h");
-  const m = parseSpan(span);
-  const toMs = Math.floor((m ? m.to : nowMs) / H) * H;
+  const toMs = Math.floor(nowMs / H) * H;
   return { fromMs: toMs - 24 * H, toMs };
 }
 

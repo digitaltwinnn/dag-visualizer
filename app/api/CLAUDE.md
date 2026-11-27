@@ -169,8 +169,9 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   (`fetchSince.ts`), not just its newest page. The History view (`/trends`) is the read route's
   consumer.
 - **`/api/submitters`** (2026-11-27) is the READ route for who sent a network's data blocks: `?net=` (DED or
-  Dor, anything else 400) with either `window=24h` (the 24 whole hours ending at the newest whole
-  measured hour) or `from`/`to` epoch ms (within ten years). Answers a `SubmittersWindow` (`assemble.ts`):
+  Dor, anything else 400) with either `window=24h` (the 24 whole hours ending at the CURRENT
+  hour — anchored at now, so a stalled sampler's missing hours read as not measured, never days-old
+  figures as the last 24 hours) or `from`/`to` epoch ms (within ten years). Answers a `SubmittersWindow` (`assemble.ts`):
   per-bucket organisation tallies (or Dor's device counts, HyperLogLog ESTIMATES — `estimate: true`,
   ~0.81% standard error, R19: PFCOUNT of each measured bucket's `…:hll:1h|1d:…` key and of their
   union, so no device id leaves the store), the names hash, the busiest-of-all-time

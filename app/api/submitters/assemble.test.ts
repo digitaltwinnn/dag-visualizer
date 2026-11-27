@@ -135,11 +135,8 @@ describe("palette", () => {
 });
 
 describe("windowRange24h", () => {
-  it("is the 24 whole hours ending at the newest whole measured hour", () => {
-    const r = windowRange24h({ from: String(T0), to: String(T0 + 30 * H + 1800000) }, T0 + 99 * H);
-    expect(r).toEqual({ fromMs: T0 + 6 * H, toMs: T0 + 30 * H });
-  });
-  it("ends at the current hour when nothing is measured", () => {
-    expect(windowRange24h(null, T0 + 50 * H + 5)).toEqual({ fromMs: T0 + 26 * H, toMs: T0 + 50 * H });
+  it("is the 24 whole hours ending at the current hour, whatever the span says: a stalled sampler reads unmeasured hours, never days-old figures as the last 24 hours", () => {
+    expect(windowRange24h(T0 + 50 * H + 5)).toEqual({ fromMs: T0 + 26 * H, toMs: T0 + 50 * H });
+    expect(windowRange24h(T0 + 50 * H)).toEqual({ fromMs: T0 + 26 * H, toMs: T0 + 50 * H });
   });
 });

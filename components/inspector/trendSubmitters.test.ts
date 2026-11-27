@@ -164,4 +164,21 @@ describe("measuredFloor — the line under the chart when the range reaches befo
   it("a range wholly inside the span has no line", () => {
     expect(measuredFloor(win({}), stamp)).toBeNull();
   });
+  it("the 1h pill — one bucket, the one still being written — says so, never a blank card", () => {
+    const now = win({ buckets: [3 * H], distinct: [null], measured: { from: 0, to: 3 * H + 600_000 } });
+    expect(measuredFloor(now, stamp)).toBe("Measured by the hour; this hour is still being read.");
+    // the sampler has not reached this hour yet (its last run ended in the previous one)
+    const early = win({ buckets: [3 * H], distinct: [null], measured: { from: 0, to: 3 * H - 600_000 } });
+    expect(measuredFloor(early, stamp)).toBe("Measured by the hour; this hour is still being read.");
+  });
+  it("a range reaching past where the sampler stopped says since when (a stalled sampler)", () => {
+    const after = win({ buckets: [10 * H, 11 * H], distinct: [null, null], measured: { from: 0, to: 3 * H + 5 } });
+    expect(measuredFloor(after, stamp)).toBe(`Not measured since @${3 * H + 5}`);
+    const tail = win({ buckets: [0, H, 2 * H, 3 * H, 4 * H, 5 * H], distinct: [1, 1, null, null, null, null], measured: { from: 0, to: 2 * H + 5 } });
+    expect(measuredFloor(tail, stamp)).toBe(`Not measured since @${2 * H + 5}`);
+  });
+  it("a hole inside the range is said, and is never read as the start of measuring (R20)", () => {
+    const holed = win({ distinct: [null, 0, 0], holes: [{ from: 0, to: H }] });
+    expect(measuredFloor(holed, stamp)).toBe("Part of this range is not measured");
+  });
 });

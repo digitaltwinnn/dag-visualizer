@@ -16,7 +16,7 @@ export function subTierOf(fromMs: number, toMs: number): SubTier {
   return toMs - fromMs <= 30 * DAY ? "1h" : "1d";
 }
 
-/** `range` is `[fromMs, toMs)` or `"24h"` (the 24 whole hours ending at the newest measured hour).
+/** `range` is `[fromMs, toMs)` or `"24h"` (the 24 whole hours ending at the current hour).
  *  `years: false` skips the 1d year hashes, so `seenTotal`, `firstSeenMs` and `palette` stay empty:
  *  the notes need none of them. The network must have a `SUBMITTERS` row; a read that throws
  *  propagates. */
@@ -30,7 +30,7 @@ export async function readSubmitters(
   const [span, names, holes] = await Promise.all([
     store.hgetall(subSpanKeyOf(net)), store.hgetall(subNamesKeyOf(net)), store.hgetall(subHolesKeyOf(net)),
   ]);
-  const { fromMs, toMs } = range === "24h" ? windowRange24h(span, nowMs) : range;
+  const { fromMs, toMs } = range === "24h" ? windowRange24h(nowMs) : range;
   const tier: SubTier = range === "24h" ? "1h" : subTierOf(fromMs, toMs);
   if (SUBMITTERS[net]!.kind === "device") {
     // DOR (R19): no fields to read — PFCOUNT of each measured bucket's HLL and of their union.
