@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { READ_SLACK_MS, chainReadThrough, durationWords, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, spanMeasured, pairChange, spellDurations, withChangeFacts, changeShare, wholeMean } from "@/src/data/noteFacts";
+import { READ_SLACK_MS, chainReadThrough, durationWords, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, spanMeasured, pairChange, spellDurations, withChangeFacts, changeShare, wholeMean, MULTIPLE_FROM, MULTIPLE_MAX, moveOf, changeMultiple, changeFact } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatDag } from "@/src/data/trendSeries";
 
@@ -293,6 +293,56 @@ describe("withChangeFacts", () => {
   it("adds nothing for a pair that rounds to no change, or has nothing to move from", () => {
     expect(withChangeFacts(pair("k", "k before", 1000, "k now", 1002))).toHaveLength(2);
     expect(withChangeFacts(pair("k", "k before", 0, "k now", 5))).toHaveLength(2);
+  });
+});
+
+// A RISE OF TENFOLD OR MORE IS A MULTIPLE (user, 2026-11-27: "can't you say 10x?").
+describe("a move of tenfold or more", () => {
+  const ends = (from: number, to: number) => [fact("k before", from, "count", undefined, { key: "k", end: "from" }), fact("k now", to, "count", undefined, { key: "k", end: "to" })] as const;
+  it("is a whole multiple from MULTIPLE_FROM times, a percentage below it, and nothing from MULTIPLE_MAX", () => {
+    expect(MULTIPLE_FROM).toBe(10);
+    expect(MULTIPLE_MAX).toBe(100);
+    expect(moveOf(...ends(100, 999))).toEqual({ pct: 899 });
+    expect(moveOf(...ends(100, 1000))).toEqual({ times: 10 });
+    expect(moveOf(...ends(100, 1137))).toEqual({ times: 11 });
+    expect(moveOf(...ends(100, 9_900))).toEqual({ times: 99 });
+    expect(moveOf(...ends(100, 10_000))).toBeNull();
+    // 99.6 times writes as 100x, which is MULTIPLE_MAX: none, never a "100x" the cap was meant to stop.
+    expect(moveOf(...ends(100, 9_960))).toBeNull();
+    // A fall never passes 100%, so it stays a percentage; a stop and no move state none.
+    expect(moveOf(...ends(1000, 30))).toEqual({ pct: -97 });
+    expect(moveOf(...ends(1000, 0))).toBeNull();
+    expect(moveOf(...ends(1000, 1002))).toBeNull();
+  });
+  it("is a ratio fact written as the note writes it, so the gate backs 11x and 11 times", () => {
+    const m = changeMultiple("Fees now", "the start", 11);
+    expect(m).toMatchObject({ kind: "ratio", value: 11, text: "11x", move: "up", label: "Fees now, change against the start, up" });
+    const facts = withChangeFacts(ends(100, 1137));
+    expect(facts.at(-1)).toMatchObject({ kind: "ratio", text: "11x" });
+    expect(checkNote("It rose 11x to 1,137.", facts, [], { maxSentences: 2 })).toEqual({ ok: true });
+    expect(checkNote("It rose 11 times over to 1,137.", facts, [], { maxSentences: 2 })).toEqual({ ok: true });
+    expect(checkNote("It rose 14x to 1,137.", facts, [], { maxSentences: 2 }).ok).toBe(false);
+    // A multiple only rises.
+    expect(checkNote("It fell 11x to 1,137.", facts, [], { maxSentences: 2 }).ok).toBe(false);
+  });
+  it("is a change, not a network's ratio: a label naming $DAG or no network backs it in every note (review 2026-11-27)", () => {
+    const fees = withChangeFacts([
+      fact("Fees in $DAG per hour, usual", 10, "amount", undefined, { key: "f", end: "from" }),
+      fact("Fees in $DAG per hour, recent", 137, "amount", undefined, { key: "f", end: "to" }),
+    ]);
+    // The whole network's note: "$DAG" in the label names the DAG, which a ratio's scope would read as a network.
+    expect(checkNote("Fees rose 14x to 137 $DAG per hour.", fees, ["DAG", "DED"], { maxSentences: 2 })).toEqual({ ok: true });
+    // A network's caption: the day's change label names no network.
+    const day = withChangeFacts([
+      fact("Notable day 1, the span median", 100, "count", undefined, { key: "d", end: "from" }),
+      fact("Notable day 1 busiest day of the span", 1300, "count", undefined, { key: "d", end: "to" }),
+    ]);
+    expect(checkNote("1,300 metagraph snapshots anchored, up 13x on a typical day.", day, ["DED"], { maxSentences: 2, subject: "DED" })).toEqual({ ok: true });
+  });
+  it("is the one builder both change kinds come from", () => {
+    expect(changeFact("a", "b", { pct: -6 })).toEqual(changeShare("a", "b", -6));
+    expect(changeFact("a", "b", { times: 12 })).toEqual(changeMultiple("a", "b", 12));
+    expect(changeFact("a", "b", null)).toBeNull();
   });
 });
 

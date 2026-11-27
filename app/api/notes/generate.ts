@@ -1,11 +1,11 @@
-import { factsBlock, pairChange, withChangeFacts } from "@/src/data/noteFacts";
+import { factsBlock, moveOf, withChangeFacts } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { namesSubject } from "@/src/data/noteChanges";
 import { LINE_MAX } from "@/src/engine/domain/briefing";
 import type { Fact, NoteChange, NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
 import { GateError, type gateChat, type GateErrorKind } from "./gate";
 import { failKeyOf, isBriefingNote, lockKeyOf, noteKeyOf, statsKeyOf, timingOf, type NoteSpan } from "./keys";
-import { buildMessages, parseAnswer, spanBeforeWords, spanWords } from "./prompts";
+import { buildMessages, parseAnswer, spanWords } from "./prompts";
 
 const NEGATIVE_RE = /\b(?:no|none)\b/i;
 import { utcDayKey } from "@/src/util/localTime";
@@ -185,25 +185,13 @@ function styleSlips(text: string, facts: readonly Fact[]): string[] {
   for (const from of facts) {
     if (from.pair?.end !== "from" || said.has(from.text)) continue;
     const to = facts.find((f) => f.pair?.key === from.pair!.key && f.pair.end === "to");
-    const pct = to ? pairChange(from, to) : 0;
-    const hasChange = to != null && pct !== 0 && to.value !== 0 && pct < 1000;
+    const hasChange = to != null && moveOf(from, to) != null;
     const elsewhere = facts.some((f) => f !== from && f.pair?.end !== "from" && f.text === from.text);
     const esc = from.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     if (hasChange && !elsewhere && new RegExp(`(?<![\\d.,])${esc}(?![\\d]|[.,]\\d)`).test(text)) {
       said.add(from.text);
       out.push(`"${from.text}" is an earlier figure: give only ${to!.text} and how far it moved, as its change fact says`);
     }
-  }
-  // A WHOLE SPAN WRITTEN AS A CLIMB ("blocks fell 50% to 154 per day" over two 90-day averages, live):
-  // the figure is right and the shape says it moved inside the span (user, 2026-11-02).
-  for (const to of facts) {
-    if (to.pair?.end !== "to" || !to.pair.span) continue;
-    const esc = to.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    // "grew 85% to 7,553 per day on the 30 days before" names what it is measured against and reads
-    // true; the same rise with no "on …" after it reads as a climb inside the span.
-    const climb = new RegExp(`\\b(?:rose|fell|grew|dropped|climbed|declined|increased|decreased|slipped)\\b[^.;]{0,40}?\\bto ${esc}(?![\\d]|[.,]\\d)([^.;,]*)`, "i").exec(text);
-    if (climb && !/\bon\b/.test(climb[1] ?? ""))
-      out.push(`"${to.text}" is a whole range's figure: say what it is measured against ("on the range before"), or write "averaged ${to.text} per day" with its change`);
   }
   // A NETWORK'S GLOBAL SNAPSHOTS AS A SHARE OR ANOTHER NOUN ("its share of global snapshots rose 5%",
   // "placements", live 2026-11-03): the figure is the global snapshots it was part of.
@@ -221,16 +209,20 @@ function styleSlips(text: string, facts: readonly Fact[]): string[] {
   if (held) out.push(`"${held[0]}": held means it did not move; a figure with a change rose or fell`);
   // A CHANGE WITH NO CURRENT FIGURE ("Germany lost 9% of its nodes", live): the reader gets how far
   // it moved and not where it stands.
-  const moves = new Map<string, string[]>();
+  const moves = new Map<string, { verb: string; nows: string[] }>();
   for (const to of facts) {
     if (to.pair?.end !== "to") continue;
     const from = facts.find((f) => f.pair?.key === to.pair!.key && f.pair.end === "from");
-    const pct = from ? pairChange(from, to) : 0;
-    if (pct) moves.set(`${Math.abs(pct)}%`, [...(moves.get(`${Math.abs(pct)}%`) ?? []), to.text]);
+    const move = from ? moveOf(from, to) : null;
+    if (!move) continue;
+    const words = "times" in move ? `${move.times}x` : `${Math.abs(move.pct)}%`;
+    // The verb the move itself goes: a multiple only rises.
+    const verb = "times" in move || move.pct > 0 ? "rose" : "fell";
+    moves.set(words, { verb, nows: [...(moves.get(words)?.nows ?? []), to.text] });
   }
-  for (const [pct, nows] of moves) {
+  for (const [change, { verb, nows }] of moves) {
     const has = (t: string) => new RegExp(`(?<![\\d.,])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\d]|[.,]\\d)`).test(text);
-    if (has(pct) && !nows.some(has)) out.push(`"${pct}": give the current figure beside its change, as "<what> fell ${pct} to <current figure>"`);
+    if (has(change) && !nows.some(has)) out.push(`"${change}": give the current figure beside its change, as "<what> ${verb} ${change} to <current figure>"`);
   }
   return out;
 }
@@ -262,7 +254,7 @@ async function write(
     if (attempt > 0) await count("retried");
     let answer: string;
     try {
-      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.kind, span, wantsLine, spanBeforeWords(req.view, req.span), briefs), wantsLine || briefs.length ? { maxTokens: LINE_TOKENS } : undefined);
+      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.kind, span, wantsLine, briefs), wantsLine || briefs.length ? { maxTokens: LINE_TOKENS } : undefined);
       await count("calls");
     } catch (e) {
       if (!(e instanceof GateError)) throw e; // not the Gate's: `generateNote` counts it as `error`

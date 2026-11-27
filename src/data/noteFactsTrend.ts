@@ -1,4 +1,4 @@
-import { chainReadThrough, changeShare, fact, gaugeChange, networksAnchored, type ChainReads } from "@/src/data/noteFacts";
+import { chainReadThrough, changeFact, fact, moveOf, gaugeChange, networksAnchored, type ChainReads } from "@/src/data/noteFacts";
 import { NOTABLE_CAPS, rangeNotableCap, NOTABLE_FLOOR, notableDays, rangeExtremes } from "@/src/data/notableDays";
 import type { Fact, NotableDay } from "@/src/data/noteTypes";
 import { formatDag, globalSeries, lastSeen, METRIC_ORDER, metricLabel, metricSeries, spanAverage, trimCounterEdges, TREND_METRICS, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
@@ -19,10 +19,19 @@ import type { TrendMetric } from "@/src/store/store";
 // blurb mentions.
 //
 // HONESTY (rule 10):
-//   · a null is not measured: a measure is stated only when its side was measured, and a ratio
-//     only when BOTH sides were and the previous one is above 0 (no division by an absence);
+//   · a null is not measured: a measure is stated only when it was measured, and a ratio only
+//     when both ends were and the start is above 0 (no division by an absence);
 //   · counters are read as an average PER DAY over the measured buckets, partial edge buckets
 //     trimmed (`trimCounterEdges`); the nodes are a gauge and go through `gaugeChange`;
+//   · A NOTE SAYS WHAT ITS CHART SHOWS (user, 2026-11-27: "chart is about 24hrs, should it say
+//     something about those 24 hours, e.g. between first and last point?"). Every measure moves
+//     INSIDE the span, start to end, never against the span before it, which no chart on screen
+//     draws: a 24-hour note read "up 730% on the 24 hours before" over a chart that rose fivefold.
+//     A counter's start and end are its RATE over the span's first and last `EDGE_SHARE` of
+//     buckets (`edgeLevels`), a mean and not a median, since a rate is one (a median of a sparse
+//     counter's buckets is 0 and would read as stopped); the gauges keep `gaugeChange`. The span's
+//     average is stated only while the measure moved less than `AVERAGE_BELOW`: past that it is a
+//     figure halfway up a climb, which no part of the chart stands at (user, same day);
 //   · a payload with no covered bucket (`g.ticks`, the store's one coverage marker) yields null;
 //   · the still-filling newest day never reaches `notableDays` (`trimNewestPartial`);
 //   · shares are of what the networks anchored, and the denominator is never smaller than their sum;
@@ -34,9 +43,10 @@ import type { TrendMetric } from "@/src/store/store";
 //     ran) states only its current level, never a "start" that is not the span's;
 //   · a span SHORTER than a day states counters as the span's total, not "per day" (×288 of five
 //     minutes is a rate nobody measured); ratios are the same either way;
-//   · A CHANGE IS A PAIR (R54): a gauge's start and end, and a counter's previous span and this
-//     span, carry `pair` (`from` / `to`, keyed by the measure's label), so the gate states an
-//     earlier figure only beside its own current one (R60). A floor (", at least") is never an end.
+//   · A CHANGE IS A PAIR (R54): every measure's start and end carry `pair` (`from` / `to`, keyed
+//     by the measure's label), so the gate states an earlier figure only beside its own current one
+//     (R60). A floor (", at least") is never an end: the hypergraph's floored totals state their
+//     average alone.
 //
 // WHICH ZOOMS GET NOTABLE DAYS: 7d, 30d, 90d, 1y and all (`NOTABLE_CAPS`), and a brushed range of a
 // week or more (`rangeNotableCap`). A 1h, 24h or shorter note describes a stretch too short for "a
@@ -44,14 +54,18 @@ import type { TrendMetric } from "@/src/store/store";
 //
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).
 
-/** `cur`, `prev` and `daily` are the STORE's payload (what the tile route assembles), UNFOLDED:
+/** `cur`, `gauges` and `daily` are the STORE's payload (what the tile route assembles), UNFOLDED:
  *  `trendFacts` folds each with `withUnlisted` itself. */
 export interface TrendFactsInput {
   subject: "dag" | string; // "dag" = the whole hypergraph
   zoom: "1h" | "24h" | "7d" | "30d" | "90d" | "1y" | "all" | "range";
   span: { fromMs: number; toMs: number };
-  cur: TrendsWindowData; // the span's own payload (store, unfolded)
-  prev: TrendsWindowData | null; // the equal span before it (null for "all"; store, unfolded)
+  /** The span's own payload (store, unfolded), read at the tier its CHART is drawn at, so a
+   *  start and an end are the chart's own. */
+  cur: TrendsWindowData;
+  /** The gauges' payload where `cur` is finer than they are written (the 5-minute tier holds no
+   *  node count): the same span at the hourly tier. Absent, the gauges read `cur`. */
+  gauges?: TrendsWindowData | null;
   /** Daily buckets for the notable days: ~30 days of LEAD-IN before the span (they feed each
    *  series' level) through the span's end. Null for 1h / 24h / short ranges. */
   daily: TrendsWindowData | null;
@@ -85,18 +99,33 @@ const TOP_NETWORKS = 3;
 const LATE_START = 0.1;
 
 /** The words after the label that say what a value is, per measure: a counter's average PER DAY
- *  or, on a span under a day, its TOTAL. */
-const UNIT_PHRASE: Record<TrendMetric, { day: string; total: string }> = {
-  snapshots: { day: "per day", total: "" },
-  globals: { day: "per day", total: "" },
-  blocks: { day: "per day", total: "" },
-  transfers: { day: "per day", total: "" },
-  fees: { day: "$DAG per day", total: "$DAG" },
-  kb: { day: "MB per day", total: "MB" },
-  nodes: { day: "", total: "" },
-  continuity: { day: "between snapshots", total: "between snapshots" },
+ *  or, on a span under a day, its TOTAL — and on such a span its start and end PER HOUR. */
+const UNIT_PHRASE: Record<TrendMetric, { day: string; hour: string; total: string }> = {
+  snapshots: { day: "per day", hour: "per hour", total: "" },
+  globals: { day: "per day", hour: "per hour", total: "" },
+  blocks: { day: "per day", hour: "per hour", total: "" },
+  transfers: { day: "per day", hour: "per hour", total: "" },
+  fees: { day: "$DAG per day", hour: "$DAG per hour", total: "$DAG" },
+  kb: { day: "MB per day", hour: "MB per hour", total: "MB" },
+  nodes: { day: "", hour: "", total: "" },
+  continuity: { day: "between snapshots", hour: "between snapshots", total: "between snapshots" },
 };
 const DAY_MS = 86_400_000;
+
+/** A counter's start and end are read over this share of the span's buckets at either edge… */
+const EDGE_SHARE = 0.05;
+/** …and never fewer than these, so one odd bucket is not a level. */
+const EDGE_MIN = 3;
+/** Fewer trimmed buckets than this and the span has no start and end apart from its middle. */
+const EDGE_SPAN_MIN = 8;
+/** A COUNT'S EDGES MUST HOLD ENOUGH OF WHAT THEY COUNT to be a level (live 2026-11-27: the DAG's
+ *  blocks, about three an hour, read "19 to 0 per day" over 70-minute edges holding one block and
+ *  none). Both edges widen together until they hold this many between them… */
+const EDGE_EVENTS = 20;
+/** …up to this share of the span each; still short, the measure states its average alone. */
+const EDGE_SHARE_MAX = 0.25;
+/** The span's average is stated beside its start and end only while they differ by less than this. */
+const AVERAGE_BELOW = 0.2;
 
 const valueKind = (m: TrendMetric): Fact["kind"] => (m === "continuity" ? "duration" : m === "fees" || m === "kb" ? "amount" : "count");
 /** A fee is written by the chart's own formatter. */
@@ -121,6 +150,31 @@ function spanValue(metric: TrendMetric, id: string, data: TrendsWindowData): num
   return spanAverage(metric, cut(points), data.stepMs, weights && cut(weights));
 }
 
+/** A COUNTER'S START AND END: its rate over the first and the last `EDGE_SHARE` of the span's
+ *  trimmed buckets, through `spanAverage` (per day; spacing weighted by its snapshots, as the
+ *  span's own figure is). Both edges widen until they hold `EDGE_EVENTS` of what the measure rides
+ *  on: a count its own events, a spacing the snapshots it is measured over, and a fee or data
+ *  amount the snapshots that paid it or carried it (review 2026-11-27: one snapshot every six hours
+ *  read "fees up 700%" off one snapshot against two). Null on a span too short to have two edges,
+ *  where either edge holds no measured bucket, or where the widest edges still hold too few to call
+ *  a level. `n` is how many trimmed buckets each edge spans. */
+function edgeLevels(metric: TrendMetric, id: string, data: TrendsWindowData): { from: number; to: number; n: number } | null {
+  const { points, weights } = pointsOf(metric, id, data);
+  const pts = trimCounterEdges(points, data.stepMs);
+  const wts = weights && trimCounterEdges(weights, data.stepMs);
+  if (pts.length < EDGE_SPAN_MIN) return null;
+  let n = Math.max(EDGE_MIN, Math.ceil(EDGE_SHARE * pts.length));
+  const counted = wts ?? (valueKind(metric) === "count" ? pts : trimCounterEdges(pointsOf("snapshots", id, data).points, data.stepMs));
+  const sum = (a: readonly (number | null)[]) => a.reduce<number>((t, v) => t + (v ?? 0), 0);
+  const held = (k: number) => sum(counted.slice(0, k)) + sum(counted.slice(-k));
+  const most = Math.max(n, Math.ceil(EDGE_SHARE_MAX * pts.length));
+  while (n < most && held(n) < EDGE_EVENTS) n++;
+  if (held(n) < EDGE_EVENTS) return null;
+  const from = spanAverage(metric, pts.slice(0, n), data.stepMs, wts?.slice(0, n));
+  const to = spanAverage(metric, pts.slice(-n), data.stepMs, wts?.slice(-n));
+  return from != null && to != null ? { from, to, n } : null;
+}
+
 /** A counter's TOTAL over the (edge-trimmed) span: the sum of its buckets. Null unless EVERY
  *  bucket was measured — a sum that skipped a hole would understate and read as the span's. */
 function spanTotal(metric: TrendMetric, id: string, data: TrendsWindowData): number | null {
@@ -133,6 +187,15 @@ function spanTotal(metric: TrendMetric, id: string, data: TrendsWindowData): num
  *  the hypergraph's fee and data totals their catalog floor there. */
 function floorOnly(data: TrendsWindowData): boolean {
   return trimCounterEdges(unlistedUnmeasured(data.series), data.stepMs).some(Boolean);
+}
+
+/** Whether the unlisted channels went unmeasured in either EDGE (`n` trimmed buckets each), which
+ *  makes the hypergraph's fee or data start or end a floor. A hole between the edges floors the
+ *  span's average, never its start or end (review 2026-11-27: one failed read in 24 hours of
+ *  five-minute runs dropped the move). */
+function edgesFloored(data: TrendsWindowData, n: number): boolean {
+  const u = trimCounterEdges(unlistedUnmeasured(data.series), data.stepMs);
+  return [...u.slice(0, n), ...u.slice(-n)].some(Boolean);
 }
 
 /** The unlisted chains, as a note calls them: a SET, never one network. The name the facts carry
@@ -157,7 +220,7 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
   const isListed = (id: string) => LISTED_IDS.has(id) || id in catalog;
   const fold = (d: TrendsWindowData): TrendsWindowData => ({ ...d, series: withUnlisted(d.series, isListed, UNLISTED_ID) });
   const cur = fold(input.cur);
-  const prev = input.prev && fold(input.prev);
+  const gauges = input.gauges ? fold(input.gauges) : cur;
   if (!(cur.series["g.ticks"] ?? []).some((v) => v != null)) return null;
   // Silent by the store, but the sampler never reached the chain: nothing is known of the span, so
   // it stays an instrument state (rule 10). The silence below is a measured one.
@@ -191,9 +254,8 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
   for (const metric of METRIC_ORDER) {
     const label = base(metric, subject);
     if (TREND_METRICS[metric].kind === "gauge") {
-      // A gauge is a level, not a rate: its start and end, read through outages. No previous-span
-      // comparison — the change inside the span is what a level has to say.
-      const gauge = pointsOf(metric, subject, cur).points;
+      // A gauge is a level, not a rate: its start and end, read through outages.
+      const gauge = pointsOf(metric, subject, gauges).points;
       const ch = gaugeChange(gauge);
       if (!ch) continue;
       // A gauge that began well after the span did has no start of the span's: state only where it
@@ -208,30 +270,33 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
       continue;
     }
     const total = !perDay && metric !== "continuity";
-    const phrase = metric === "continuity" ? `between ${subject === "dag" ? "global" : "metagraph"} snapshots` : UNIT_PHRASE[metric][total ? "total" : "day"];
+    const phrases = UNIT_PHRASE[metric];
+    const spacing = `between ${subject === "dag" ? "global" : "metagraph"} snapshots`;
+    const phrase = metric === "continuity" ? spacing : phrases[total ? "total" : "day"];
     const unit = phrase ? `, ${phrase}` : "";
+    // A start and an end are RATES: per day, or per hour on a span under a day (whose own figure is a total).
+    const edgePhrase = metric === "continuity" ? spacing : phrases[perDay ? "day" : "hour"];
     const kind = valueKind(metric);
     const format = valueFormat(metric);
     // The hypergraph's fee and data totals are only a floor where the unlisted channels were not measured.
     const isTotalRow = subject === "dag" && (metric === "fees" || metric === "kb");
     const curFloor = isTotalRow && floorOnly(cur);
-    const prevFloor = isTotalRow && !!prev && floorOnly(prev);
-    const now = spanValue(metric, subject, cur);
-    if (now == null) continue;
-    const read = (d: TrendsWindowData) => (total ? spanTotal(metric, subject, d) : spanValue(metric, subject, d));
-    const shown = read(cur);
-    const before = prev ? spanValue(metric, subject, prev) : null;
-    const shownBefore = before != null ? read(prev!) : null;
-    // ONE CHANGE (R54): the previous span and this one are the `from` and `to` of one quantity
-    // when both are stated and neither is a floor (a floor beside a figure is no measured change).
-    const paired = shown != null && shownBefore != null && !curFloor && !prevFloor;
-    const key = `${label}${unit}`;
-    if (shown != null)
-      facts.push(fact(`${label}${unit}, this span${curFloor ? ", at least" : ""}`, shown, kind, format, paired ? { key, end: "to", span: true } : undefined));
-    if (before == null) continue;
-    if (shownBefore != null)
-      facts.push(fact(`${label}${unit}, previous span${prevFloor ? ", at least" : ""}`, shownBefore, kind, format, paired ? { key, end: "from", span: true } : undefined));
-    if (before > 0 && !curFloor && !prevFloor) facts.push(fact(`${label}, ratio to previous span`, now / before, "ratio"));
+    if (spanValue(metric, subject, cur) == null) continue;
+    const shown = total ? spanTotal(metric, subject, cur) : spanValue(metric, subject, cur);
+    // THE SPAN'S START AND END (a floor has none: a floor at either edge is no measured move).
+    const found = edgeLevels(metric, subject, cur);
+    const perDayEdges = found && isTotalRow && edgesFloored(cur, found.n) ? null : found;
+    const toRate = (v: number) => (perDay || metric === "continuity" ? v : v / 24);
+    const edges = perDayEdges && { from: toRate(perDayEdges.from), to: toRate(perDayEdges.to) };
+    // Judged on the whole percent the note would state (`pairChange`'s rounding), so "up 20%" never sits beside an average.
+    const moved = edges != null && (edges.from > 0 ? Math.abs(Math.round((edges.to / edges.from - 1) * 100)) >= AVERAGE_BELOW * 100 : edges.to > 0);
+    if (shown != null && !moved)
+      facts.push(fact(`${label}${unit}, this span${curFloor ? ", at least" : ""}`, shown, kind, format));
+    if (!edges) continue;
+    const key = `${label}, ${edgePhrase}`;
+    facts.push(fact(`${key}, at the start of the span`, edges.from, kind, format, { key, end: "from" }));
+    facts.push(fact(`${key}, at the end of the span`, edges.to, kind, format, { key, end: "to" }));
+    if (edges.from > 0 && edges.to !== edges.from) facts.push(fact(`${label}, ratio end to start`, edges.to / edges.from, "ratio"));
   }
 
   if (dag) {
@@ -252,8 +317,6 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
         const own = perDay ? v : spanTotal("snapshots", id, cur);
         if (own != null) facts.push(fact(`${n} metagraph snapshots anchored${dayWord}, this span`, own, "count"));
         facts.push(fact(`${n} share of metagraph snapshots anchored, this span`, v / denom, "share"));
-        const before = prev ? spanValue("snapshots", id, prev) : null;
-        if (before != null && before > 0) facts.push(fact(`${n} metagraph snapshots anchored, ratio to previous span`, v / before, "ratio"));
       }
       const anchored = networksAnchored(ranked.length, cur.series, cur.stepMs);
       facts.push(fact(`Networks that anchored metagraph snapshots, this span${anchored.atLeast ? ", at least" : ""}`, anchored.count, "count"));
@@ -411,10 +474,12 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
       if (level && Number.isFinite(day.level)) facts.push(fact(`Notable day ${n} ${what}, ${level}`, read(day.level), kind, format));
       // HOW FAR THE DAY STOOD FROM IT, as a fact (user, 2026-11-03: a figure and its change, in the
       // model's own words rather than appended by code). A count only: a gap is said against the normal
-      // spacing. Capped at tenfold like `withChangeFacts`, where a percentage stops reading as a change.
+      // spacing. Written as `withChangeFacts` writes one: a percentage, from tenfold a multiple (`moveOf`).
       const counted = day.kind === "high" || day.kind === "low" || day.kind === "peak" || day.kind === "trough";
-      const pct = counted && day.level > 0 ? Math.round((day.value / day.level - 1) * 100) : 0;
-      if (level && pct !== 0 && pct < 1000) facts.push(changeShare(`Notable day ${n} ${what}`, `the ${level}`, pct));
+      const change = counted && level && day.level > 0
+        ? changeFact(`Notable day ${n} ${what}`, `the ${level}`, moveOf(fact("", day.level, "count"), fact("", day.value, "count")))
+        : null;
+      if (change) facts.push(change);
       if (dag && (day.kind === "first" || day.kind === "last") && day.networkId && blurbOf[day.networkId]) {
         const line = `${nameOf(day.networkId)} is: ${blurbOf[day.networkId]}`;
         if (!blurbs.includes(line)) blurbs.push(line);

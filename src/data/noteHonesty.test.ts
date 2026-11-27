@@ -448,19 +448,6 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
     expect(checkNote("Global snapshots stood at 7,478, down from 4,021 to 87.", span, [], { maxSentences: 3, subject: undefined }).ok).toBe(false);
   });
 
-  it("sends back two whole spans written as a start and an end, the reason naming the way to write them", () => {
-    const pair = (end: "from" | "to") => ({ key: "g", end, span: true }) as const;
-    const span = [fact("Blocks, per day, this span", 227, "count", undefined, pair("to")), fact("Blocks, per day, previous span", 355, "count", undefined, pair("from")), fact("Gap, this span", 12, "duration", undefined, { key: "c", end: "to", span: true }), fact("Gap, previous span", 21, "duration", undefined, { key: "c", end: "from", span: true })];
-    const check = (note: string) => checkNote(note, span, [], { maxSentences: 3 });
-    const failed = check("Blocks fell from 355 to 227 per day.");
-    expect(failed.ok).toBe(false);
-    expect(!failed.ok && failed.reasons[0]).toMatch(/two whole spans.*write 227 and how far it moved.*never 355/);
-    expect(check("The gap went from 21 seconds to 12 seconds.").ok).toBe(false);
-    expect(check("The gap went from 21 to 12 seconds.").ok).toBe(false);
-    expect(check("Blocks fell to 227 per day from 355.").ok).toBe(false);
-    expect(check("Blocks averaged 227 per day, down from 355.")).toEqual({ ok: true });
-  });
-
   it("leaves a start and an end alone: those did move inside the span", () => {
     const gauge = [fact("Nodes at the start", 163, "count", undefined, { key: "n", end: "from" }), fact("Nodes at the end", 87, "count", undefined, { key: "n", end: "to" })];
     expect(checkNote("Nodes fell from 163 to 87.", gauge, [], { maxSentences: 3 })).toEqual({ ok: true });

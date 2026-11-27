@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NoteView, NotableDay } from "@/src/data/noteTypes";
-import { BLOCKS_WHOLE, CAPTION_FORMAT, DATA_WHOLE, LINE_FORMAT, PROMPTS, VOICE, buildMessages, parseAnswer, spanBeforeWords, spanFigures, spanWords } from "./prompts";
+import { BLOCKS_WHOLE, CAPTION_FORMAT, DATA_WHOLE, LINE_FORMAT, PROMPTS, VOICE, buildMessages, parseAnswer, spanWords, TREND_FIGURES } from "./prompts";
 
 const VIEWS: NoteView[] = ["hyper", "geo", "ledger", "trend", "blocks"];
 
@@ -222,7 +222,6 @@ describe("PROMPTS", () => {
     expect(PROMPTS.blocks.system("transaction blocks")).toContain("Subject: transaction blocks.");
     expect(PROMPTS.blocks.questions).toBeUndefined();
     expect(spanWords("blocks", "hours", 0, 1)).toBe("the last 24 hours");
-    expect(spanBeforeWords("blocks", "hours")).toBeNull();
   });
 
   it("asks every sentence to be a finding: no view description, no read confirmation (user, 2026-11-09)", () => {
@@ -238,38 +237,21 @@ describe("PROMPTS", () => {
   });
 });
 
-// A SPAN AGAINST THE ONE BEFORE IT IS NOT A CLIMB INSIDE THE SPAN (user, 2026-11-02): "over the last 30
-// days, global snapshots rose 86% from 4,021 to 7,478" was two averages, and inside the span they
-// rose about a third.
-describe("the span before", () => {
-  it("is named by the pill's own length, and only where one was read", () => {
-    expect(spanBeforeWords("trend", "1h")).toBe("the hour before");
-    expect(spanBeforeWords("trend", "24h")).toBe("the 24 hours before");
-    expect(spanBeforeWords("trend", "7d")).toBe("the 7 days before");
-    expect(spanBeforeWords("trend", "30d")).toBe("the 30 days before");
-    expect(spanBeforeWords("trend", "90d")).toBe("the 90 days before");
-    expect(spanBeforeWords("trend", "1y")).toBe("the year before");
-    expect(spanBeforeWords("trend", "all")).toBeNull();
-    expect(spanBeforeWords("trend", `r0-${20 * 86_400_000}`)).toBe("the 20 days before");
-    expect(spanBeforeWords("trend", `r0-${86_400_000}`)).toBe("the day before");
-    expect(spanBeforeWords("trend", "r1-2")).toBe("the same length of time before");
-    expect(spanBeforeWords("hyper", "day")).toBeNull();
-    expect(spanBeforeWords("ledger", "hours")).toBeNull();
+// HISTORY'S FIGURES MOVE INSIDE THE RANGE (user, 2026-11-27): the facts hold a start and an end read
+// off the chart, and no earlier range; a whole range's average never rose or fell (2026-11-02).
+describe("History's figures", () => {
+  it("are read start to end, the end figure with its change, never the start figure", () => {
+    const system = PROMPTS.trend.system("x");
+    expect(system).toContain(TREND_FIGURES);
+    expect(TREND_FIGURES).toContain('"<what> rose <change> to <end figure>"');
+    expect(TREND_FIGURES).toMatch(/never the start figure/);
+    expect(TREND_FIGURES).toMatch(/A figure for "this span" is the whole range.*never say it rose or fell/);
   });
-  it("reaches the model beside the span", () => {
-    const user = buildMessages("trend", "x", "Facts", null, undefined, undefined, undefined, "the last 30 days", undefined, "the 30 days before")[1]!.content;
-    expect(user).toContain("Span: the last 30 days\nSpan before: the 30 days before\n\nFacts:");
-  });
-  it("tells History's note what those figures are, and how to write them, in the span-before words themselves", () => {
-    const system = PROMPTS.trend.system("x", undefined, undefined, "the 30 days before");
-    expect(system).toMatch(/a figure for "this range" or the "previous range" is that whole range/i);
-    expect(system).toMatch(/never say it rose or fell over the range/i);
-    expect(system).toContain('"<what> rose <change> to <this range\'s figure> per day on "the 30 days before""');
-    // live 2026-11-03: a placeholder naming the "Span before line" was copied as "on the Span before".
-    expect(system).not.toContain("Span before line");
-    expect(system).toContain('averaged <this range\'s figure> per day, up <change> on "the 30 days before"');
-    expect(system).toMatch(/never the previous range's figure/);
-    expect(spanFigures(null)).toContain("on the range before");
+  it("name no earlier range: the model is never told of one", () => {
+    expect(TREND_FIGURES).not.toMatch(/before|previous/i);
+    const user = buildMessages("trend", "x", "Facts", null, undefined, undefined, undefined, "the last 30 days")[1]!.content;
+    expect(user).toContain("Span: the last 30 days\n\nFacts:");
+    expect(user).not.toContain("Span before");
   });
   it("leaves the tour's line to write figures as the note does", () => {
     expect(LINE_FORMAT).not.toContain("from X to Y");

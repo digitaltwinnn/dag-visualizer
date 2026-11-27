@@ -779,26 +779,21 @@ describe("an answer with a line gets more room", () => {
 });
 
 describe("the style slips are asked for once more, never edited", () => {
-  const span = (end: "from" | "to") => ({ key: "b", end, span: true }) as const;
-  const BLOCKS: NoteFacts = { ...FACTS, facts: [...FACTS.facts, fact("Blocks, per day, this span", 64, "count", undefined, span("to")), fact("Blocks, per day, previous span", 73, "count", undefined, span("from"))] };
+  const end = (e: "from" | "to") => ({ key: "b", end: e }) as const;
+  const BLOCKS: NoteFacts = { ...FACTS, facts: [...FACTS.facts, fact("Blocks, per day, at the end of the span", 64, "count", undefined, end("to")), fact("Blocks, per day, at the start of the span", 73, "count", undefined, end("from"))] };
   const second = (d: ReturnType<typeof deps>) => d.chat.mock.calls[1]![0].map((m) => m.content).join("\n");
-
-  it("a whole span written as a climb with nothing it is measured against", async () => {
-    const d = deps({ facts: async () => structuredClone(BLOCKS), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, and blocks fell 12% to 64 per day.", CLEAN] });
-    await generateNote(REQ, d, "read");
-    expect(second(d)).toContain('"64" is a whole range\'s figure');
-  });
-
-  it("but not when the comparison follows it", async () => {
-    const d = deps({ facts: async () => structuredClone(BLOCKS), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, and blocks fell 12% to 64 per day on the 7 days before."] });
-    await generateNote(REQ, d, "read");
-    expect(d.chat).toHaveBeenCalledTimes(1);
-  });
 
   it("a change with no current figure beside it, and held beside a change", async () => {
     const d = deps({ facts: async () => structuredClone(BLOCKS), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, and blocks held, down 12%.", CLEAN] });
     await generateNote(REQ, d, "read");
     expect(second(d)).toContain('"12%": give the current figure beside its change');
     expect(second(d)).toContain("held means it did not move");
+  });
+
+  it("asks for the verb the move goes: a rise rose", async () => {
+    const RISE: NoteFacts = { ...FACTS, facts: [...FACTS.facts, fact("Blocks, per day, at the end of the span", 82, "count", undefined, end("to")), fact("Blocks, per day, at the start of the span", 73, "count", undefined, end("from"))] };
+    const d = deps({ facts: async () => structuredClone(RISE), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, and blocks were up 12%.", CLEAN] });
+    await generateNote(REQ, d, "read");
+    expect(second(d)).toContain('as "<what> rose 12% to <current figure>"');
   });
 });

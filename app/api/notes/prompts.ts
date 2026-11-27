@@ -25,7 +25,7 @@ export const VOICE = [
   // THE CURRENT FIGURE AND HOW FAR IT MOVED (user, 2026-11-03: "from x to y, up z% can be shortened
   // by saying just the current value and its increase"). Every measured change has a "change
   // against" fact (`withChangeFacts`), so the model copies a percentage rather than working one out.
-  "When something rose or fell, give the current figure and how far it moved, in one of two shapes: \"<what> fell <change> to <current figure>\", or \"<current figure>, up <change> on <what it is measured against>\". Take the change from its \"change against\" fact, with that fact's direction. Never write the earlier figure. A figure with no change fact either held, or moved too far for a percentage to mean anything: say where it stands now, and that it held only when its ends are the same.",
+  "When something rose or fell, give the current figure and how far it moved, in one of two shapes: \"<what> fell <change> to <current figure>\", or \"<current figure>, up <change> on <what it is measured against>\". Take the change from its \"change against\" fact, with that fact's direction. A change fact given as a multiple, \"<N>x\", is written as it is given, \"<what> rose <N>x to <current figure>\". Never write the earlier figure. A figure with no change fact either held, or moved too far for a percentage to mean anything: say where it stands now, and that it held only when its ends are the same.",
   // HONEST, AND SAID POSITIVELY (user, 2026-10-31). The second half of the rule is what keeps it honest.
   "Say things positively. When a figure grew, open the sentence with the growth, never leave it trailing at the end. When nothing moved, say what held steady, anywhere in a sentence: never write that something did not happen, such as \"no changes\" or \"no networks\". A range where nothing was anchored at all was quiet: say it in one sentence, in the shape \"<the range>, <name> was quiet, and last anchored on <date>\", or first anchored on the date when the facts say it had not begun, and never call it steady. State a fall plainly: never soften, hide or reframe it, and never call a figure good or bad.",
   // THE READER'S WORD (user, 2026-11-07: "you often say 'span' but I prefer range or other human readable term").
@@ -82,14 +82,12 @@ export const VOICE = [
 // logical". Each kind's question now gives the first sentence's shape with an ACTOR, "<network>
 // hosts N nodes in <country>", so the name lands as the sentence's subject, not as a label.
 type KindQuestions = Partial<Record<Exclude<SubjectKind, "view">, string>>;
-// A SPAN AGAINST THE ONE BEFORE IT IS NOT A CLIMB INSIDE THE SPAN (user, 2026-11-02). Live: "Over the
-// last 30 days, global snapshots rose 86% from 4,021 to 7,478 per day", where both were 30-day
-// averages and the figure inside the range rose about a third. The gate holds the form, since the
-// figures alone are right (`noteHonesty.ts`).
-export function spanFigures(spanBefore?: string | null): string {
-  const before = spanBefore ? `"${spanBefore}"` : "the range before";
-  return `A figure for "this range" or the "previous range" is that whole range, as an average per day or a total, never a point in it: never say it rose or fell over the range. Give its change against ${before}, in one of two shapes: "<what> averaged <this range's figure> per day, up <change> on ${before}", or "<what> rose <change> to <this range's figure> per day on ${before}", with "down" or "fell" for a fall and the change from its "change against" fact, never the previous range's figure. After the first time, "on the range before" will do, or the averaged shape alone. A total or a spacing takes the same shapes without "averaged" and "per day". Figures "at the start of the range" and "at the end of the range" did move inside the span: write those as "<what> rose <change> to <end figure>" or "fell <change> to". A ratio is for reading: never write it as a figure. Count nothing yourself: a count the facts do not give, such as how many days are listed, is not written.`;
-}
+// HISTORY'S FIGURES MOVE INSIDE THE RANGE (user, 2026-11-27: "chart is about 24hrs, should it say
+// something about those 24 hours"). The facts hold each measure's start and end, read off the chart's
+// own buckets (`noteFactsTrend.ts`), and no earlier range: live, "rose 730% … on the 24 hours before"
+// stood over a chart that rose fivefold. A whole range's average is a figure halfway up a climb, so
+// the facts state it only where the measure held (2026-11-02's lesson stands: an average never rose).
+export const TREND_FIGURES = `Figures "at the start of the span" and "at the end of the span" are where the chart stood near each end of the range, as a rate: they are what moved. Write the end figure and how far it moved, as "<what> rose <change> to <end figure>" or "<what> fell <change> to <end figure>", with the change from its "change against" fact, never the start figure. A figure for "this span" is the whole range, as an average per day or a total, never a point in it: never say it rose or fell, write "<what> averaged <figure> per day", or a total as it is. A ratio is for reading: never write it as a figure. Count nothing yourself: a count the facts do not give, such as how many days are listed, is not written.`;
 
 /** THE WHOLE NETWORK'S SUBJECT LABELS for the two register notes (`sources.ts` writes them): a
  *  one-network note's label is the network's own name, so its prompt asks the one-network question
@@ -98,7 +96,7 @@ export function spanFigures(spanBefore?: string | null): string {
 export const BLOCKS_WHOLE = "transaction blocks";
 export const DATA_WHOLE = "the data blocks";
 
-export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; questionOne?: string; system: (subjectLabel: string, lead?: NoteLead, kind?: SubjectKind, spanBefore?: string | null) => string }> = {
+export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; questionOne?: string; system: (subjectLabel: string, lead?: NoteLead, kind?: SubjectKind) => string }> = {
   hyper: {
     // A QUIET WEEK IS SAID (user, 2026-10-30): the facts count what changed even at 0, so the note
     // says the composition held. The node count and its move are this note's alone (Geography says where).
@@ -180,10 +178,7 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
       // and ended" came back as the very rise the top card states.
       span: "Describe the range's shape, as a companion to a note above it that already states what rose and fell: the busiest day and the quietest day, each with its date and figure, and a typical day's figure, using only the facts named for those days. If the facts name none, say how quiet or steady the range was. Do not say what rose or fell overall.",
     },
-    // THE SPAN-BEFORE WORDS ARE WRITTEN IN (live 2026-11-03: a placeholder naming the "Span before
-    // line" came back as "up 26% … on the Span before"): the rule carries the very words to use.
-    system: (subjectLabel, _lead, kind, spanBefore) =>
-      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("trend", kind)}\n${spanFigures(spanBefore)}`,
+    system: (subjectLabel, _lead, kind) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("trend", kind)}\n${TREND_FIGURES}`,
   },
 };
 
@@ -211,22 +206,6 @@ const PILL_WORDS: Record<string, string> = {
   "1y": "the last year",
   all: "all measured history",
 };
-const BEFORE_WORDS: Record<string, string> = {
-  "1h": "the hour before",
-  "24h": "the 24 hours before",
-  "7d": "the 7 days before",
-  "30d": "the 30 days before",
-  "90d": "the 90 days before",
-  "1y": "the year before",
-};
-/** The equal range History compares its figures with, in the note's words. Null where none is read. */
-export function spanBeforeWords(view: NoteView, span: NoteSpan): string | null {
-  if (view !== "trend" || span === "all") return null;
-  const range = /^r(\d+)-(\d+)$/.exec(span);
-  const days = range ? (Number(range[2]) - Number(range[1])) / 86_400_000 : 0;
-  if (days === 1) return "the day before";
-  return Number.isInteger(days) && days > 1 ? `the ${days} days before` : (BEFORE_WORDS[span] ?? "the same length of time before");
-}
 const utcDay = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 export function spanWords(view: NoteView, span: NoteSpan, spanFrom: number, spanTo: number): string {
   if (view === "hyper" || view === "geo") return WEEK_WORDS.range;
@@ -247,7 +226,7 @@ export function spanWords(view: NoteView, span: NoteSpan, spanFrom: number, span
 /** THE CAPTION FORMAT. THE ROW SAYS THE DATE AND THE KIND (user, 2026-10-30, design B: "date and
  *  kind lead"), so a caption repeats neither: a short clause with the figure and whose it was. */
 export const CAPTION_FORMAT =
-  "Answer format: first a line starting NOTE: with the note, then exactly one line per listed day, starting DAY YYYY-MM-DD: with a caption of one short clause, at most ten words, using only numbers from the facts, in plain words a reader would say: never \"median\", never \"against\". The reader sees the day's date and what kind of day it was beside the caption, so the caption repeats neither: it gives the figure and whose it was, as the facts name the day. For a first or last day, the network and that nothing was anchored before, or since. For the range's busiest or quietest day, a spike or a dip: the day's figure and what it counts, then how far it stood from the usual, in the shape \"<figure> <what>, up <change> on a typical day\", with \"down\" for a fall and the change from the day's \"change against\" fact. For a pause or a longest gap: what paused and for how long, then the normal spacing it stood against, in the shape \"Global snapshots paused for <gap>, normally one every <spacing>\" for the hypergraph, or \"Anchoring paused for <gap>, normally a metagraph snapshot every <spacing>\" for a network. Never \"wait\". For the most networks: the day's figure, then the typical day's as \"usually …\". Start with a capital letter. Nothing else.";
+  "Answer format: first a line starting NOTE: with the note, then exactly one line per listed day, starting DAY YYYY-MM-DD: with a caption of one short clause, at most ten words, using only numbers from the facts, in plain words a reader would say: never \"median\", never \"against\". The reader sees the day's date and what kind of day it was beside the caption, so the caption repeats neither: it gives the figure and whose it was, as the facts name the day. For a first or last day, the network and that nothing was anchored before, or since. For the range's busiest or quietest day, a spike or a dip: the day's figure and what it counts, then how far it stood from the usual, in the shape \"<figure> <what>, up <change> on a typical day\", with \"down\" for a fall and the change from the day's \"change against\" fact, a multiple \"<N>x\" written as it is given. For a pause or a longest gap: what paused and for how long, then the normal spacing it stood against, in the shape \"Global snapshots paused for <gap>, normally one every <spacing>\" for the hypergraph, or \"Anchoring paused for <gap>, normally a metagraph snapshot every <spacing>\" for a network. Never \"wait\". For the most networks: the day's figure, then the typical day's as \"usually …\". Start with a capital letter. Nothing else.";
 
 /** THE NOTABLE-CHANGE ROWS, IN THE MODEL'S WORDS (user, 2026-11-03: "the notable-change rows all must
  *  come from AI"). Code picks each row and hands its brief; the model writes the line. */
@@ -268,7 +247,6 @@ export function buildMessages(
   kind?: SubjectKind,
   span?: string | null,
   line?: boolean,
-  spanBefore?: string | null,
   rows?: readonly ChangeBrief[] | null,
 ): { role: "system" | "user"; content: string }[] {
   const withDays = !!days && days.length > 0;
@@ -276,8 +254,7 @@ export function buildMessages(
   const format = (withDays
     ? CAPTION_FORMAT
     : withRows ? "Answer format: first a line starting NOTE: with the note." : "Answer format: one line starting NOTE: and nothing else.") + (withRows ? ` ${ROW_FORMAT}` : "");
-  const spanLines = [...(span ? [`Span: ${span}`] : []), ...(spanBefore ? [`Span before: ${spanBefore}`] : [])];
-  const parts = [...(spanLines.length ? [spanLines.join("\n")] : []), `Facts:\n${factsBlock}`];
+  const parts = [...(span ? [`Span: ${span}`] : []), `Facts:\n${factsBlock}`];
   if (withDays) parts.push(`Days to caption, in order:\n${days.map((d) => `DAY ${utcDayKey(d.dayMs)}`).join("\n")}`);
   // The note and its rows share one card, so the note keeps to the overall picture and leaves each
   // row's own figures to the row (user, 2026-11-03: the rows "almost copy the card's own AI section").
@@ -286,7 +263,7 @@ export function buildMessages(
   if (retryReasons && retryReasons.length)
     parts.push(`Your previous answer was rejected: ${retryReasons.join("; ")}. Write it again and fix this.`);
   return [
-    { role: "system", content: `${PROMPTS[view].system(subjectLabel, lead, kind, spanBefore)}\n\n${format}${line ? ` ${LINE_FORMAT}` : ""}` },
+    { role: "system", content: `${PROMPTS[view].system(subjectLabel, lead, kind)}\n\n${format}${line ? ` ${LINE_FORMAT}` : ""}` },
     { role: "user", content: parts.join("\n\n") },
   ];
 }

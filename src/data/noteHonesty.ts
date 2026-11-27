@@ -159,7 +159,12 @@ function candidates(f: Fact, cls: Cls, ratios: readonly Fact[], dir: Dir): numbe
       return dir === "fall" ? [(1 - f.value) * 100]
         : dir === "rise" ? [(f.value - 1) * 100, f.value * 100]
         : [(f.value - 1) * 100, (1 - f.value) * 100, f.value * 100];
-    case "x": return isRatio ? [f.value] : [];
+    // A MULTIPLE CHANGE FACT ("13x", `changeMultiple`) is a change, read like a share: never scoped
+    // by the names (its label carries the current figure's, which may name none or "$DAG"), and
+    // only beside a verb going its way.
+    case "x":
+      if (f.move) return (f.move === "up" && dir === "fall") || (f.move === "down" && dir === "rise") ? [] : [f.value];
+      return isRatio ? [f.value] : [];
     case "dur": return f.kind === "duration" ? [f.value] : [];
   }
 }
@@ -171,8 +176,6 @@ function near(t: Tok, v: number): boolean {
   const zero = t.cls === "plain" && t.value === 0;
   return zero ? v === 0 : Math.abs(v - t.value) <= t.tol + 1e-9 * Math.max(1, Math.abs(v));
 }
-
-const UP_OR_DOWN_FROM_RE = /\b(?:up|down) from\s+$/i;
 
 /** A move verb directly on a bare decimal ("rose 14.03"): a ratio can be quoted, never moved by. */
 const MOVED_BY_RE = /\b(rose|fell|grew|climbed|dropped|increased|decreased|declined|slipped)\s+(\d+\.\d+)(?![\d%x]|\s*times)/gi;
@@ -409,15 +412,6 @@ export function checkNote(
       if (!isPast[k]) return void reasons.push(`"${t.raw}" is not backed by any measured fact`);
       const why = pastReason(k, digits, toks, isPast, facts, own, dir);
       if (why) reasons.push(why);
-    });
-    // TWO WHOLE SPANS ARE NOT A START AND AN END (user, 2026-11-02): "rose from 4,021 to 7,478" over
-    // two 30-day averages read as a climb inside the span. The figures are right, so `backed` passes it.
-    toks.forEach((t, k) => {
-      if (!isPast[k]) return;
-      const past = facts.find((f) => f.pair?.end === "from" && f.pair.span && says(t, f, own, dir));
-      if (!past || UP_OR_DOWN_FROM_RE.test(digits.slice(0, t.at))) return;
-      const now = facts.find((f) => f.pair?.key === past.pair!.key && f.pair.end === "to");
-      reasons.push(now ? `${past.text} and ${now.text} are two whole spans, not a start and an end: write ${now.text} and how far it moved, as its change fact says, never ${past.text}` : `${past.text} is the previous span's figure: leave it out`);
     });
     for (const m of s.matchAll(MOVED_BY_RE)) {
       if (ratios.some((f) => f.text === m[2])) reasons.push(`"${m[0]}" writes a ratio as how far a figure moved: give the figures instead`);

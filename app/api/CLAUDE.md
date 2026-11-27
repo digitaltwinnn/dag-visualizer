@@ -214,10 +214,20 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
   states must match a fact the model was shown, within the precision it was written to, and a
   failing note is asked for once more with the reasons, then dropped and counted. A note that
-  passes with a FORM slip (`styleSlips`: an earlier figure, a span written as a climb, "held" beside
-  a change) is asked for once more too, and the checked note stands if the second answer fails; a
+  passes with a FORM slip (`styleSlips`: an earlier figure, a change with no current figure beside
+  it, "held" beside a change) is asked for once more too, and the checked note stands if the second answer fails; a
   change's percentage is read only beside a verb going its way (`Fact.move`), and a notable-change
-  row's line must name the subject its click commits (`namesSubject`). Nothing is ever
+  row's line must name the subject its click commits (`namesSubject`). **A rise of tenfold or
+  more is a multiple** (user, 2026-11-27: "can't you say 10x?"; `noteFacts.moveOf`): "rose 13x to
+  852", a percentage below 10x, no change at all from 100x (the start was almost nothing), and a
+  fall stays a percentage; the gate reads a multiple as a change, like a percentage, never scoped by
+  the names. **A History note says what its chart shows** (user, 2026-11-27, `NOTES_VERSION` 85):
+  it reads the chart's own tier (`TREND_PILLS` = `ZOOMS`; a 5m read takes its nodes from the hourly
+  tier, where they are written), and every measure moves from the START to the END inside the
+  range (`noteFactsTrend.edgeLevels`: the rate over the first and last 5% of the buckets, widened
+  until each pair of edges holds 20 of what the measure rides on, up to a quarter of the range) —
+  never against the range before it, which is no longer read. The range's average is stated only
+  while the move is under 20% (user: above it "the average is just one-time"). Nothing is ever
   stored unchecked, and the model's text is untrusted (a plain string, never markup). **A failure
   holds its key** (`failKeyOf`, `FAIL_TTL_S` = 15 minutes): a read or request whose write failed
   leaves a marker, and the next read or request of that key answers `unavailable` without a model

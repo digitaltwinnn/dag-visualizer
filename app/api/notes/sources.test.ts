@@ -234,12 +234,11 @@ describe("noteSupported — the ledger's whole network is ONE subject", () => {
 });
 
 describe("factsFor — the per-view read table", () => {
-  it("trend 7d: 1h for the span and the one before, 1d with a 30-day lead-in for the days", async () => {
+  it("trend 7d: 1h for the span, as its chart, 1d with a 30-day lead-in for the days, and no span before it", async () => {
     const r = fakeReads();
     const out = await factsFor("trend", "dag", "7d", NOW, r);
     expect(r.calls).toEqual([
       { tier: "1h", from: NOW - 7 * D, to: NOW },
-      { tier: "1h", from: NOW - 14 * D, to: NOW - 7 * D },
       { tier: "1d", from: NOW - 37 * D, to: NOW },
     ]);
     const input = vi.mocked(trendFacts).mock.calls[0]![0];
@@ -247,7 +246,7 @@ describe("factsFor — the per-view read table", () => {
     expect(input.zoom).toBe("7d");
     expect(input.span).toEqual({ fromMs: NOW - 7 * D, toMs: NOW });
     expect((input.cur as { tag?: string }).tag).toBe(`1h:${NOW - 7 * D}:${NOW}`);
-    expect((input.prev as { tag?: string }).tag).toBe(`1h:${NOW - 14 * D}:${NOW - 7 * D}`);
+    expect(input.gauges).toBeNull();
     expect((input.daily as { tag?: string }).tag).toBe(`1d:${NOW - 37 * D}:${NOW}`);
     expect(input.names.dag).toBe("DAG");
     expect(input.names[USDC]).toBe("USDC.dag");
@@ -260,39 +259,40 @@ describe("factsFor — the per-view read table", () => {
     expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Span length", value: 604_800, kind: "duration", text: "7 days" }));
   });
 
-  it("trend 24h reads 1h and no days; 1h reads 5m", async () => {
+  it("trend 24h and 1h read 5m, as their charts do, the gauges at 1h where they are written, and no days", async () => {
     const r = fakeReads();
     await factsFor("trend", USDC, "24h", NOW, r);
     expect(r.calls).toEqual([
+      { tier: "5m", from: NOW - D, to: NOW },
       { tier: "1h", from: NOW - D, to: NOW },
-      { tier: "1h", from: NOW - 2 * D, to: NOW - D },
     ]);
-    expect(vi.mocked(trendFacts).mock.calls[0]![0].daily).toBeNull();
-    expect(vi.mocked(trendFacts).mock.calls[0]![0].zoom).toBe("24h");
+    const input = vi.mocked(trendFacts).mock.calls[0]![0];
+    expect(input.daily).toBeNull();
+    expect(input.zoom).toBe("24h");
+    expect((input.gauges as { tag?: string } | null)?.tag).toBe(`1h:${NOW - D}:${NOW}`);
 
     const r2 = fakeReads();
     const out = await factsFor("trend", USDC, "1h", NOW, r2);
     expect(r2.calls).toEqual([
       { tier: "5m", from: NOW - H, to: NOW },
-      { tier: "5m", from: NOW - 2 * H, to: NOW - H },
+      { tier: "1h", from: NOW - H, to: NOW },
     ]);
     expect(out!.label).toBe("USDC.dag");
     expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Span length", value: 3600 }));
   });
 
-  it("trend 30d and 1y read 1d with the days' lead-in", async () => {
-    for (const [span, ms] of [["30d", 30 * D], ["1y", 365 * D]] as const) {
+  it("trend 30d reads 1h and 1y reads 1d, as their charts do, with the days' lead-in", async () => {
+    for (const [span, ms, tier] of [["30d", 30 * D, "1h"], ["1y", 365 * D, "1d"]] as const) {
       const r = fakeReads();
       await factsFor("trend", "dag", span, NOW, r);
       expect(r.calls).toEqual([
-        { tier: "1d", from: NOW - ms, to: NOW },
-        { tier: "1d", from: NOW - 2 * ms, to: NOW - ms },
+        { tier, from: NOW - ms, to: NOW },
         { tier: "1d", from: NOW - ms - 30 * D, to: NOW },
       ]);
     }
   });
 
-  it("trend all reads 1d once, starts where measuring began and has no previous span", async () => {
+  it("trend all reads 1d once and starts where measuring began", async () => {
     const day0 = Date.UTC(2025, 6, 1);
     const buckets = [day0 - 2 * D, day0 - D, day0, day0 + D];
     const raw = { buckets, stepMs: D, now: NOW, series: { "g.ticks": [null, null, 5, 6] } };
@@ -301,7 +301,7 @@ describe("factsFor — the per-view read table", () => {
     expect(r.calls).toHaveLength(1);
     expect(r.calls[0]!.tier).toBe("1d");
     const input = vi.mocked(trendFacts).mock.calls[0]![0];
-    expect(input.prev).toBeNull();
+    expect(input.gauges).toBeNull();
     expect(input.cur.buckets).toEqual([day0, day0 + D]);
     expect(input.daily).toBe(raw);
     expect(input.span).toEqual({ fromMs: day0, toMs: NOW });
@@ -316,16 +316,13 @@ describe("factsFor — the per-view read table", () => {
     expect(trendFacts).not.toHaveBeenCalled();
   });
 
-  it("a brushed range reads the tier the range is charted at, and the equal span before it", async () => {
+  it("a brushed range reads the tier the range is charted at, and no span before it", async () => {
     const from = Date.UTC(2026, 9, 1);
     const to = Date.UTC(2026, 9, 6);
     const r = fakeReads();
     await factsFor("trend", "dag", `r${from}-${to}`, NOW, r);
     const tier = pickRangeTier(from, to);
-    expect(r.calls).toEqual([
-      { tier, from, to },
-      { tier, from: from - (to - from), to: from },
-    ]);
+    expect(r.calls).toEqual([{ tier, from, to }, ...(tier === "5m" ? [{ tier: "1h", from, to }] : [])]);
     const input = vi.mocked(trendFacts).mock.calls[0]![0];
     expect(input.zoom).toBe("range");
     expect(input.daily).toBeNull();
