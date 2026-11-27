@@ -789,4 +789,11 @@ describe("the style slips are asked for once more, never edited", () => {
     expect(second(d)).toContain('"12%": give the current figure beside its change');
     expect(second(d)).toContain("held means it did not move");
   });
+
+  it("asks for the verb the move goes: a rise rose", async () => {
+    const RISE: NoteFacts = { ...FACTS, facts: [...FACTS.facts, fact("Blocks, per day, at the end of the span", 82, "count", undefined, end("to")), fact("Blocks, per day, at the start of the span", 73, "count", undefined, end("from"))] };
+    const d = deps({ facts: async () => structuredClone(RISE), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, and blocks were up 12%.", CLEAN] });
+    await generateNote(REQ, d, "read");
+    expect(second(d)).toContain('as "<what> rose 12% to <current figure>"');
+  });
 });

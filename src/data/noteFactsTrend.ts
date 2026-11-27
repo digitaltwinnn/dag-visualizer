@@ -152,27 +152,27 @@ function spanValue(metric: TrendMetric, id: string, data: TrendsWindowData): num
 
 /** A COUNTER'S START AND END: its rate over the first and the last `EDGE_SHARE` of the span's
  *  trimmed buckets, through `spanAverage` (per day; spacing weighted by its snapshots, as the
- *  span's own figure is). A count, and a spacing by the snapshots it is measured over, widens both
- *  edges until they hold `EDGE_EVENTS` (an amount rides on the snapshots that paid it and does
- *  not). Null on a span too short to have two edges, where either edge holds no measured bucket,
- *  or where the widest edges still hold too few to call a level. */
-function edgeLevels(metric: TrendMetric, id: string, data: TrendsWindowData): { from: number; to: number } | null {
+ *  span's own figure is). Both edges widen until they hold `EDGE_EVENTS` of what the measure rides
+ *  on: a count its own events, a spacing the snapshots it is measured over, and a fee or data
+ *  amount the snapshots that paid it or carried it (review 2026-11-27: one snapshot every six hours
+ *  read "fees up 700%" off one snapshot against two). Null on a span too short to have two edges,
+ *  where either edge holds no measured bucket, or where the widest edges still hold too few to call
+ *  a level. `n` is how many trimmed buckets each edge spans. */
+function edgeLevels(metric: TrendMetric, id: string, data: TrendsWindowData): { from: number; to: number; n: number } | null {
   const { points, weights } = pointsOf(metric, id, data);
   const pts = trimCounterEdges(points, data.stepMs);
   const wts = weights && trimCounterEdges(weights, data.stepMs);
   if (pts.length < EDGE_SPAN_MIN) return null;
   let n = Math.max(EDGE_MIN, Math.ceil(EDGE_SHARE * pts.length));
-  const counted = wts ?? (valueKind(metric) === "count" ? pts : null);
-  if (counted) {
-    const sum = (a: readonly (number | null)[]) => a.reduce<number>((t, v) => t + (v ?? 0), 0);
-    const held = (k: number) => sum(counted.slice(0, k)) + sum(counted.slice(-k));
-    const most = Math.max(n, Math.ceil(EDGE_SHARE_MAX * pts.length));
-    while (n < most && held(n) < EDGE_EVENTS) n++;
-    if (held(n) < EDGE_EVENTS) return null;
-  }
+  const counted = wts ?? (valueKind(metric) === "count" ? pts : trimCounterEdges(pointsOf("snapshots", id, data).points, data.stepMs));
+  const sum = (a: readonly (number | null)[]) => a.reduce<number>((t, v) => t + (v ?? 0), 0);
+  const held = (k: number) => sum(counted.slice(0, k)) + sum(counted.slice(-k));
+  const most = Math.max(n, Math.ceil(EDGE_SHARE_MAX * pts.length));
+  while (n < most && held(n) < EDGE_EVENTS) n++;
+  if (held(n) < EDGE_EVENTS) return null;
   const from = spanAverage(metric, pts.slice(0, n), data.stepMs, wts?.slice(0, n));
   const to = spanAverage(metric, pts.slice(-n), data.stepMs, wts?.slice(-n));
-  return from != null && to != null ? { from, to } : null;
+  return from != null && to != null ? { from, to, n } : null;
 }
 
 /** A counter's TOTAL over the (edge-trimmed) span: the sum of its buckets. Null unless EVERY
@@ -187,6 +187,15 @@ function spanTotal(metric: TrendMetric, id: string, data: TrendsWindowData): num
  *  the hypergraph's fee and data totals their catalog floor there. */
 function floorOnly(data: TrendsWindowData): boolean {
   return trimCounterEdges(unlistedUnmeasured(data.series), data.stepMs).some(Boolean);
+}
+
+/** Whether the unlisted channels went unmeasured in either EDGE (`n` trimmed buckets each), which
+ *  makes the hypergraph's fee or data start or end a floor. A hole between the edges floors the
+ *  span's average, never its start or end (review 2026-11-27: one failed read in 24 hours of
+ *  five-minute runs dropped the move). */
+function edgesFloored(data: TrendsWindowData, n: number): boolean {
+  const u = trimCounterEdges(unlistedUnmeasured(data.series), data.stepMs);
+  return [...u.slice(0, n), ...u.slice(-n)].some(Boolean);
 }
 
 /** The unlisted chains, as a note calls them: a SET, never one network. The name the facts carry
@@ -275,7 +284,8 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
     if (spanValue(metric, subject, cur) == null) continue;
     const shown = total ? spanTotal(metric, subject, cur) : spanValue(metric, subject, cur);
     // THE SPAN'S START AND END (a floor has none: a floor at either edge is no measured move).
-    const perDayEdges = curFloor ? null : edgeLevels(metric, subject, cur);
+    const found = edgeLevels(metric, subject, cur);
+    const perDayEdges = found && isTotalRow && edgesFloored(cur, found.n) ? null : found;
     const toRate = (v: number) => (perDay || metric === "continuity" ? v : v / 24);
     const edges = perDayEdges && { from: toRate(perDayEdges.from), to: toRate(perDayEdges.to) };
     // Judged on the whole percent the note would state (`pairChange`'s rounding), so "up 20%" never sits beside an average.

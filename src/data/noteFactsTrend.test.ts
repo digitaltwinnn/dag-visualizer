@@ -171,7 +171,7 @@ describe("trendFacts tags each change as a pair (R54)", () => {
       expect(from.startsWith(k) && /at the start of the span$/.test(from), k).toBe(true);
       expect(to.startsWith(k) && /at the end of the span$/.test(to), k).toBe(true);
     }
-    const floored = trendFacts(input({ ...MONTH, cur: climb({ "u.cov": row(30, (i) => (i === 10 ? null : 0)) }) }))!;
+    const floored = trendFacts(input({ ...MONTH, cur: climb({ "u.cov": row(30, (i) => (i === 1 ? null : 0)) }) }))!;
     for (const f of floored.facts.filter((x) => /^(Fees|Data),/.test(x.label))) expect(f.pair, f.label).toBeUndefined();
     expect(pairsOf(floored.facts).has("Metagraph snapshots anchored, per day")).toBe(true);
   });
@@ -535,12 +535,36 @@ describe("trendFacts reads the STORE payload and folds it (fees and data)", () =
     expect(r.facts.some((f) => f.label === "Fees, $DAG per day, this span, at least")).toBe(true);
     expect(r.facts.some((f) => f.label === "Data, MB per day, this span, at least")).toBe(true);
     expect(r.facts.some((f) => f.kind === "ratio" && /^(Fees|Data)/.test(f.label))).toBe(false);
-    const climbing = trendFacts(input({ ...MONTH, cur: climb({ "u.cov": row(30, (i) => (i === 10 ? null : 0)) }) }))!;
+    const climbing = trendFacts(input({ ...MONTH, cur: climb({ "u.cov": row(30, (i) => (i === 1 ? null : 0)) }) }))!;
     expect(climbing.facts.some((f) => f.label === "Fees, $DAG per day, this span, at least")).toBe(true);
     expect(climbing.facts.some((f) => /^(Fees|Data),.*of the span/.test(f.label))).toBe(false);
     expect(climbing.facts.some((f) => f.kind === "ratio" && /^(Fees|Data)/.test(f.label))).toBe(false);
     // Everything else still moves.
     expect(climbing.facts.some((f) => f.label === "Blocks, ratio end to start")).toBe(true);
+  });
+
+  it("a hole between the edges floors the average, never the start and end (review 2026-11-27)", () => {
+    const r = trendFacts(input({ ...MONTH, cur: climb({ "u.cov": row(30, (i) => (i === 10 ? null : 0)) }) }))!;
+    expect(r.facts.find((f) => f.label === "Fees, $DAG per day, at the end of the span")).toBeDefined();
+    expect(r.facts.find((f) => f.label === "Fees, ratio end to start")!.value).toBeCloseTo(2, 9);
+    expect(r.facts.find((f) => f.label === "Data, ratio end to start")!.value).toBeCloseTo(2, 9);
+  });
+
+  it("reads a fee's or data's edges only over enough snapshots: one every six hours states its average alone (review 2026-11-27)", () => {
+    // A week at 1h, a snapshot every six hours: its count has no edges, and neither has what it paid.
+    const n = 7 * 24;
+    const H = 3_600_000;
+    const sparse: TrendsWindowData = {
+      buckets: row(n, (i) => T0 + i * H) as number[], stepMs: H, now: T0 + n * H + 1000,
+      series: {
+        "g.ticks": row(n, () => 120), "g.anchors": row(n, () => 120), "u.cov": row(n, () => 0),
+        "m.usdc.snaps": row(n, (i) => (i % 6 === 0 ? 1 : 0)), "m.usdc.fee": row(n, (i) => (i % 6 === 0 ? (i > n / 2 ? 8e8 : 1e8) : 0)),
+        "m.usdc.kb": row(n, (i) => (i % 6 === 0 ? 500 : 0)),
+      },
+    };
+    const r = trendFacts(input({ zoom: "7d", span: { fromMs: T0, toMs: T0 + 7 * DAY }, subject: "usdc", cur: sparse }))!;
+    expect(r.facts.some((f) => /of the span$/.test(f.label) && /fees|data|snapshots/.test(f.label))).toBe(false);
+    expect(r.facts.some((f) => f.kind === "ratio")).toBe(false);
   });
 
   it("an uncovered EDGE bucket is trimmed away and does not make a floor", () => {

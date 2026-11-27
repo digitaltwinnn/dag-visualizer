@@ -145,8 +145,7 @@ export async function geoInputs(nowMs: number, reads: NoteReads): Promise<GeoDay
 }
 
 /** The default reads for ONE note, or one warm pass: the trends store's read client, each hash read
- *  at most once (a History note reads the same daily year-hash for its span, the span before and
- *  its days). */
+ *  at most once (a History note's span and its days can read the same daily year-hash). */
 export function storeReads(nowMs: number, store: HashReader = readStore()): NoteReads {
   const seen = new Map<string, Promise<Record<string, string> | null>>();
   const once: HashReader = {
@@ -531,8 +530,8 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
       return { built, spanFrom, spanTo, windows: [["Span length", secondsOf(spanFrom, spanTo)]] };
     },
   },
-  // HOW IT CHANGED: the pill's (or the brushed range's) span, the equal span before it, and for the
-  // long pills the daily tier the notable days are picked from.
+  // HOW IT CHANGED: the pill's (or the brushed range's) span at its chart's tier, the hourly gauges
+  // beside a five-minute read, and for the long pills the daily tier the notable days are picked from.
   trend: {
     // …or a network's SPAN FACET (`<net>/span`, keys.ts), over a pill only: a brush has its own note.
     accepts: (subject, span) =>

@@ -159,7 +159,12 @@ function candidates(f: Fact, cls: Cls, ratios: readonly Fact[], dir: Dir): numbe
       return dir === "fall" ? [(1 - f.value) * 100]
         : dir === "rise" ? [(f.value - 1) * 100, f.value * 100]
         : [(f.value - 1) * 100, (1 - f.value) * 100, f.value * 100];
-    case "x": return isRatio ? [f.value] : [];
+    // A MULTIPLE CHANGE FACT ("13x", `changeMultiple`) is a change, read like a share: never scoped
+    // by the names (its label carries the current figure's, which may name none or "$DAG"), and
+    // only beside a verb going its way.
+    case "x":
+      if (f.move) return (f.move === "up" && dir === "fall") || (f.move === "down" && dir === "rise") ? [] : [f.value];
+      return isRatio ? [f.value] : [];
     case "dur": return f.kind === "duration" ? [f.value] : [];
   }
 }

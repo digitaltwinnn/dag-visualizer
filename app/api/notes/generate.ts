@@ -209,17 +209,19 @@ function styleSlips(text: string, facts: readonly Fact[]): string[] {
   if (held) out.push(`"${held[0]}": held means it did not move; a figure with a change rose or fell`);
   // A CHANGE WITH NO CURRENT FIGURE ("Germany lost 9% of its nodes", live): the reader gets how far
   // it moved and not where it stands.
-  const moves = new Map<string, string[]>();
+  const moves = new Map<string, { verb: string; nows: string[] }>();
   for (const to of facts) {
     if (to.pair?.end !== "to") continue;
     const from = facts.find((f) => f.pair?.key === to.pair!.key && f.pair.end === "from");
     const move = from ? moveOf(from, to) : null;
-    const words = move ? ("times" in move ? `${move.times}x` : `${Math.abs(move.pct)}%`) : null;
-    if (words) moves.set(words, [...(moves.get(words) ?? []), to.text]);
+    if (!move) continue;
+    const words = "times" in move ? `${move.times}x` : `${Math.abs(move.pct)}%`;
+    // The verb the move itself goes: a multiple only rises.
+    const verb = "times" in move || move.pct > 0 ? "rose" : "fell";
+    moves.set(words, { verb, nows: [...(moves.get(words)?.nows ?? []), to.text] });
   }
-  for (const [change, nows] of moves) {
+  for (const [change, { verb, nows }] of moves) {
     const has = (t: string) => new RegExp(`(?<![\\d.,])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\d]|[.,]\\d)`).test(text);
-    const verb = change.endsWith("x") ? "rose" : "fell";
     if (has(change) && !nows.some(has)) out.push(`"${change}": give the current figure beside its change, as "<what> ${verb} ${change} to <current figure>"`);
   }
   return out;

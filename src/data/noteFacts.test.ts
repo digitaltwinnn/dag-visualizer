@@ -307,6 +307,8 @@ describe("a move of tenfold or more", () => {
     expect(moveOf(...ends(100, 1137))).toEqual({ times: 11 });
     expect(moveOf(...ends(100, 9_900))).toEqual({ times: 99 });
     expect(moveOf(...ends(100, 10_000))).toBeNull();
+    // 99.6 times writes as 100x, which is MULTIPLE_MAX: none, never a "100x" the cap was meant to stop.
+    expect(moveOf(...ends(100, 9_960))).toBeNull();
     // A fall never passes 100%, so it stays a percentage; a stop and no move state none.
     expect(moveOf(...ends(1000, 30))).toEqual({ pct: -97 });
     expect(moveOf(...ends(1000, 0))).toBeNull();
@@ -320,6 +322,22 @@ describe("a move of tenfold or more", () => {
     expect(checkNote("It rose 11x to 1,137.", facts, [], { maxSentences: 2 })).toEqual({ ok: true });
     expect(checkNote("It rose 11 times over to 1,137.", facts, [], { maxSentences: 2 })).toEqual({ ok: true });
     expect(checkNote("It rose 14x to 1,137.", facts, [], { maxSentences: 2 }).ok).toBe(false);
+    // A multiple only rises.
+    expect(checkNote("It fell 11x to 1,137.", facts, [], { maxSentences: 2 }).ok).toBe(false);
+  });
+  it("is a change, not a network's ratio: a label naming $DAG or no network backs it in every note (review 2026-11-27)", () => {
+    const fees = withChangeFacts([
+      fact("Fees in $DAG per hour, usual", 10, "amount", undefined, { key: "f", end: "from" }),
+      fact("Fees in $DAG per hour, recent", 137, "amount", undefined, { key: "f", end: "to" }),
+    ]);
+    // The whole network's note: "$DAG" in the label names the DAG, which a ratio's scope would read as a network.
+    expect(checkNote("Fees rose 14x to 137 $DAG per hour.", fees, ["DAG", "DED"], { maxSentences: 2 })).toEqual({ ok: true });
+    // A network's caption: the day's change label names no network.
+    const day = withChangeFacts([
+      fact("Notable day 1, the span median", 100, "count", undefined, { key: "d", end: "from" }),
+      fact("Notable day 1 busiest day of the span", 1300, "count", undefined, { key: "d", end: "to" }),
+    ]);
+    expect(checkNote("1,300 metagraph snapshots anchored, up 13x on a typical day.", day, ["DED"], { maxSentences: 2, subject: "DED" })).toEqual({ ok: true });
   });
   it("is the one builder both change kinds come from", () => {
     expect(changeFact("a", "b", { pct: -6 })).toEqual(changeShare("a", "b", -6));

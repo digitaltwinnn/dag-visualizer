@@ -243,9 +243,9 @@ export const MULTIPLE_MAX = 100;
 export function moveOf(from: Fact, to: Fact): { pct: number } | { times: number } | null {
   const pct = pairChange(from, to);
   if (pct === 0 || to.value === 0) return null;
-  const times = to.value / from.value;
+  const times = Math.round(to.value / from.value);
   if (times >= MULTIPLE_MAX) return null;
-  return times >= MULTIPLE_FROM ? { times: Math.round(times) } : { pct };
+  return to.value / from.value >= MULTIPLE_FROM ? { times } : { pct };
 }
 
 /** ONE MULTIPLE FACT, `changeShare`'s sibling for a rise of tenfold or more: a ratio, so the gate
