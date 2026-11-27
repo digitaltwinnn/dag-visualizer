@@ -15,37 +15,35 @@ const REAL = [
 ];
 
 describe("submitterHue", () => {
-  it("is deterministic and in the clear set for any id", () => {
-    expect(submitterHue("org-1")).toBe(submitterHue("org-1"));
-    for (let i = 0; i < 400; i++) {
-      const h = submitterHue(crypto.randomUUID());
-      expect(inAllowedZone(h)).toBe(true);
-      for (const n of NETS) expect(dist(h, n)).toBeGreaterThanOrEqual(MIN_HUE_GAP);
-    }
-  });
-  it("spreads the seven real organisations", () => {
-    const m = submitterHues(REAL);
-    const hs = REAL.map((id) => m.get(id) as number);
+  it("seats the seven palette ids pairwise 24 apart, clear of DED and Dor, in the zones", () => {
+    const hs = REAL.map((id) => submitterHue(id, REAL) as number);
     for (let i = 0; i < hs.length; i++) {
       expect(inAllowedZone(hs[i])).toBe(true);
       for (const n of NETS) expect(dist(hs[i], n)).toBeGreaterThanOrEqual(MIN_HUE_GAP);
       for (let j = i + 1; j < hs.length; j++) expect(dist(hs[i], hs[j])).toBeGreaterThanOrEqual(ORG_HUE_GAP);
-      expect(submitterHue(REAL[i], REAL)).toBe(hs[i]);
     }
+    expect(REAL.map((id) => submitterHue(id, REAL))).toEqual(hs);
   });
-  it("does not depend on input order", () => {
-    const a = submitterHues(REAL), b = submitterHues([...REAL].reverse());
-    for (const id of REAL) expect(b.get(id)).toBe(a.get(id));
+  it("assigns by palette order: the same slots, the busiest first", () => {
+    const rev = [...REAL].reverse();
+    expect(submitterHue(rev[0], rev)).toBe(submitterHue(REAL[0], REAL));
+  });
+  it("gives an id outside the palette no hue", () => {
+    expect(submitterHue("eighth", REAL)).toBeNull();
+    expect(submitterHues(REAL).size).toBe(7);
   });
 });
 
 describe("string forms", () => {
-  it("HUD is theme-deferred", () => {
-    expect(submitterHudCss("a", REAL)).toBe(`oklch(var(--ident-l) var(--ident-c) ${submitterHue("a", REAL)}deg)`);
+  it("HUD is theme-deferred inside the palette and muted outside", () => {
+    expect(submitterHudCss(REAL[0], REAL)).toBe(`oklch(var(--ident-l) var(--ident-c) ${submitterHue(REAL[0], REAL)}deg)`);
+    expect(submitterHudCss("eighth", REAL)).toBe("var(--muted-foreground)");
   });
-  it("scene hex per theme", () => {
-    const h = submitterHue("a");
-    expect(submitterSceneHex("a")).toBe(oklchToHex(SCENE_L, SCENE_C, h));
-    expect(submitterSceneHex("a", [], "light")).toBe(oklchToHex(SCENE_L_LIGHT, SCENE_C_LIGHT, h));
+  it("scene hex per theme inside the palette, the chamber's neutral outside", () => {
+    const h = submitterHue(REAL[0], REAL) as number;
+    expect(submitterSceneHex(REAL[0], REAL)).toBe(oklchToHex(SCENE_L, SCENE_C, h));
+    expect(submitterSceneHex(REAL[0], REAL, "light")).toBe(oklchToHex(SCENE_L_LIGHT, SCENE_C_LIGHT, h));
+    expect(submitterSceneHex("eighth", REAL)).toBe("#8a96b8");
+    expect(submitterSceneHex("eighth", REAL, "light")).toBe("#5a6478");
   });
 });

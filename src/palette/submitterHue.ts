@@ -1,13 +1,15 @@
 // Organisation identity hues (DED submitters): the network identity API's sibling. Ruling R14:
 // organisations are only drawn beside DED and Dor, so a hue keeps MIN_HUE_GAP degrees from THOSE two
 // networks' hues alone (the catalog's other hues leave only ~17 free degrees), inside the palette's
-// allowed zones. The KNOWN (named) organisations are additionally spread ORG_HUE_GAP apart: slots
-// packed along the clear runs (a hash-and-search greedy, brand.ts's spreadColliding pattern, left
-// the zones too fragmented to seat seven) taken in hash order. Any other id takes its hashed hue
-// from the clear set. Deterministic: the same ids give the same hues, in any input order.
+// allowed zones. Ruling R15: only a PALETTE of the busiest organisations (the read route's
+// `palette`, up to seven, busiest of all time first) carries a hue; the zones seat seven at
+// ORG_HUE_GAP apart, packed along the clear runs and assigned by palette ORDER, so the busiest
+// takes the first slot and the assignment is stable while the ranking holds. Every other
+// organisation has no hue (null) and reads neutral. Deterministic.
 import { oklchToHex } from "./palette";
 import { inAllowedZone } from "./brand";
 import { identityHueDeg, SCENE_L, SCENE_C, SCENE_L_LIGHT, SCENE_C_LIGHT } from "./identity";
+import { UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
 import { DED_ID, DOR_ID } from "@/src/data/submitters";
 import type { Theme } from "@/src/theme/resolve";
 
@@ -15,12 +17,6 @@ export const MIN_HUE_GAP = 18;
 export const ORG_HUE_GAP = 24;
 
 const dist = (a: number, b: number) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); };
-
-function hash(id: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return h >>> 0;
-}
 
 // Whole degrees inside the allowed zones and MIN_HUE_GAP clear of DED's and Dor's hues. Hashing into
 // this list (not hashing a hue and snapping) keeps ids spread: a guard-band hash would collapse
@@ -60,12 +56,12 @@ function slots(gap: number): number[] {
 }
 
 const _spread = new Map<string, Map<string, number>>();
-/** The named organisations' hues, pairwise at least ORG_HUE_GAP apart while the clear set holds
- *  that many slots (a crowd beyond it relaxes the gap a degree at a time, never fails). Ids take
- *  slots in hash order, so the assignment looks arbitrary but depends only on the set. Memoised. */
-export function submitterHues(named: readonly string[]): Map<string, number> {
-  const ids = [...new Set(named)].sort((a, b) => hash(a) - hash(b) || (a < b ? -1 : 1));
-  const key = [...ids].sort().join(",");
+/** The palette's hues in palette order, pairwise at least ORG_HUE_GAP apart while the clear set
+ *  holds that many slots (a longer palette relaxes the gap a degree at a time, never fails).
+ *  Memoised per palette. */
+export function submitterHues(palette: readonly string[]): Map<string, number> {
+  const ids = [...new Set(palette)];
+  const key = ids.join(",");
   const hit = _spread.get(key);
   if (hit) return hit;
   const out = new Map<string, number>();
@@ -79,21 +75,23 @@ export function submitterHues(named: readonly string[]): Map<string, number> {
   return out;
 }
 
-export function submitterHue(id: string, named: readonly string[] = []): number {
-  const spread = named.includes(id) ? submitterHues(named).get(id) : undefined;
-  if (spread !== undefined) return spread;
-  const list = clearHues();
-  return list[hash(id) % list.length];
+/** The organisation's hue, or null when it is outside the palette (it reads neutral). */
+export function submitterHue(id: string, palette: readonly string[]): number | null {
+  return submitterHues(palette).get(id) ?? null;
 }
 
-/** Theme-deferred HUD colour, identityHudCss's form. */
-export function submitterHudCss(id: string, named: readonly string[] = []): string {
-  return `oklch(var(--ident-l) var(--ident-c) ${submitterHue(id, named)}deg)`;
+/** Theme-deferred HUD colour, identityHudCss's form; the muted ink outside the palette. */
+export function submitterHudCss(id: string, palette: readonly string[]): string {
+  const h = submitterHue(id, palette);
+  return h === null ? "var(--muted-foreground)" : `oklch(var(--ident-l) var(--ident-c) ${h}deg)`;
 }
 
 const _scene = new Map<string, string>();
-export function submitterSceneHex(id: string, named: readonly string[] = [], theme: Theme = "dark"): string {
-  const h = submitterHue(id, named);
+const hex6 = (n: number) => "#" + n.toString(16).padStart(6, "0");
+/** The scene colour; the chamber's neutral (the unlisted network's) outside the palette. */
+export function submitterSceneHex(id: string, palette: readonly string[], theme: Theme = "dark"): string {
+  const h = submitterHue(id, palette);
+  if (h === null) return hex6(UNLISTED_SCENE_HEX_BY_THEME[theme]);
   const key = `${theme}:${h}`;
   const hit = _scene.get(key);
   if (hit) return hit;

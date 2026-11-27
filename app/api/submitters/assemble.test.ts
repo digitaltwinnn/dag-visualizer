@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DED_ID, DOR_ID } from "@/src/data/submitters";
-import { assembleSubmitters, windowRange24h } from "./assemble";
+import { assembleSubmitters, windowRange24h, ORG_PALETTE_MAX } from "./assemble";
 import { subField, subSlotOf } from "./keys";
 
 const H = 3600000;
@@ -72,6 +72,31 @@ describe("assembleSubmitters", () => {
     });
     expect(w.seenTotal).toBe(3);
     expect(w.firstSeenMs).toBe(Date.UTC(2026, 1, 1));
+  });
+});
+
+describe("palette", () => {
+  const yh = {
+    "sub:mainnet:x:1d:2025": { "12-31|k": "5" },
+    "sub:mainnet:x:1d:2026": Object.fromEntries([
+      ...["a", "b", "c", "d", "e", "f", "g", "h"].map((id, i) => [`01-02|${id}`, String(10 + i)]),
+      ["01-03|k", "5"], ["01-03|a", "0"],
+    ]),
+  };
+  const base = { net: DED_ID, tier: "1h" as const, hashes: {}, span: null, names: null, yearHashes: yh };
+  it("is the seven busiest of all time, busiest first, ties by id", () => {
+    const w = assembleSubmitters({ ...base, fromMs: T0, toMs: T0 + H });
+    // sums: h17 g16 f15 e14 d13 c12 b11, then a10 and k10 (tied, a first) fall past the cap
+    expect(w.palette).toEqual(["h", "g", "f", "e", "d", "c", "b"]);
+    expect(w.palette).toHaveLength(ORG_PALETTE_MAX);
+  });
+  it("is the same for two different ranges", () => {
+    const a = assembleSubmitters({ ...base, fromMs: T0, toMs: T0 + H });
+    const b = assembleSubmitters({ ...base, fromMs: T0 + 90 * H, toMs: T0 + 95 * H });
+    expect(b.palette).toEqual(a.palette);
+  });
+  it("is empty for devices", () => {
+    expect(assembleSubmitters({ ...base, net: DOR_ID, fromMs: T0, toMs: T0 + H }).palette).toEqual([]);
   });
 });
 

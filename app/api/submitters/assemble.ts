@@ -6,6 +6,9 @@ import { SUBMITTERS, type SubmitterKind } from "@/src/data/submitters";
 import { stepMsOf } from "../trends/keys";
 import { subSlotOf, type SubTier } from "./keys";
 
+/** How many organisations carry a hue of their own (the palette); every other one reads neutral. */
+export const ORG_PALETTE_MAX = 7;
+
 export interface SubmittersWindow {
   net: string;
   kind: SubmitterKind;
@@ -29,6 +32,9 @@ export interface SubmittersWindow {
   seenTotal: number;
   /** Earliest 1d bucket any organisation appears in, epoch ms; null when none. */
   firstSeenMs: number | null;
+  /** Up to ORG_PALETTE_MAX organisation ids, busiest of ALL TIME first (the 1d tier's sums, ties by
+   *  id), the same whatever range is asked; the ids that carry a hue. Devices give []. */
+  palette: string[];
 }
 
 export interface AssembleInput {
@@ -123,6 +129,7 @@ export function assembleSubmitters(input: AssembleInput): SubmittersWindow {
   series.sort((a, b) => totals.findIndex((t) => t.id === a.id) - totals.findIndex((t) => t.id === b.id));
 
   let seenTotal = 0, firstSeenMs: number | null = null;
+  const allTime = new Map<string, number>();
   if (isOrg) {
     const seen = new Set(Object.keys(input.names ?? {}));
     for (const [key, h] of Object.entries(input.yearHashes ?? {})) {
@@ -130,7 +137,9 @@ export function assembleSubmitters(input: AssembleInput): SubmittersWindow {
       for (const f of Object.keys(h)) {
         const bar = f.indexOf("|");
         if (bar < 0) continue;
-        seen.add(f.slice(bar + 1));
+        const oid = f.slice(bar + 1);
+        seen.add(oid);
+        allTime.set(oid, (allTime.get(oid) ?? 0) + (num(String(h[f])) ?? 0));
         const [mo, da] = f.slice(0, bar).split("-").map(Number);
         const ms = Date.UTC(year, mo - 1, da);
         if (Number.isFinite(ms) && (firstSeenMs === null || ms < firstSeenMs)) firstSeenMs = ms;
@@ -145,5 +154,7 @@ export function assembleSubmitters(input: AssembleInput): SubmittersWindow {
     distinct: perBucket.map((m) => (m ? m.size : null)),
     rangeDistinct: perBucket.some((m) => m) ? union.size : null,
     totals, seenTotal, firstSeenMs,
+    palette: [...allTime].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+      .slice(0, ORG_PALETTE_MAX).map(([id]) => id),
   };
 }
