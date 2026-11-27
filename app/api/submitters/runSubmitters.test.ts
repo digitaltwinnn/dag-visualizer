@@ -183,6 +183,31 @@ describe("runSubmitters", () => {
     expect(subData(store)).toEqual(subData(clean));
   });
 
+  it("a deadline passed mid-batch commits the prefix as a truncation, and the next run resumes to clean totals", async () => {
+    const clean = memStore();
+    await runSubmitters(deps(clean));
+
+    // A slow L0: each read costs the fake clock 10 s; the run's budget is 100 s.
+    const store = memStore();
+    let clock = NOW;
+    const slow = { now: () => clock, fetchSnap: async (_n: string, o: number) => { clock += 10000; return root(o); } };
+    const res = await runSubmitters(deps(store, { ...slow, deadlineMs: NOW + 100000, pool: 1 }));
+    expect(res.read[DED_ID]).toBe(10);
+    expect(res.failed[DED_ID]).toBeNull();
+    expect(store.applies).toHaveLength(1);
+    expect(span(store)!.get("cursor")).toBe("1069");
+    expect(span(store)!.get("to")).toBe(String(tsOf(1069)));
+    expect(span(store)!.get("from")).toBe(String(PREV_HOUR));
+
+    // The default budget: 200 s from the run's own start.
+    const res2 = await runSubmitters(deps(store, { ...slow, pool: 1 }));
+    expect(res2.read[DED_ID]).toBe(20);
+    const res3 = await runSubmitters(deps(store, { now: () => NOW + HOUR / 6 }));
+    expect(res3.read[DED_ID]).toBe(40);
+    expect(span(store)!.get("from")).toBe(String(PREV_HOUR)); // contiguous throughout
+    expect(subData(store)).toEqual(subData(clean));
+  });
+
   it("a network whose list cannot be read reports -1 and moves nothing; the others still commit", async () => {
     const store = memStore();
     const OTHER = "DAG0other";

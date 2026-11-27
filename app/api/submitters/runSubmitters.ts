@@ -22,6 +22,11 @@
 //   it is counted, the cursor is the last ordinal read and `to` its time, and `failed[net]` names the
 //   failing ordinal — so the next run resumes there with no hole and no double count. A network
 //   whose explorer list cannot be read reports `failed[net] = -1` and moves nothing.
+// - A TIME BUDGET (review, 2026-11-27): `deadlineMs` (default 200 s after the run starts, under the
+//   route's 300 s maxDuration) stops new L0 reads once passed; the prefix read so far is committed
+//   exactly like a `maxRecs` truncation — cursor over what was read, span contiguous, no failure
+//   reported. Without it a slow L0 during a catch-up would be killed before the one write, commit
+//   nothing, and retry the same reads forever.
 //
 // The write phase is ALL-OR-NOTHING, `runSample`'s pattern: the lock (`subLockKeyOf`, its own, so the
 // two samplers never wait on each other) excludes every other run, the counts are INCREMENTS merged
@@ -52,6 +57,8 @@ export interface SubmittersDeps {
   pool?: number;
   /** Records read per network per run (default 4000). */
   maxRecs?: number;
+  /** Epoch ms after which no new L0 read starts (default: 200 s after the run starts, by `now`). */
+  deadlineMs?: number;
 }
 
 export interface SubmittersResult {
@@ -71,6 +78,8 @@ const PAGE = 1000;
 const FIRST_CAP = 30000;
 /** Lock TTL well above the route's maxDuration (300 s), per `store.ts`'s releaseLock invariant. */
 const LOCK_TTL_S = 900;
+/** The default read budget — leaves the merge and the one transaction ~100 s of the 300 s maxDuration. */
+const READ_BUDGET_MS = 200000;
 
 /** R7: the records at or after `boundaryMs`, oldest first, paged newest-first until one is older. */
 async function listFromHour(page: (limit: number, next?: string) => Promise<ChainPage<MetaRec>>, boundaryMs: number): Promise<MetaRec[]> {
@@ -92,7 +101,7 @@ interface NetRun {
   span: { from: number; to: number; cursor: number } | null;
 }
 
-async function runNet(deps: SubmittersDeps, net: string, prevSpan: Record<string, string> | null): Promise<NetRun> {
+async function runNet(deps: SubmittersDeps, net: string, prevSpan: Record<string, string> | null, deadlineMs: number): Promise<NetRun> {
   const page = (limit: number, next?: string) => deps.pageMeta(net, limit, next);
   const cursor = prevSpan?.cursor != null ? Number(prevSpan.cursor) : null;
   const prev = prevSpan?.from != null && prevSpan.to != null ? { from: Number(prevSpan.from), to: Number(prevSpan.to) } : null;
@@ -110,7 +119,7 @@ async function runNet(deps: SubmittersDeps, net: string, prevSpan: Record<string
   }
   batch = batch.slice(0, deps.maxRecs ?? 4000);
 
-  const got = await readL0Snapshots(batch, (o) => deps.fetchSnap(net, o), deps.pool ?? 8);
+  const got = await readL0Snapshots(batch, (o) => deps.fetchSnap(net, o), deps.pool ?? 8, () => deps.now() >= deadlineMs);
   let failedAt = got.failedAt;
   const read: NetRun["read"] = [];
   for (const { rec, root } of got.read) {
@@ -143,10 +152,11 @@ export async function runSubmitters(deps: SubmittersDeps): Promise<SubmittersRes
   const failed: Record<string, number | null> = {};
   if (!(await store.acquireLock(subLockKeyOf(), LOCK_TTL_S))) return { skipped: "locked", read, failed, names: 0 };
   try {
+    const deadlineMs = deps.deadlineMs ?? deps.now() + READ_BUDGET_MS;
     const runs = await Promise.all(
       deps.nets.map(async (net): Promise<NetRun> => {
         try {
-          return await runNet(deps, net, await store.hgetall(subSpanKeyOf(net)));
+          return await runNet(deps, net, await store.hgetall(subSpanKeyOf(net)), deadlineMs);
         } catch {
           return { net, read: [], failedAt: -1, span: null }; // the list could not be read
         }

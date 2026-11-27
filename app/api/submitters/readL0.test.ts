@@ -43,6 +43,14 @@ describe("readL0Snapshots", () => {
     expect(peak).toBe(2);
   });
 
+  it("a spent budget starts no new read and answers the prefix read so far, not as a failure", async () => {
+    let started = 0;
+    const res = await readL0Snapshots(recs, async (o) => { started++; await tick(); return { value: { ordinal: o } }; }, 2, () => started >= 3);
+    expect(started).toBe(3);
+    expect(res.failedAt).toBeNull();
+    expect(res.read.map((r) => r.rec.ordinal)).toEqual([1, 2, 3]);
+  });
+
   it("answers an empty batch", async () => {
     expect(await readL0Snapshots([], async () => ({}), 8)).toEqual({ read: [], failedAt: null });
   });

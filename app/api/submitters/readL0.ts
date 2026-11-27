@@ -7,6 +7,11 @@
 // one, and the next run resumes AT the failure with no hole and no double count (the submitters
 // design's Review Focus 2). Once a failure is seen no record after it is started; reads already in
 // flight are let finish and dropped.
+//
+// A TIME BUDGET (review, 2026-11-27): `shouldStop`, asked before each new read, ends the batch
+// early — reads in flight finish, none is started, and the answer is the prefix read so far with
+// `failedAt: null` (a truncation, like the caller's `maxRecs`, never a failure). Without it a slow
+// L0 after an outage, exactly when a backlog exists, would outlive the function and commit nothing.
 import type { MetaRec } from "../trends/bucketing";
 
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -15,12 +20,13 @@ export async function readL0Snapshots(
   recs: MetaRec[],
   fetchSnap: (ordinal: number) => Promise<unknown>,
   pool: number,
+  shouldStop: () => boolean = () => false,
 ): Promise<{ read: { rec: MetaRec; root: Record<string, unknown> }[]; failedAt: number | null }> {
   const roots: (Record<string, unknown> | undefined)[] = new Array(recs.length);
   let firstFail = recs.length; // index of the earliest failure seen
   let next = 0;
   const worker = async () => {
-    while (next < recs.length && next < firstFail) {
+    while (next < recs.length && next < firstFail && !shouldStop()) {
       const i = next++;
       try {
         const body = await fetchSnap(recs[i].ordinal);
@@ -32,7 +38,9 @@ export async function readL0Snapshots(
     }
   };
   await Promise.all(Array.from({ length: Math.max(1, Math.min(pool, recs.length)) }, worker));
+  // The prefix ends at the first record not read: a failure, or (budget spent) one never started.
   const read: { rec: MetaRec; root: Record<string, unknown> }[] = [];
-  for (let i = 0; i < firstFail; i++) read.push({ rec: recs[i], root: roots[i]! });
-  return { read, failedAt: firstFail < recs.length ? recs[firstFail].ordinal : null };
+  let i = 0;
+  for (; i < recs.length && roots[i] !== undefined; i++) read.push({ rec: recs[i], root: roots[i]! });
+  return { read, failedAt: i === firstFail && i < recs.length ? recs[i].ordinal : null };
 }
