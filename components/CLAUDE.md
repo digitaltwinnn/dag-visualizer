@@ -1400,7 +1400,13 @@ Metagraph snapshots register says "N metagraph snapshots" and its size. **The DA
 own slot under the Metagraph snapshot (`DISPLAY_LANE.ledger`, after `block`, the lane's last; a
 subject of its own, not the snapshot's child rung), present in Data
 blocks alone and only under the snapshot that carried it (`parentHolds`), named by its place in
-that snapshot ("3 of 10"), its UPDATES BY KIND as the body, "Signed by N dL1 validators" and Size as
+that snapshot ("3 of 10"), its UPDATES BY KIND as the body — and on a Digital Evidence block a
+second table, BY ORGANISATION (2026-11-27): each organisation's dot in its palette hue
+(`palette/submitterHue.submitterHudCss`, the muted ink outside the busiest seven), its name or "Org
+<first 8 of id>" (`submitterLabel`, names from `useSubmitters`' 24-hour answer), its batches right-aligned,
+each row previewing its organisation on `hoverSubmitter` (the chamber lights its bands; a preview, never
+a commit), while a Dor block states one fact, "Checked in by N devices" (devices are counted, never
+named), and an unread block keeps its unread wording — "Signed by N dL1 validators" and Size as
 facts (a fact row, as the global and metagraph snapshot cards state theirs), a "Block records" door onto the snapshot's RAW record, and a foot with the
 snapshot's ordinal and the DIGEST (`DataBlockSummary`, never a hash). Its ghost's step is the pinned
 snapshot's first data block (`railSiblings.dataBlockStep`), its pager EVERY data block of its global snapshot,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DATA_MARK, DATA_STACK, carriesData, dataMarkCount, dataStackBoxes } from "./dataMark";
+import { DATA_BANDS, DATA_MARK, DATA_STACK, carriesData, dataBoxBands, dataMarkCount, dataStackBoxes } from "./dataMark";
 
 // THE DATA BLOCKS REGISTER'S TILE MARK (D6, 2026-11-07): a mark on each metagraph snapshot tile whose
 // exact read says it carried data blocks: a column of boxes, one per data block.
@@ -59,5 +59,34 @@ describe("dataStackBoxes — one box per data block (user, 2026-11-23)", () => {
   });
   it("leaves air between the boxes", () => {
     expect(DATA_STACK.gap).toBeGreaterThan(0);
+  });
+});
+
+describe("dataBoxBands — a box banded by who submitted its updates (2026-11-27)", () => {
+  const sub = (id: string, updates: number) => ({ id, updates });
+  it("is each submitter's share of the box, busiest first", () => {
+    expect(dataBoxBands({ submitters: [sub("a", 93), sub("b", 7)] })).toEqual([
+      { id: "a", share: 0.93 },
+      { id: "b", share: 0.07 },
+    ]);
+  });
+  it("draws the busiest max − 1 past the ceiling, the rest as one unnamed band", () => {
+    const bands = dataBoxBands({ submitters: [sub("a", 40), sub("b", 30), sub("c", 15), sub("d", 10), sub("e", 5)] });
+    expect(bands).toHaveLength(DATA_BANDS.max);
+    expect(bands.map((b) => b.id)).toEqual(["a", "b", "c", null]);
+    expect(bands[3].share).toBeCloseTo(0.15);
+    expect(bands.reduce((n, b) => n + b.share, 0)).toBeCloseTo(1);
+  });
+  it("names every submitter while they fit under the ceiling", () => {
+    const bands = dataBoxBands({ submitters: [sub("a", 1), sub("b", 1), sub("c", 1), sub("d", 1)] });
+    expect(bands.map((b) => b.id)).toEqual(["a", "b", "c", "d"]);
+  });
+  it("orders by updates whatever order it is handed, ties by id", () => {
+    expect(dataBoxBands({ submitters: [sub("z", 1), sub("y", 3), sub("a", 1)] }).map((b) => b.id)).toEqual(["y", "a", "z"]);
+  });
+  it("is empty for a block with no submitters: it draws as one plain box (rule 10)", () => {
+    expect(dataBoxBands({})).toEqual([]);
+    expect(dataBoxBands({ submitters: [] })).toEqual([]);
+    expect(dataBoxBands({ submitters: [sub("a", 0)] })).toEqual([]);
   });
 });

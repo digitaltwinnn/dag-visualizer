@@ -756,6 +756,8 @@ export class Engine {
       this.ledger.setBlockReads(st.blockReads, windowReadsSettled(getBlockWindow(), st.blockReads, st.blockReadMiss, st.exactMiss));
       this.ledger.setSelectedBlock(st.block?.hash ?? null);
       this.ledger.setHoveredBlock(st.hoverBlock);
+      this.ledger.setSubmitterPalette(st.submitterPalette);
+      this.ledger.setHoveredSubmitter(st.hoverSubmitter);
     }
     // The globe colours the DAG's own validator nodes (the L0/cL1 shells) with sceneColors["dag"]
     // (see globe.js setNodes) — seed it here, synchronously, so it's populated before the first
@@ -1137,6 +1139,11 @@ export class Engine {
         if (st.hoverBlock !== prev.hoverBlock) this.ledger.setHoveredBlock(st.hoverBlock);
         // …and the hovered DATA BLOCK, which lights its snapshot's mark, never the tile (2026-11-09).
         if (st.hoverDataBlock !== prev.hoverDataBlock) this.ledger.setHoveredDataBlock(st.hoverDataBlock);
+        // …and the hovered ORGANISATION, which lights its bands in the data columns (2026-11-27), and
+        // the organisation palette those bands are coloured from (a publish channel: React writes it,
+        // the chamber takes it as plain data).
+        if (st.hoverSubmitter !== prev.hoverSubmitter) this.ledger.setHoveredSubmitter(st.hoverSubmitter);
+        if (st.submitterPalette !== prev.submitterPalette) this.ledger.setSubmitterPalette(st.submitterPalette);
         // …with whether the window's reads are ALL in — the edge the DAG is laid out on, so a miss
         // (either map) re-hands them too.
         if (st.blockReads !== prev.blockReads || st.blockReadMiss !== prev.blockReadMiss || st.exactMiss !== prev.exactMiss) {

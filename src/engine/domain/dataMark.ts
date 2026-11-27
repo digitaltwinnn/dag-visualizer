@@ -58,3 +58,26 @@ export function dataMarkCount(row: { dataBlocks?: number; dataTxCount?: number }
 export function carriesData(row: { dataBlocks?: number; dataTxCount?: number } | null | undefined): boolean {
   return dataMarkCount(row) != null;
 }
+
+/** A BOX IS BANDED BY WHO SUBMITTED ITS UPDATES (2026-11-27, the data-submitters feature): Digital
+ *  Evidence's organisations stack inside each data block's box, each band's height its share of the
+ *  block's attributed updates. `max` is the most bands a box draws: past it the busiest `max − 1`
+ *  keep their own band and every other submitter shares one unnamed band on top (a labelled
+ *  remainder — the card names them all). */
+export const DATA_BANDS: Readonly<{ max: number }> = { max: 4 };
+
+/** A box's bands, busiest first (ties by id), shares summing to 1; `[]` for a block that names no
+ *  submitter, which draws as one plain box. Event-time: it allocates. */
+export function dataBoxBands(block: { submitters?: readonly { id: string; updates: number }[] }): { id: string | null; share: number }[] {
+  const subs = (block.submitters ?? []).filter((s) => s.updates > 0);
+  const total = subs.reduce((n, s) => n + s.updates, 0);
+  if (total <= 0) return [];
+  const ranked = [...subs].sort((a, b) => b.updates - a.updates || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const named = ranked.length <= DATA_BANDS.max ? ranked : ranked.slice(0, DATA_BANDS.max - 1);
+  const bands: { id: string | null; share: number }[] = named.map((s) => ({ id: s.id, share: s.updates / total }));
+  if (named.length < ranked.length) {
+    const rest = ranked.slice(named.length).reduce((n, s) => n + s.updates, 0);
+    bands.push({ id: null, share: rest / total });
+  }
+  return bands;
+}

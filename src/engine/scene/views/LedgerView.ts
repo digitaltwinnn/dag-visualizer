@@ -71,7 +71,7 @@ import {
   type LaneBlock,
 } from "../../domain/ledgerModel";
 import { blockPlace, forkSpread, frontMark, referenceSegments, silentRun, stretchLabel, type BlockRead } from "../../domain/blockBraid";
-import { DATA_MARK, DATA_STACK, carriesData, dataMarkCount, dataStackBoxes } from "../../domain/dataMark";
+import { DATA_BANDS, DATA_MARK, DATA_STACK, carriesData, dataBoxBands, dataMarkCount, dataStackBoxes } from "../../domain/dataMark";
 import { ENTRY_STAG, entryStep, entryTotal } from "../../domain/entryBeat";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, RIBBON_LANE_HALF, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
@@ -80,6 +80,7 @@ import type {
   Anchor,
   PickDescriptor,
   SnapshotExact,
+  ChannelSnapRow,
 } from "@/src/data/types";
 import { dataBlockSnapKey, metaSnapHoverKey } from "@/src/data/types";
 import type { BlockWindow } from "@/src/data/blockWindow";
@@ -89,6 +90,9 @@ import type { ViewPolicy } from "../../domain/viewPolicy";
  *  reaches nothing in the store, types included (`layerBoundaries.test.ts`). */
 type LedgerRegister = ViewPolicy["registers"][number];
 import { fmtKB } from "@/src/util/format"; // the HUD's own size vocabulary — one formatter, so scene and cards can't disagree
+import { SUBMITTERS } from "@/src/data/submitters";
+import { UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
+import { submitterSceneHex } from "@/src/palette/submitterHue";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
 import { ByteBar, SEED_W } from "../objects/ByteBar";
 import { LiveEdge } from "../objects/LiveEdge";
@@ -191,6 +195,7 @@ const KB_Z0 = -ORD_LINE_Z0;
 const _dummy = new THREE.Object3D();
 const _ordSeen = new Set<number>(); // scratch for _syncOrdLabels (event-time)
 const _col = new THREE.Color();
+const _bandCol = new THREE.Color(); // per-frame scratch: one band's ink (the column's stays in `_col`)
 const _tileV = new THREE.Vector3(); // per-frame scratch: a tile's top as the frame draws it
 
 /** Resolves a lane tile to the metagraph snapshot it stands for. A tile the polled buffer no longer
@@ -256,6 +261,12 @@ const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolea
 };
 /** A data mark's brightness over its tile's: a footnote on the tile, but one that must read on it. */
 const DATA_MARK_GAIN = 2.2;
+/** The data boxes' pool: every box may stand as `DATA_BANDS.max` bands (its organisations). */
+const DATA_POOL = META_TRAIL_MAX * DATA_BANDS.max;
+/** While an organisation is hovered, the OTHER bands of a column holding it step back to this share
+ *  of their weight, so its own bands read out of the box (the hovered card's column is at full
+ *  weight, and an equal weight would light nothing). */
+const BAND_BACK = 0.4;
 
 /** How far the chamber's identity hues lean toward the page on paper — the HUD's identity bars'
  *  own 0.75 opacity, as a share of the page (`setSceneColors`). */
@@ -546,6 +557,29 @@ export class LedgerView implements SceneView {
   private readonly _dataMarkN = new Float32Array(META_TRAIL_MAX).fill(-1);
   /** How many boxes each tile's column holds (`dataMark.dataStackBoxes`), resolved with the count. */
   private readonly _dataBoxN = new Uint8Array(META_TRAIL_MAX);
+  /** THE BANDS (2026-11-27): a DED box stacks its organisations (`dataMark.dataBoxBands`), each
+   *  band's height its share. Per box (tile `mi`, box `bx` → `mi * DATA_STACK.max + bx`): how many
+   *  bands (0 = one plain box, as before) and where they start in the band pool; per band its share
+   *  and its organisation (interned below; -1 the unnamed remainder). Per tile: how many sub-boxes
+   *  its column draws, and whether it holds the hovered organisation. All filled at event time with
+   *  the pick table; the frame reads numbers. */
+  private readonly _bandN = new Uint8Array(META_TRAIL_MAX * DATA_STACK.max);
+  private readonly _bandAt = new Int32Array(META_TRAIL_MAX * DATA_STACK.max);
+  private readonly _bandShare = new Float32Array(DATA_POOL);
+  private readonly _bandOrg = new Int16Array(DATA_POOL);
+  private readonly _dataSubN = new Uint16Array(META_TRAIL_MAX);
+  private readonly _subHot = new Uint8Array(META_TRAIL_MAX);
+  /** Organisations seen in the bands, interned once (a few dozen), with their resolved scene ink —
+   *  re-resolved on a palette change and a theme flip, never per frame. */
+  private readonly _orgIx = new Map<string, number>();
+  private readonly _orgIds: string[] = [];
+  private readonly _orgCols: THREE.Color[] = [];
+  /** The remainder band's ink: the chamber's neutral, as an organisation outside the palette. */
+  private readonly _restCol = new THREE.Color();
+  private _palette: readonly string[] = [];
+  private _hoverSubId: string | null = null;
+  /** The hovered organisation's interned index; -2 for none (or one no band holds). */
+  private _hoverOrg = -2;
   /** The mist each data column hangs over (`objects/LiftMist.ts`), one per drawn column, packed. */
   private _liftMist!: LiftMist;
   /** The hover's clock, and whether motion is held still (reduced motion; the Engine says). */
@@ -660,22 +694,23 @@ export class LedgerView implements SceneView {
     // The Data blocks register's marks: the tiles' own species (solid, normal-blended, depth-writing,
     // in the bloom set), one unit box scaled per instance onto its tile's top. Not pickable — a mark
     // is part of its tile, and the tile under it answers the click.
-    this._dataMarkMesh = new THREE.InstancedMesh(faceShade(new THREE.BoxGeometry(1, 1, 1)), new THREE.MeshBasicMaterial({ vertexColors: true }), META_TRAIL_MAX);
+    this._dataMarkMesh = new THREE.InstancedMesh(faceShade(new THREE.BoxGeometry(1, 1, 1)), new THREE.MeshBasicMaterial({ vertexColors: true }), DATA_POOL);
     joinBloom(this._dataMarkMesh);
     joinMirror(this._dataMarkMesh);
     this._dataMarkMesh.frustumCulled = false;
     this._dataMarkMesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
     this._dataMarkMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    for (let i = 0; i < META_TRAIL_MAX; i++) {
+    for (let i = 0; i < DATA_POOL; i++) {
       this._dataMarkMesh.setColorAt(i, _col.set(0xffffff));
       this._dataMarkMesh.setMatrixAt(i, _dummy.matrix); // still the zero-scale matrix from above
     }
     this._dataMarkMesh.instanceMatrix.needsUpdate = true;
     // Nothing is drawn until the first data frame sets the count (review M5): `update` returns early
-    // before any data, and the pool would submit all META_TRAIL_MAX zero-scaled boxes every frame.
+    // before any data, and the pool would submit all DATA_POOL zero-scaled boxes every frame.
     this._dataMarkMesh.count = 0;
     this.group.add(this._dataMarkMesh);
     this._liftMist = new LiftMist(this.group, META_TRAIL_MAX, DATA_MARK.foot, TILE_D * DATA_MARK.lift, this._paper);
+    this._restCol.setHex(UNLISTED_SCENE_HEX_BY_THEME[this._paper ? "light" : "dark"]);
   }
 
   private _laneColor(id: string): THREE.Color {
@@ -857,6 +892,7 @@ export class LedgerView implements SceneView {
     this._bar.setColors(c);
     this._ribbons.setColors(c);
     this._liftMist?.setGround(this._paper);
+    this._resolveOrgCols();
     for (const t of this._tiers) t.setColors(c);
     this._stretch.setColors(c);
     this._rebuildBlockTier(); // the DAG's blocks and links bake the structural cyan (`_core`)
@@ -1658,6 +1694,83 @@ export class LedgerView implements SceneView {
     this._syncHoverTile();
   }
 
+  /** The ORGANISATION PALETTE (the read route's `palette`, from the Engine as plain data): which
+   *  organisations wear a hue in the bands. Event-time: re-resolves every interned organisation. */
+  setSubmitterPalette(ids: readonly string[]): void {
+    this._palette = ids;
+    this._resolveOrgCols();
+  }
+
+  /** The hovered ORGANISATION: its bands light in every column that holds it. Event-time. */
+  setHoveredSubmitter(id: string | null): void {
+    this._hoverSubId = id;
+    this._syncSubHot();
+  }
+
+  /** Every interned organisation's scene ink, and the remainder's, for this palette and ground. */
+  private _resolveOrgCols(): void {
+    const theme = this._paper ? "light" : "dark";
+    this._restCol.setHex(UNLISTED_SCENE_HEX_BY_THEME[theme]);
+    for (let i = 0; i < this._orgIds.length; i++) this._orgCols[i].set(submitterSceneHex(this._orgIds[i], this._palette, theme));
+  }
+
+  /** An organisation's interned index, interning it (and resolving its ink) on first sight. */
+  private _orgOf(id: string): number {
+    let ix = this._orgIx.get(id);
+    if (ix == null) {
+      ix = this._orgIds.length;
+      this._orgIx.set(id, ix);
+      this._orgIds.push(id);
+      this._orgCols.push(new THREE.Color(submitterSceneHex(id, this._palette, this._paper ? "light" : "dark"))); // event-time
+    }
+    return ix;
+  }
+
+  /** Which columns hold the hovered organisation — on a hover change and on every band rebuild. */
+  private _syncSubHot(): void {
+    const id = this._hoverSubId;
+    this._hoverOrg = id == null ? -2 : (this._orgIx.get(id) ?? -2);
+    this._subHot.fill(0);
+    if (this._hoverOrg < 0) return;
+    for (let mi = 0; mi < META_TRAIL_MAX; mi++) {
+      const boxes = this._dataBoxN[mi];
+      for (let bx = 0; bx < boxes && !this._subHot[mi]; bx++) {
+        const at = mi * DATA_STACK.max + bx;
+        for (let k = 0; k < this._bandN[at]; k++) {
+          if (this._bandOrg[this._bandAt[at] + k] === this._hoverOrg) { this._subHot[mi] = 1; break; }
+        }
+      }
+    }
+  }
+
+  /** One tile's bands, from its snapshot's exact row: organisation networks only (Dor's devices are
+   *  counted, never broken down), each box its own block's (`dataBlockRows[bx]`). Returns the band
+   *  pool's cursor after it; a box the pool has no room for draws plain. */
+  private _fillBands(mi: number, row: ChannelSnapRow | null, metaId: string, cursor: number): number {
+    const boxes = this._dataBoxN[mi];
+    const banded = row != null && SUBMITTERS[metaId]?.kind === "organisation";
+    let sub = 0;
+    for (let bx = 0; bx < boxes; bx++) {
+      const at = mi * DATA_STACK.max + bx;
+      const bands = banded ? dataBoxBands(row.dataBlockRows?.[bx] ?? {}) : [];
+      if (bands.length === 0 || cursor + bands.length > DATA_POOL) {
+        this._bandN[at] = 0;
+        sub += 1;
+        continue;
+      }
+      this._bandN[at] = bands.length;
+      this._bandAt[at] = cursor;
+      for (const band of bands) {
+        this._bandShare[cursor] = band.share;
+        this._bandOrg[cursor] = band.id == null ? -1 : this._orgOf(band.id);
+        cursor++;
+      }
+      sub += bands.length;
+    }
+    this._dataSubN[mi] = sub;
+    return cursor;
+  }
+
   /** Resolve the hovered snapshot to its INSTANCE INDEX over the pick table update() draws in
    *  lockstep with. Event-time only — on a hover change and on every pick-table rebuild, since a
    *  data refresh reshuffles the indices under a held hover. */
@@ -1998,6 +2111,7 @@ export class LedgerView implements SceneView {
       return;
     }
     let mi = 0;
+    let bandAt = 0; // the band pool's cursor (`_fillBands`)
     for (const lane of this.model.lanes.values()) {
       // `k` is the tile's index WITHIN ITS TICK — the resolver looks a snapshot up by
       // (metagraph, tick) and indexes that tick's own list. A lane's blocks are contiguous per
@@ -2014,13 +2128,16 @@ export class LedgerView implements SceneView {
         const dataRow = this._cargo.tiles === "data" && pick?.kind === "metaSnap" ? this._dataRowOf(pick.sel.globalOrdinal, pick.sel.metaId, pick.sel.ordinal) : null;
         this._dataMarkN[mi] = dataMarkCount(dataRow) ?? -1;
         this._dataBoxN[mi] = dataStackBoxes(dataRow);
+        if (dataRow && pick?.kind === "metaSnap") bandAt = this._fillBands(mi, dataRow, pick.sel.metaId, bandAt);
+        else this._dataSubN[mi] = 0;
         // A tile the register does not draw (`_tileDrawn`) is not pickable either.
         this._tilePicks[mi] = pick && this._tileDrawn(b, mi) ? pick : null;
         if (b.filled) k++;
         mi++;
       }
     }
-    for (let j = mi; j < META_TRAIL_MAX; j++) { this._tilePicks[j] = null; this._dataMarkN[j] = -1; this._dataBoxN[j] = 0; }
+    for (let j = mi; j < META_TRAIL_MAX; j++) { this._tilePicks[j] = null; this._dataMarkN[j] = -1; this._dataBoxN[j] = 0; this._dataSubN[j] = 0; }
+    this._syncSubHot();
     // A held hover's tile index is only valid against THIS table — and so is the selected
     // tile's (the callout anchor).
     this._syncHoverTile();
@@ -2340,7 +2457,8 @@ export class LedgerView implements SceneView {
         // reach it through its tile.
         if (dataMarks) {
           const boxes = this._dataBoxN[mi];
-          if (boxes > 0 && si + boxes <= META_TRAIL_MAX) {
+          const subN = this._dataSubN[mi];
+          if (boxes > 0 && si + subN <= DATA_POOL) {
             // Each box is a cube inside the tile's footprint; the column rises from the lift.
             const w = b.size * DATA_MARK.foot * dataIn;
             const h = w;
@@ -2353,15 +2471,47 @@ export class LedgerView implements SceneView {
             // Its HUE is its tile's (user, 2026-11-23: "unlike all other elements in the trail, the
             // data block still keeps its metagraph color"): identity on the active row, a hover
             // and the committed network's own trail, the neutral trail everywhere else.
-            inkMix(_col.copy(ident || mi === this._hoverMark ? laneColor : this._coreCol), mi === this._hoverMark ? 1 : Math.min(1, bright * DATA_MARK_GAIN), this._colors);
+            // A column holding the hovered ORGANISATION is lit as a hover into it (2026-11-27).
+            const lit = ident || mi === this._hoverMark || this._subHot[mi] === 1;
+            const weight = mi === this._hoverMark ? 1 : Math.min(1, bright * DATA_MARK_GAIN);
+            inkMix(_col.copy(lit ? laneColor : this._coreCol), weight, this._colors);
+            // THE BANDS (2026-11-27, the user's ruling "own hues, chamber rule"): a DED box stacks its
+            // organisations, each band's height its share. Their HUES follow the column's: on a lit
+            // column (the active row, a hover into it, the committed network's trail) each band wears
+            // its organisation's ink — the palette's hue, else the neutral — and everywhere else the
+            // column's neutral, so down the trail a banded box reads as one. A hovered organisation's
+            // bands take the subject's full weight and the rest of its columns step back.
+            const subBack = this._subHot[mi] === 1;
             _dummy.rotation.set(0, 0, 0);
-            _dummy.scale.set(w, h, w);
             for (let bx = 0; bx < boxes; bx++) {
-              _dummy.position.set(_tileV.x, under + bx * pitch + h / 2, _tileV.z);
-              _dummy.updateMatrix();
-              this._dataMarkMesh.setMatrixAt(si, _dummy.matrix);
-              this._dataMarkMesh.setColorAt(si, _col);
-              si++;
+              const at = mi * DATA_STACK.max + bx;
+              const n = this._bandN[at];
+              if (n === 0) {
+                _dummy.scale.set(w, h, w);
+                _dummy.position.set(_tileV.x, under + bx * pitch + h / 2, _tileV.z);
+                _dummy.updateMatrix();
+                this._dataMarkMesh.setMatrixAt(si, _dummy.matrix);
+                this._dataMarkMesh.setColorAt(si, _col);
+                si++;
+                continue;
+              }
+              let y = under + bx * pitch;
+              for (let k = 0; k < n; k++) {
+                const bi = this._bandAt[at] + k;
+                const hh = h * this._bandShare[bi];
+                const org = this._bandOrg[bi];
+                if (lit) {
+                  const own = org >= 0 && org === this._hoverOrg;
+                  inkMix(_bandCol.copy(org >= 0 ? this._orgCols[org] : this._restCol), own ? 1 : subBack ? weight * BAND_BACK : weight, this._colors);
+                } else _bandCol.copy(_col);
+                _dummy.scale.set(w, hh, w);
+                _dummy.position.set(_tileV.x, y + hh / 2, _tileV.z);
+                _dummy.updateMatrix();
+                this._dataMarkMesh.setMatrixAt(si, _dummy.matrix);
+                this._dataMarkMesh.setColorAt(si, _bandCol);
+                y += hh;
+                si++;
+              }
             }
             // THE MIST it hangs over: the sheet stands on the tile's top at the tile's size, in the
             // column's ink at the tile's entry fade (a colour multiply: it is added light on dark,
