@@ -168,6 +168,17 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   network's new address) is read back to its FIRST snapshot within the same depth
   (`fetchSince.ts`), not just its newest page. The History view (`/trends`) is the read route's
   consumer.
+- **`/api/submitters/sample`** (2026-11-27) is the Vercel-Cron sampler (quarter-hourly at 3,18,33,48,
+  `CRON_SECRET` auth) for WHO SUBMITS a data block: Digital Evidence's organisations (`orgId`) and Dor's
+  devices (`publicId`), the two networks in `src/data/submitters.ts`. Its own key family `sub:mainnet:`
+  (1h and 1d tiers, `app/api/submitters/keys.ts`) — outside `t:` on purpose: a rebuild wipes `t:`, and
+  per-organisation series would ride every History payload. Its own lock and cursor, so it never waits on
+  the trends sampler. It pages the explorer's snapshot list since the cursor, then reads each snapshot
+  from the network's OWN L0 by ordinal (200 s read budget inside `maxDuration` 300; the prefix read is
+  committed, a failed read stops there and resumes next run). The measured span (`sub:…:span`) is what
+  History reads as measured. DED's names come from DED's public API (`/v1/fingerprints/latest`), once a
+  run. Production-only and fail-closed like the trends sampler; no `force-dynamic`, which would bypass
+  the `unstable_cache` behind `cachedL0Url`.
 - **`/api/notes`, `/api/notes/request`, `/api/notes/warm`** (2026-10-27) are the AI notes: a few
   sentences a paid model (the Constellation Gate, `GATE_API_KEY`, `GATE_MODEL`, default `z-ai/glm-5-3-flash` with thinking held low, `gate.ts`) writes about the
   figures a view is showing. Notes live in

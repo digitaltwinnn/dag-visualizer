@@ -6,7 +6,7 @@ import { fetchChainIds } from "@/app/api/network/chainList";
 import { getLiveGeo } from "@/app/api/geo/live";
 import { runSample } from "../runSample";
 import { writeStore } from "../store";
-import type { FleetCounts, GlobalRec, MetaRec, TxRec } from "../bucketing";
+import type { FleetCounts, GlobalRec, TxRec } from "../bucketing";
 import { stakeReading } from "../stake";
 import { mergeDagClusters, type DagNode } from "@/src/data/dagCore";
 import type { ClusterNode } from "@/src/data/types";
@@ -14,6 +14,7 @@ import { readClusters } from "@/app/api/live/upstream";
 import { fleetGeo } from "../fleetGeo";
 import { fleetTallies } from "../fleetTally";
 import type { ChainPage } from "../fetchSince";
+import { getJson, pageCurrencySnapshots } from "../explorerPages";
 
 // The trends SAMPLER — Vercel Cron hits this every 15 min (vercel.json). It pages the tiny
 // explorer list records since the Redis cursor (never the ~2.5 MB raw snapshot routes) and
@@ -24,16 +25,6 @@ export const dynamic = "force-dynamic";
 // 300 s (was 60): pays for the pager's 30K-record self-heal depth after downtime — a normal
 // 15-min run still finishes in seconds; only a catch-up after an outage goes deep.
 export const maxDuration = 300;
-
-async function getJson(url: string, ms = 7000): Promise<unknown> {
-  const r = await fetch(url, {
-    cache: "no-store",
-    signal: AbortSignal.timeout(ms),
-    headers: { "User-Agent": "dag-visualizer" },
-  });
-  if (!r.ok) throw new Error(`${r.status}`);
-  return r.json();
-}
 
 /** The DAG's own nodes from its two clusters, merged — null when either cluster cannot be read.
  *  Two small `cluster/info` reads, once an hour (the fleet sample's cadence): the live route's memo
@@ -120,10 +111,7 @@ export async function GET(req: Request) {
         const j = (await getJson(`${be}/global-snapshots?limit=${limit}${next ? `&next=${encodeURIComponent(next)}` : ""}`)) as { data?: GlobalRec[]; meta?: { next?: string } };
         return { data: j.data ?? [], next: j.meta?.next } satisfies ChainPage<GlobalRec>;
       },
-      pageMeta: async (id, limit, next) => {
-        const j = (await getJson(`${be}/currency/${id}/snapshots?limit=${limit}${next ? `&next=${encodeURIComponent(next)}` : ""}`)) as { data?: MetaRec[]; meta?: { next?: string } };
-        return { data: j.data ?? [], next: j.meta?.next } satisfies ChainPage<MetaRec>;
-      },
+      pageMeta: (id, limit, next) => pageCurrencySnapshots(be, id, limit, next),
       fleet: () => fleetCounts(),
       // TRANSFERS (2026-11-04): the DAG's own list and each network's token list, read only for the
       // snapshots the walks above passed (`runSample`), so a quiet chain costs no request.
