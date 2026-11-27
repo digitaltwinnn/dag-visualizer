@@ -4,7 +4,7 @@
 // is still being written and is null, like History's partial edges. Outside the span is null, never 0.
 import { SUBMITTERS, type SubmitterKind } from "@/src/data/submitters";
 import { stepMsOf } from "../trends/keys";
-import { subField, subSlotOf, type SubTier } from "./keys";
+import { subSlotOf, type SubTier } from "./keys";
 
 export interface SubmittersWindow {
   net: string;
@@ -79,10 +79,10 @@ function parseNames(raw: Record<string, string> | null): Record<string, string> 
 function readBucket(h: Record<string, string> | undefined, bucket: string): Map<string, number> {
   const out = new Map<string, number>();
   if (!h) return out;
-  const prefix = subField(bucket, "");
   for (const [f, v] of Object.entries(h)) {
-    if (!f.startsWith(prefix)) continue;
-    const id = f.slice(prefix.length);
+    const bar = f.indexOf("|");
+    if (bar < 0 || f.slice(0, bar) !== bucket) continue;
+    const id = f.slice(bar + 1);
     if (id) out.set(id, num(String(v)) ?? 0);
   }
   return out;
