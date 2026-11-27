@@ -21,6 +21,18 @@ describe("submitterOf", () => {
     }
     expect(submitterOf(DED_ID, ded(""))).toBeNull();
   });
+  it("answers null for an id of the wrong shape (one malformed id must never stall a run)", () => {
+    expect(submitterOf(DED_ID, ded("a|b"))).toBeNull();
+    expect(submitterOf(DED_ID, ded(`${A}|x`))).toBeNull();
+    expect(submitterOf(DED_ID, ded("x".repeat(1 << 20)))).toBeNull();
+    expect(submitterOf(DED_ID, ded("o1"))).toBeNull();
+    expect(submitterOf(DED_ID, ded(A.toUpperCase()))).toBe(A.toUpperCase());
+    expect(submitterOf(DOR_ID, { publicId: "8e25d1c3|a0a6d54b" })).toBeNull();
+    expect(submitterOf(DOR_ID, { publicId: "not-hex-at-all" })).toBeNull();
+    expect(submitterOf(DOR_ID, { publicId: "z".repeat(1 << 20) })).toBeNull();
+    expect(submitterOf(DOR_ID, { publicId: "F".repeat(1 << 20) })).toBe("F".repeat(DEVICE_ID_LEN)); // hex, then the cut
+    expect(submitterOf(DOR_ID, { publicId: 12345 })).toBeNull();
+  });
   it("answers null for an unlisted network", () => {
     expect(submitterOf("DAG0other", ded(A))).toBeNull();
   });

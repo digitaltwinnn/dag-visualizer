@@ -19,7 +19,8 @@ export function subSlotOf(netId: string, tier: SubTier, tsMs: number): { key: st
   return { key: `sub:${STORE_NS}:${netId}:1d:${y}`, bucket: `${mo}-${da}` };
 }
 
-/** `<bucket>|<submitter>`. Submitter ids (DED UUIDs, Dor ids cut to 16 chars) never hold `|`. */
+/** `<bucket>|<submitter>`. Submitter ids never hold `|`: `src/data/submitters.ts` counts only a DED UUID
+ *  or a hex Dor id (cut to 16 chars), so the throw below is a guard, never a reachable stall. */
 export function subField(bucket: string, submitter: string): string {
   if (submitter.includes("|")) throw new Error(`submitter id may not contain "|": ${submitter}`);
   return `${bucket}|${submitter}`;

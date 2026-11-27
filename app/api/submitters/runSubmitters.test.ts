@@ -34,6 +34,8 @@ function memStore(): TrendsStore & { data: Map<string, Map<string, string>>; loc
 }
 
 const MIN = 60000, HOUR = 3600000;
+/** Two organisations (ids are UUIDs: `submitters.ts` counts no other shape). */
+const O1 = "00000000-0000-4000-8000-000000000001", O2 = "00000000-0000-4000-8000-000000000002";
 const NOW = Date.UTC(2026, 10, 27, 14, 10);
 const PREV_HOUR = Date.UTC(2026, 10, 27, 13, 0);
 
@@ -47,8 +49,8 @@ const tsOf = (o: number) => Date.parse(CHAIN.find((r) => r.ordinal === o)!.times
 
 /** Every record carries one data block: two batches by `o1`, and one by `o2` on odd ordinals. */
 function root(ordinal: number): Record<string, unknown> {
-  const updates = [{ MetagraphBatchMessage: { orgId: "o1" } }, { MetagraphBatchMessage: { orgId: "o1" } }];
-  if (ordinal % 2) updates.push({ MetagraphBatchMessage: { orgId: "o2" } });
+  const updates = [{ MetagraphBatchMessage: { orgId: O1 } }, { MetagraphBatchMessage: { orgId: O1 } }];
+  if (ordinal % 2) updates.push({ MetagraphBatchMessage: { orgId: O2 } });
   const blk = { proofs: [], value: { updates: updates.map((v) => ({ value: v })) } };
   return { value: { ordinal, dataApplication: { blocks: [Array.from(Buffer.from(JSON.stringify(blk)))] } }, proofs: [] };
 }
@@ -93,12 +95,12 @@ describe("runSubmitters", () => {
     expect(sp.get("cursor")).toBe("1129");
     // The 13h hour: 60 records, 2 batches each by o1, 30 odd ordinals with one by o2.
     const hour = h1(store, PREV_HOUR)!;
-    expect(hour.get("27-13|o1")).toBe("120");
-    expect(hour.get("27-13|o2")).toBe("30");
-    expect(hour.get("27-14|o1")).toBe("20");
-    expect(hour.get("27-14|o2")).toBe("5");
-    expect(hour.has("27-12|o1")).toBe(false); // before the boundary: not read
-    expect(store.data.get(subSlotOf(DED_ID, "1d", NOW).key)!.get("11-27|o1")).toBe("140");
+    expect(hour.get(`27-13|${O1}`)).toBe("120");
+    expect(hour.get(`27-13|${O2}`)).toBe("30");
+    expect(hour.get(`27-14|${O1}`)).toBe("20");
+    expect(hour.get(`27-14|${O2}`)).toBe("5");
+    expect(hour.has(`27-12|${O1}`)).toBe(false); // before the boundary: not read
+    expect(store.data.get(subSlotOf(DED_ID, "1d", NOW).key)!.get(`11-27|${O1}`)).toBe("140");
     expect(store.locked).toBe(false);
   });
 
@@ -119,8 +121,8 @@ describe("runSubmitters", () => {
     expect(span(store)!.get("cursor")).toBe("1061");
     expect(span(store)!.get("to")).toBe(String(tsOf(1061)));
     expect(span(store)!.get("from")).toBe(String(PREV_HOUR));
-    expect(h1(store, PREV_HOUR)!.get("27-13|o1")).toBe("4");
-    expect(h1(store, PREV_HOUR)!.get("27-13|o2")).toBe("1");
+    expect(h1(store, PREV_HOUR)!.get(`27-13|${O1}`)).toBe("4");
+    expect(h1(store, PREV_HOUR)!.get(`27-13|${O2}`)).toBe("1");
 
     down = false;
     const res2 = await runSubmitters(deps(store, { fetchSnap, now: () => NOW + MIN }));
@@ -301,7 +303,7 @@ describe("walkRange", () => {
   it("writes each hour as a SET of its tally, never reads or writes an hour the sampler owns, and a rerun changes nothing", async () => {
     const store = await sampled();
     expect(span(store)!.get("from")).toBe(String(SPAN_FROM));
-    const samplerHours = [13, 14].map((h) => [field(store, "1h", D2 + h * HOUR, "o1"), field(store, "1h", D2 + h * HOUR, "o2")]);
+    const samplerHours = [13, 14].map((h) => [field(store, "1h", D2 + h * HOUR, O1), field(store, "1h", D2 + h * HOUR, O2)]);
     expect(samplerHours).toEqual([["12", "3"], ["2", undefined]]); // 14:00 is ordinal 5372, even
 
     const days: number[] = [];
@@ -311,15 +313,15 @@ describe("walkRange", () => {
     expect(res.read).toBe(2 * 144 + 13 * 6);
     expect(days).toEqual([D1, D2, SPAN_FROM]); // progress once a day
     // 6 records an hour: 12 batches by o1, 3 by o2 (odd ordinals).
-    expect(field(store, "1h", D0, "o1")).toBe("12");
-    expect(field(store, "1h", D0, "o2")).toBe("3");
-    expect(field(store, "1h", D2 + 12 * HOUR, "o1")).toBe("12");
+    expect(field(store, "1h", D0, O1)).toBe("12");
+    expect(field(store, "1h", D0, O2)).toBe("3");
+    expect(field(store, "1h", D2 + 12 * HOUR, O1)).toBe("12");
     // The sampler's hours untouched.
-    expect([13, 14].map((h) => [field(store, "1h", D2 + h * HOUR, "o1"), field(store, "1h", D2 + h * HOUR, "o2")])).toEqual(samplerHours);
+    expect([13, 14].map((h) => [field(store, "1h", D2 + h * HOUR, O1), field(store, "1h", D2 + h * HOUR, O2)])).toEqual(samplerHours);
     // 1d = Σ1h, the boundary day's from ALL its hours (the sampler's included).
-    for (const d of [D0, D1, D2]) for (const id of ["o1", "o2"]) expect(field(store, "1d", d, id)).toBe(sum1h(store, d, id));
-    expect(field(store, "1d", D0, "o1")).toBe("288");
-    expect(field(store, "1d", D2, "o1")).toBe(String(85 * 2));
+    for (const d of [D0, D1, D2]) for (const id of [O1, O2]) expect(field(store, "1d", d, id)).toBe(sum1h(store, d, id));
+    expect(field(store, "1d", D0, O1)).toBe("288");
+    expect(field(store, "1d", D2, O1)).toBe(String(85 * 2));
 
     const once = subData(store);
     await walkRange(wdeps(store), DED_ID, D0, SPAN_FROM, progress);
@@ -337,9 +339,9 @@ describe("walkRange", () => {
     expect(res.nextMs).toBe(D1 + 5 * HOUR);
     expect(res.lowered).toBe(false);
     expect(span(store)!.get("from")).toBe(String(SPAN_FROM));
-    expect(field(store, "1h", D1 + 5 * HOUR, "o1")).toBeUndefined(); // the failed hour is not written
-    expect(field(store, "1d", D1, "o1")).toBe(sum1h(store, D1, "o1"));
-    expect(field(store, "1d", D1, "o1")).toBe(String(5 * 12));
+    expect(field(store, "1h", D1 + 5 * HOUR, O1)).toBeUndefined(); // the failed hour is not written
+    expect(field(store, "1d", D1, O1)).toBe(sum1h(store, D1, O1));
+    expect(field(store, "1d", D1, O1)).toBe(String(5 * 12));
 
     const res2 = await walkRange(wdeps(store), DED_ID, D0, SPAN_FROM, progress, res.nextMs);
     expect(res2.failedAt).toBeNull();
@@ -378,7 +380,7 @@ describe("walkRange", () => {
     expect(waits).toBe(1);
     expect(res.lowered).toBe(true);
     expect(store.locked).toBe(false);
-    expect(field(store, "1d", D2, "o1")).toBe(sum1h(store, D2, "o1"));
+    expect(field(store, "1d", D2, O1)).toBe(sum1h(store, D2, O1));
   });
 
   it("refuses without a measured span: the sampler must run first", async () => {

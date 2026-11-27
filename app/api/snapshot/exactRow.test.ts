@@ -44,9 +44,10 @@ describe("exactRowOf", () => {
   });
 
   it("passes the row's metaId so a DED row carries its submitters", async () => {
-    const ded = Array.from(Buffer.from(JSON.stringify({ proofs: [], value: { dataTransactions: [{ value: { MetagraphBatchMessage: { orgId: "o1" } } }] } })));
+    const O1 = "00000000-0000-4000-8000-000000000001";
+    const ded = Array.from(Buffer.from(JSON.stringify({ proofs: [], value: { dataTransactions: [{ value: { MetagraphBatchMessage: { orgId: O1 } } }] } })));
     const r = await exactRowOf(DED_ID, entry([ded]));
-    expect(r.dataBlockRows?.[0].submitters).toEqual([{ id: "o1", updates: 1 }]);
+    expect(r.dataBlockRows?.[0].submitters).toEqual([{ id: O1, updates: 1 }]);
   });
 
   it("keys the exact cache at v12", () => {

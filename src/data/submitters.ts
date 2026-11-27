@@ -4,7 +4,7 @@
 // can read, so it has no row and `submitterOf` answers null (rule 10: absent is absent, never a guess).
 //
 // Mechanical like `payloadKinds`: the id is read off the update's own field; an update without one
-// (a missing field, a non-object, an empty string) has no submitter and is simply not counted — the
+// (a missing field, a non-object, an empty string, an id of the wrong shape) has no submitter and is simply not counted — the
 // block's other figures never depend on it. Dor's device ids are stored TRUNCATED to
 // `DEVICE_ID_LEN`: devices are counted exactly (a union of ids), never named or broken down.
 
@@ -27,6 +27,12 @@ export const DEVICE_ID_LEN = 16;
 
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
 const text = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);
+// THE ID'S SHAPE IS CHECKED HERE, IN THE ONE TABLE (final review, 2026-11-27): an id becomes a store
+// field (`<bucket>|<id>`, `app/api/submitters/keys.ts`), so one malformed id — a `|`, a megabyte —
+// would throw inside the sampler and the walk and stall both. An id of the wrong shape is no
+// submitter (null, not counted), like a missing one.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const HEX_RE = /^[0-9a-f]+$/i;
 
 export const SUBMITTERS: Readonly<Record<string, SubmitterSpec>> = {
   [DED_ID]: {
@@ -34,7 +40,8 @@ export const SUBMITTERS: Readonly<Record<string, SubmitterSpec>> = {
     unit: "batches",
     read: (u) => {
       if (!isObj(u) || !isObj(u.MetagraphBatchMessage)) return null;
-      return text(u.MetagraphBatchMessage.orgId);
+      const id = text(u.MetagraphBatchMessage.orgId);
+      return id !== null && UUID_RE.test(id) ? id : null;
     },
   },
   [DOR_ID]: {
@@ -43,7 +50,7 @@ export const SUBMITTERS: Readonly<Record<string, SubmitterSpec>> = {
     read: (u) => {
       if (!isObj(u)) return null;
       const id = text(u.publicId);
-      return id === null ? null : id.slice(0, DEVICE_ID_LEN);
+      return id !== null && HEX_RE.test(id) ? id.slice(0, DEVICE_ID_LEN) : null;
     },
   },
 };

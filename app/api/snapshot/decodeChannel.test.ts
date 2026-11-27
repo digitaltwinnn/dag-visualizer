@@ -81,8 +81,9 @@ describe("decodeSnapshotRoot submitters", () => {
   const dedBlock = (ids: string[]) => Array.from(Buffer.from(JSON.stringify({ proofs: [], value: { dataTransactions: ids.map((orgId) => ({ value: { MetagraphBatchMessage: { orgId } } })) } })));
   const root = (blocks: number[][]) => ({ value: { ordinal: 1, dataApplication: { onChainState: [], blocks } }, proofs: [] });
   it("tallies each data block's submitters on a submitter network", () => {
-    const d = decodeSnapshotRoot(root([dedBlock(["a", "a", "b"])]), DED_ID);
-    expect(d.dataBlockRows[0].submitters).toEqual([{ id: "a", updates: 2 }, { id: "b", updates: 1 }]);
+    const A = "00000000-0000-4000-8000-00000000000a", B = "00000000-0000-4000-8000-00000000000b";
+    const d = decodeSnapshotRoot(root([dedBlock([A, A, B])]), DED_ID);
+    expect(d.dataBlockRows[0].submitters).toEqual([{ id: A, updates: 2 }, { id: B, updates: 1 }]);
     expect(d.dataBlockRows[0].updates).toBe(3);
   });
   it("leaves submitters absent on a network with no row", () => {
