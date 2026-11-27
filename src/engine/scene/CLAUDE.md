@@ -823,8 +823,9 @@ hues, chamber rule"): down the neutral trail a banded box is one neutral column;
 active row, a hover into it (its tile, its row, its data block, or `hoverSubmitter` naming an
 organisation it holds), the committed network's trail — each band wears its organisation's scene ink
 (`palette/submitterHue.submitterSceneHex`: the seven-strong palette's hue, the chamber's neutral
-outside it and for the remainder). A hovered organisation's bands take the subject's full weight and
-the other bands of its columns step back (`BAND_BACK`). The palette is plain data from the Engine
+outside it and for the remainder). A hovered organisation's bands take the subject's full weight — still
+through their tile's fades (rewind, horizon, view fade, entry beat), since the hover reaches every
+column down the trail — and the other bands of its columns step back (`BAND_BACK`). The palette is plain data from the Engine
 (`setSubmitterPalette`), published by `components/SubmitterPaletteBridge.tsx` (a React → Engine
 channel, `components/publishChannelBoundary.test.ts`); the hover arrives as `setHoveredSubmitter`.
 

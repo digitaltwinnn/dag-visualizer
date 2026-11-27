@@ -2480,8 +2480,13 @@ export class LedgerView implements SceneView {
             // column (the active row, a hover into it, the committed network's trail) each band wears
             // its organisation's ink — the palette's hue, else the neutral — and everywhere else the
             // column's neutral, so down the trail a banded box reads as one. A hovered organisation's
-            // bands take the subject's full weight and the rest of its columns step back.
+            // bands take the subject's full weight (through the tile's fades) and the rest of its
+            // columns step back.
             const subBack = this._subHot[mi] === 1;
+            // The hovered organisation's full weight still rides its TILE's fades (the rewind and
+            // horizon dissolve, the view's fade, the entry beat): `_subHot` reaches every column
+            // down the trail, and a band at full ink over a dissolving tile would outlive it.
+            const ownW = edge * this._fades.alpha * entryF;
             _dummy.rotation.set(0, 0, 0);
             for (let bx = 0; bx < boxes; bx++) {
               const at = mi * DATA_STACK.max + bx;
@@ -2502,7 +2507,7 @@ export class LedgerView implements SceneView {
                 const org = this._bandOrg[bi];
                 if (lit) {
                   const own = org >= 0 && org === this._hoverOrg;
-                  inkMix(_bandCol.copy(org >= 0 ? this._orgCols[org] : this._restCol), own ? 1 : subBack ? weight * BAND_BACK : weight, this._colors);
+                  inkMix(_bandCol.copy(org >= 0 ? this._orgCols[org] : this._restCol), own ? ownW : subBack ? weight * BAND_BACK : weight, this._colors);
                 } else _bandCol.copy(_col);
                 _dummy.scale.set(w, hh, w);
                 _dummy.position.set(_tileV.x, y + hh / 2, _tileV.z);
