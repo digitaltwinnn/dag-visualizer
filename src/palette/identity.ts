@@ -128,13 +128,10 @@ function resolve(id: string): IdentityHue | null {
   return resolved;
 }
 
-/** Every catalog network's identity hue (the known() map's) plus the DAG's own — the set an
- *  organisation hue keeps clear of (submitterHue.ts). */
-export function networkHueDegs(): number[] {
-  const out = [...known().values()].map((e) => e.hueDeg);
-  const dag = resolve("dag");
-  if (dag) out.push(dag.hueDeg);
-  return out;
+/** One network's identity hue in degrees, or null for a falsy id — what an organisation hue keeps
+ *  clear of (submitterHue.ts). */
+export function identityHueDeg(id: string): number | null {
+  return resolve(id)?.hueDeg ?? null;
 }
 
 export function identityHudHex(id: string): string { return resolve(id)?.hudHex ?? CORE_HEX; }
