@@ -66,7 +66,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     // and the tray icons, so the two can never disagree.
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
     // …with Snapshots' Metagraph card at the FOOT, as its lane draws it (2026-11-20).
-    expect(ids).toEqual(["notes", "snap", "range", "instant", "country", "cohort", "composition", "metaSnap", "block", "dataBlock", "node", "context"]);
+    expect(ids).toEqual(["notes", "snap", "range", "submitters", "instant", "country", "cohort", "composition", "metaSnap", "block", "dataBlock", "node", "context"]);
     expect(detailsCards(details({ mode: "geo", filter: "dor" })).map((c) => c.id)[1]).toBe("snap"); // no foot elsewhere: the fixed order
   });
   // THE AI NOTES CARD (2026-10-27): its own card, first, in every view whose policy opts in
@@ -314,7 +314,7 @@ describe("the instant slot — History's cursor card", () => {
   const trend = (over: Partial<RailManifestState> = {}) => details({ mode: "trend", ...over });
 
   it("sits under the network dossier in History's lane, and is not a rung", () => {
-    expect(ladderSlotIds("trend")).toEqual(["notes", "context", "range", "instant"]);
+    expect(ladderSlotIds("trend")).toEqual(["notes", "context", "range", "submitters", "instant"]);
     expect(ladderLevelOfSlot("instant")).toBeNull();
   });
 
@@ -374,6 +374,40 @@ describe("the range slot — History's brushed span", () => {
   });
 });
 
+// THE DATA SUBMITTERS CARD (2026-11-27): who sent the range's data blocks — a reading of the span
+// the Range card states, so it sits under it, and like the Range a card slot with no rung that
+// always stands in History (its own body says when the network on the deck carries no data).
+describe("the submitters slot — History's Data submitters card", () => {
+  const trend = (over: Partial<RailManifestState> = {}) => details({ mode: "trend", ...over });
+  it("sits under the Range card in History's lane, and is not a rung", () => {
+    expect(ladderSlotIds("trend")).toEqual(["notes", "context", "range", "submitters", "instant"]);
+    expect(ladderLevelOfSlot("submitters")).toBeNull();
+  });
+  it("always stands in History, under All and under a network alike", () => {
+    for (const over of [{}, { trendFocus: "dor" }, { filter: "up" }] as Partial<RailManifestState>[]) {
+      const c = detailsCards(trend(over)).find((x) => x.id === "submitters")!;
+      expect(c.present).toBe(true);
+      expect(c.kind).toBe("submitters");
+    }
+  });
+  it("is History-scoped — no other view can produce it", () => {
+    for (const mode of ["hyper", "geo", "ledger"] as const) {
+      const c = detailsCards(details({ mode })).find((x) => x.id === "submitters")!;
+      expect(c.present).toBe(false);
+      expect(c.hint).toBeNull();
+    }
+  });
+  it("is keyed on the span on screen, as the Range card is", () => {
+    const R = { fromMs: 1, toMs: 2 };
+    expect(detailsCards(trend({ trendWindow: "7d" })).find((x) => x.id === "submitters")!.subjectKey).toBe("window:7d");
+    expect(detailsCards(trend({ trendRange: R })).find((x) => x.id === "submitters")!.subjectKey).toBe("1-2");
+  });
+  it("is never the box by itself: with no note and nothing chosen the Range card is", () => {
+    expect(focusSlotId(details({ mode: "trend", trendFront: "dag" }))).toBe("range");
+    expect(focusSlotId(details({ mode: "trend" }))).toBe("range");
+  });
+});
+
 describe("ladderSlotIds — the descent-spine lane (display order = reversed rung order)", () => {
   it("mirrors focusLadder.LADDERS coarsest→coarsest per 3D view", () => {
     // Every note view's lane is topped by the AI notes card (R57) — a slot, not a rung.
@@ -428,7 +462,7 @@ describe("ladderLevelOfSlot — the inverse read (which RUNG does a slot stand f
     for (const view of ["geo", "hyper", "ledger", "trend"] as const)
       for (const slot of ladderSlotIds(view)) {
         const level = ladderLevelOfSlot(slot);
-        if (!level) expect(["notes", "snap", "metaSnap", "block", "dataBlock", "range", "instant"]).toContain(slot);
+        if (!level) expect(["notes", "snap", "metaSnap", "block", "dataBlock", "range", "submitters", "instant"]).toContain(slot);
         else expect(LADDERS[view].some((r) => r.level === level)).toBe(true);
       }
   });

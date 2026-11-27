@@ -90,6 +90,9 @@ const PASSES_OVER: Partial<Record<string, Partial<Record<string, readonly string
   // (The ledger's metagraph snapshot passed over the block and the data block to its signers' node
   // slot until 2026-11-08, when the node card left the Snapshots view; the snapshot is the last rung
   // there now and declares no child, and the block and data block keep their own steps.)
+  // History's Range steps to its first moment over the Data submitters card (2026-11-27), a reading
+  // of the same span with a step of its own to the same moment.
+  trend: { range: ["submitters"] },
 };
 
 describe("child steps descend exactly one rung of the lane", () => {

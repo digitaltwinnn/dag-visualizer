@@ -37,6 +37,7 @@ import MetaSnapPane from "@/components/inspector/MetaSnapPane";
 import BlockPane from "@/components/inspector/BlockPane";
 import DataBlockPane from "@/components/inspector/DataBlockPane";
 import TrendRangePane from "@/components/inspector/TrendRangePane";
+import TrendSubmittersPane from "@/components/inspector/TrendSubmittersPane";
 import TrendInstantPane from "@/components/inspector/TrendInstantPane";
 import NotesCard from "@/components/notes/NotesCard";
 import { useAiNote } from "@/components/notes/useAiNote";
@@ -302,7 +303,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
   context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Global snapshot",
-  metaSnap: "Metagraph snapshot", block: "Transaction block", dataBlock: "Data block", range: "Range", instant: "Moment",
+  metaSnap: "Metagraph snapshot", block: "Transaction block", dataBlock: "Data block", range: "Range", submitters: "Data submitters", instant: "Moment",
 };
 /** An EMPTY RUNG, drawn as a card like every other (user, 2026-10-04 — option A of
  *  `docs/superpowers/design/2026-10-04-ghost-cards`, with "like any other card it can be expanded
@@ -706,6 +707,9 @@ export default function Inspector() {
     range: VIEW_POLICIES[mode].chartStack ? (
       <TrendRangePane key="range" onClose={trendRange ? () => useStore.getState().setTrendRange(null) : undefined} {...cx("range")} />
     ) : null,
+    // History's DATA SUBMITTERS (2026-11-27): who sent the network's data over the Range card's span.
+    // A card slot with no rung that always stands in History, so it has no × (nothing to clear).
+    submitters: VIEW_POLICIES[mode].chartStack ? <TrendSubmittersPane key="submitters" {...cx("submitters")} /> : null,
     instant: trendCursorMs != null ? (
       <TrendInstantPane key="instant" onClose={() => useStore.getState().setTrendCursor(null)} {...cx("instant")} />
     ) : null,

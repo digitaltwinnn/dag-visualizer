@@ -727,6 +727,9 @@ export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEn
   },
   trend: {
     range: { to: "instant", steps: momentOfRangeChildren },
+    // The Data submitters card reads the Range's own span and always stands under it (2026-11-27),
+    // so the lane's subject run ends on it: its step is the Range's — the span's first moment.
+    submitters: { to: "instant", steps: momentOfRangeChildren },
   },
 };
 

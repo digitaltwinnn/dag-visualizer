@@ -3,7 +3,7 @@ import { ledgerCardNetwork } from "@/src/engine/domain/tickNet";
 import { pickNetId, blockInPlace } from "@/src/engine/domain/pickActions";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
 import type { TickNetSel } from "@/src/data/types";
-import { AI_NOTES_ICON, BLOCK_ICON, EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
+import { AI_NOTES_ICON, BLOCK_ICON, EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, SUBMITTERS_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
 import { VIEW_POLICIES, drawsDataBlocks, readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
@@ -36,7 +36,7 @@ import { is3D } from "@/src/engine/domain/viewTransition";
 // Hue + active-flag stay with the tray builders (per-rail presentation), not here.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export type RailCardKind = "tool" | "context" | "range" | "instant" | "metaSnap" | "block" | "dataBlock" | "country" | "cohort" | "composition" | "node" | "snap" | "notes";
+export type RailCardKind = "tool" | "context" | "range" | "submitters" | "instant" | "metaSnap" | "block" | "dataBlock" | "country" | "cohort" | "composition" | "node" | "snap" | "notes";
 
 // ── The rail LADDER lane (Inspector's descent spine, variant-A redesign 2026-07-19) ──────────
 // Which facts-rail slot stands for each FOCUS-LADDER rung. The lane's ORDER lives in
@@ -136,7 +136,11 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // The RANGE sits between them (user, 2026-10-07: "range -> moment is also a logical parent -
   // child relation"): a brushed span of the network, and the cursor one moment inside it. Like
   // `instant`, a card slot with no rung.
-  trend: ["notes", "context", "range", "instant"],
+  // THE DATA SUBMITTERS card sits under the Range (2026-11-27): who sent the network's data blocks
+  // over that same span — a reading of the range, so it stands inside it, above the one moment the
+  // Moment card reads. A card slot with no rung, always present in History; its next ghost is the
+  // Range's own (the span's first moment, `CHILD_OF.trend.submitters`).
+  trend: ["notes", "context", "range", "submitters", "instant"],
 };
 
 export function ladderSlotIds(mode: Mode): string[] {
@@ -219,10 +223,16 @@ export function focusSlotId(s: LadderState): string | null {
   // else the card under the register's note (`REGISTER_REST`: the card the note folds onto, the
   // subject the callout names meanwhile), else the finest present slot.
   if (present.includes(NOTES_SLOT)) return NOTES_SLOT;
-  const rest = s.mode === "ledger" ? REGISTER_REST[s.ledgerRegister ?? "snapshots"] : null;
+  const rest = s.mode === "ledger" ? REGISTER_REST[s.ledgerRegister ?? "snapshots"] : (LANE_REST[s.mode] ?? null);
   if (rest && present.includes(rest)) return rest;
   return present[present.length - 1];
 }
+
+/** THE CARD A VIEW RESTS ON when no note stands and nothing is chosen — the subject the lane is about,
+ *  where the finest present card is a reading of it rather than its subject (History: the Range, not
+ *  the Data submitters card under it, which always stands). The Snapshots view's rest is per register
+ *  (`REGISTER_REST`). */
+const LANE_REST: Partial<Record<Mode, string>> = { trend: "range" };
 
 export interface RailCard {
   /** Stable id within the rail (also the tray-icon key + the render-map key). */
@@ -611,6 +621,17 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: s.mode === "trend",
     hint: rangeHint(s),
   };
+  // THE DATA SUBMITTERS card (2026-11-27): who sent the network's data blocks over the span on
+  // screen — the Range card's own span, so it shares its key and pulses with it. Always present in
+  // History (its body states a network that carries no data), so it has no ghost.
+  const submitters: RailCard = {
+    id: "submitters",
+    kind: "submitters",
+    icon: SUBMITTERS_ICON,
+    subjectKey: range.subjectKey,
+    present: s.mode === "trend",
+    hint: null,
+  };
   const metaSnap: RailCard = {
     id: "metaSnap",
     kind: "metaSnap",
@@ -706,7 +727,7 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // running off the rail). The SELECTION IS UNTOUCHED, the placeholder views' own rule above: this
   // only stops the view speaking for it, so going back restores the card in place.
   const lane = ladderSlotIds(s.mode);
-  const cards = [notes, snap, context, range, instant, country, cohort, composition, metaSnap, block, dataBlock, node].map((c) =>
+  const cards = [notes, snap, context, range, submitters, instant, country, cohort, composition, metaSnap, block, dataBlock, node].map((c) =>
     c.present && !lane.includes(c.id) ? { ...c, present: false } : c,
   );
   // …and a lane's FOOT is the manifest's last card too (review, 2026-11-20: the tray and the flat

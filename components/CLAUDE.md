@@ -503,6 +503,27 @@ and its two dates — the span's own, no fetch — placed by the span's FRACTION
 (the frame's own start date waits for its buckets). A frame that measured nothing, or a failed read,
 still draws nothing. The caption row is one line tall whatever it holds, so nothing jumps.
 
+**Under the Range stands the DATA SUBMITTERS card** (2026-11-27, `inspector/TrendSubmittersPane.tsx`,
+its pure half `inspector/trendSubmitters.ts`): who sent the network's data blocks over the Range card's
+own span (the brushed range, else the window's), on the network the deck stands on (`cardNetwork`; All
+and the DAG's plane read as every network). A card slot with no rung, always present in History, no ×,
+named "Data submitters" in the slot titles. Four bodies (`submittersCardState`): under All, one row per
+network with a `SUBMITTERS` row and its count over the span ("5 organisations", "57 devices"), each row
+bringing that plane forward through `trendPlaneActions` and the executor (paired on `hoverFilter`, the
+Moment's rows' exemption in `cardHoverBoundary`), plain rows under a filter; a network with no row says
+"<network> carried no data blocks in this range, so there is no one to show" and is never fetched for;
+Digital Evidence draws the span's TOTAL batches per bucket with its organisations as bands that
+partition it (ruling R4 — the top five palette members by the span's totals in their own hue,
+`TrendBand.hue`, every other one "Other (n)" in the neutral), the bands' share table as its key (the
+chart's own legend is off — `TrendChart legend`) and "N active of M seen"; Dor its devices per bucket
+and "N devices checked in", never named. A bucket outside the sampler's measured span is null and the
+line under the chart says "Not measured before <first measured bucket>" (`bucketStamp` at the
+window's step), or "not measured yet" in the plot when nothing is. The read asks the span with both
+ends moved up to the hour (`querySpan`) — a stable URL that keeps the window's length, so 30 days
+stay hourly. Because it always stands under the Range, the lane's subject run ends on it, so its next
+ghost is the Range's (`CHILD_OF.trend.submitters`, the span's first moment), and with no note and
+nothing chosen the Range, not it, is the box (`LANE_REST` in `railCards.ts`).
+
 **The Metagraph card is the committed subject's network, in every view** (2026-10-18, one rule
 after the user asked for Geography's node to "also populate the dossier card"): Snapshots' is the
 network inside the tick (`tickNet`), History's the plane brought forward (`cardNetwork`), and

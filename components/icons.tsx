@@ -36,6 +36,7 @@ import {
   Network,
   Clock,
   Ruler,
+  Users,
   type LucideIcon,
   Minus,
   Plus,
@@ -128,6 +129,10 @@ export const INSTANT_ICON: LucideIcon = Crosshair;
 // THE BRUSHED RANGE's mark (History's Range card, 2026-10-07): a span of dates — the Moment's
 // parent, so a calendar span beside the crosshair's single point.
 export const RANGE_ICON: LucideIcon = CalendarRange;
+
+// THE DATA SUBMITTERS card's mark (History, 2026-11-27): the people behind a network's data — its
+// organisations, or its devices, counted.
+export const SUBMITTERS_ICON: LucideIcon = Users;
 
 // THE AI NOTES card's mark (2026-10-27): the sparkles, the common sign for written-by-a-model, so
 // the card says what kind of text it holds before a word of it is read — and never mistakes itself
