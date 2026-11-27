@@ -20,7 +20,7 @@ export async function exactRowOf(metaId: string, s: StateChannelSnap | null | un
   // Actual serialized size — `content` is the snapshot's content as a byte array, so its length is
   // the real byte count anchored. NOT derived from the fee.
   const bytes = Array.isArray(s?.value?.content) ? s.value!.content!.length : 0;
-  const decoded = await decodeChannelContent(s?.value?.content);
+  const decoded = await decodeChannelContent(s?.value?.content, metaId);
   return {
     metaId,
     ordinal: decoded?.ordinal ?? 0,

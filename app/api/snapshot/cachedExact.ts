@@ -120,14 +120,14 @@ export const cachedBlockHashes = (ordinal: number) =>
   })();
 
 export const cachedExact = (ordinal: number) =>
-  // The cache key is versioned WITH the payload shape (v11: an unreadable data block is `unread` and
+  // The cache key is versioned WITH the payload shape (v12: each data block's submitters; v11: an unreadable data block is `unread` and
   // its snapshot's data updates unknown, review M3 2026-11-09; v10: one summary per data block; v9:
   // the state's shape and the dL1 signers; v8: an undecodable row's data updates unknown rather than
   // 0; v7: rows and perMeta carry the data updates,
   // D6 2026-11-07; v6: no tips, 2026-11-07; v5: each block's
   // transfers; v4: blocks + tips; v3: rows carry dataBytes, 2026-08-13; v2: signerCount) — entries
   // cached under an old key would otherwise carry a shape the client no longer reads for a day.
-  unstable_cache(() => fetchExact(ordinal), ["snapshot-exact-v11", String(ordinal)], {
+  unstable_cache(() => fetchExact(ordinal), ["snapshot-exact-v12", String(ordinal)], {
     revalidate: 86400, // ordinals are immutable; a day is plenty (success is cached, misses throw)
   })();
 

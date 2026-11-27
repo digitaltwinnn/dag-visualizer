@@ -37,7 +37,7 @@ async function fetchDeep(ordinal: number, address: string, snapOrdinal: number):
   // or 0 (an undecodable row has no ordinal to ask for).
   let best: ChannelSnapDeep | null = null;
   for (const e of entries) {
-    const d = await decodeChannelContent(e?.value?.content);
+    const d = await decodeChannelContent(e?.value?.content, address);
     if (!d) continue;
     const row: ChannelSnapDeep = {
       globalOrdinal: ordinal,

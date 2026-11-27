@@ -9,6 +9,7 @@ import { brotliDecompress } from "node:zlib";
 import { promisify } from "node:util";
 import { createHash } from "node:crypto";
 import { payloadKinds } from "@/src/data/payloadKinds";
+import { tallySubmitters } from "@/src/data/submitters";
 import type { DataBlockSummary } from "@/src/data/types";
 
 const inflate = promisify(brotliDecompress);
@@ -74,7 +75,7 @@ function shapeOf(state: unknown): { keys: { key: string; count: number }[]; has:
 
 /** `content` → the metagraph snapshot's real facts, or null if it can't be read (a channel using
  *  another encoding must degrade to bytes-only, never break the tick's read). */
-export async function decodeChannelContent(content: unknown): Promise<DecodedChannel | null> {
+export async function decodeChannelContent(content: unknown, metaId: string): Promise<DecodedChannel | null> {
   const bytes = asBytes(content);
   if (!bytes) return null;
   let root: Record<string, unknown>;
@@ -83,6 +84,13 @@ export async function decodeChannelContent(content: unknown): Promise<DecodedCha
   } catch {
     return null;
   }
+  return decodeSnapshotRoot(root, metaId);
+}
+
+/** The metagraph snapshot's own JSON (`{ value, proofs }` — what the inflated `content` parses to,
+ *  and what a metagraph's L0 serves at `/snapshots/<ordinal>`) → its facts. `metaId` names the
+ *  network so each data block can tally its submitters (`src/data/submitters.ts`). */
+export function decodeSnapshotRoot(root: Record<string, unknown>, metaId: string): DecodedChannel {
   const value = (root.value ?? {}) as Record<string, unknown>;
   const proofs = Array.isArray(root.proofs) ? (root.proofs as { id?: string }[]) : [];
   const app = (value.dataApplication ?? null) as Record<string, unknown> | null;
@@ -124,6 +132,8 @@ export async function decodeChannelContent(content: unknown): Promise<DecodedCha
         if (v != null) { dataTxValues.push(v); own.push(v); }
       }
       row.updates = own.length;
+      const subs = tallySubmitters(metaId, own);
+      if (subs.length) row.submitters = subs;
       row.kinds = payloadKinds(own).map((k) => ({ kind: k.fields ? "records" : k.kind, count: k.count }));
     } catch {
       // A block we can't read is one we don't claim (review M3): it is marked UNREAD, and the

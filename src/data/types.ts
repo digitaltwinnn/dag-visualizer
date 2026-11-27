@@ -111,6 +111,9 @@ export interface DataBlockSummary {
   signers: number;
   bytes: number;
   digest: string;
+  /** Updates per submitter (DED's organisations, Dor's devices), busiest first — absent for a network
+   *  that names no submitter and for an `unread` block. */
+  submitters?: { id: string; updates: number }[];
 }
 
 // EXACT per-tick anchor totals read straight from the raw L0 snapshot's stateChannelSnapshots

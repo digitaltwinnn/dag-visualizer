@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { brotliCompressSync } from "node:zlib";
 import { exactRowOf } from "./exactRow";
+import { DED_ID } from "@/src/data/submitters";
+import { readFileSync } from "node:fs";
 
 // The per-ordinal exact read's ROW for one anchored metagraph snapshot (`/api/snapshot/[ordinal]`).
 // The count of data updates rides the row (D6, 2026-11-07), so the metagraph snapshot card and the
@@ -39,5 +41,15 @@ describe("exactRowOf", () => {
     expect(r.decoded).toBe(false);
     expect(r.dataTxCount).toBeUndefined();
     expect(r.dataBlocks).toBeUndefined();
+  });
+
+  it("passes the row's metaId so a DED row carries its submitters", async () => {
+    const ded = Array.from(Buffer.from(JSON.stringify({ proofs: [], value: { dataTransactions: [{ value: { MetagraphBatchMessage: { orgId: "o1" } } }] } })));
+    const r = await exactRowOf(DED_ID, entry([ded]));
+    expect(r.dataBlockRows?.[0].submitters).toEqual([{ id: "o1", updates: 1 }]);
+  });
+
+  it("keys the exact cache at v12", () => {
+    expect(readFileSync(new URL("./cachedExact.ts", import.meta.url), "utf8")).toContain('"snapshot-exact-v12"');
   });
 });
