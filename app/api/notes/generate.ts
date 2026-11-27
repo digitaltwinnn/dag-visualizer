@@ -5,7 +5,7 @@ import { LINE_MAX } from "@/src/engine/domain/briefing";
 import type { Fact, NoteChange, NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
 import { GateError, type gateChat, type GateErrorKind } from "./gate";
 import { failKeyOf, isBriefingNote, lockKeyOf, noteKeyOf, statsKeyOf, timingOf, type NoteSpan } from "./keys";
-import { buildMessages, parseAnswer, spanBeforeWords, spanWords } from "./prompts";
+import { buildMessages, parseAnswer, spanWords } from "./prompts";
 
 const NEGATIVE_RE = /\b(?:no|none)\b/i;
 import { utcDayKey } from "@/src/util/localTime";
@@ -194,17 +194,6 @@ function styleSlips(text: string, facts: readonly Fact[]): string[] {
       out.push(`"${from.text}" is an earlier figure: give only ${to!.text} and how far it moved, as its change fact says`);
     }
   }
-  // A WHOLE SPAN WRITTEN AS A CLIMB ("blocks fell 50% to 154 per day" over two 90-day averages, live):
-  // the figure is right and the shape says it moved inside the span (user, 2026-11-02).
-  for (const to of facts) {
-    if (to.pair?.end !== "to" || !to.pair.span) continue;
-    const esc = to.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    // "grew 85% to 7,553 per day on the 30 days before" names what it is measured against and reads
-    // true; the same rise with no "on …" after it reads as a climb inside the span.
-    const climb = new RegExp(`\\b(?:rose|fell|grew|dropped|climbed|declined|increased|decreased|slipped)\\b[^.;]{0,40}?\\bto ${esc}(?![\\d]|[.,]\\d)([^.;,]*)`, "i").exec(text);
-    if (climb && !/\bon\b/.test(climb[1] ?? ""))
-      out.push(`"${to.text}" is a whole range's figure: say what it is measured against ("on the range before"), or write "averaged ${to.text} per day" with its change`);
-  }
   // A NETWORK'S GLOBAL SNAPSHOTS AS A SHARE OR ANOTHER NOUN ("its share of global snapshots rose 5%",
   // "placements", live 2026-11-03): the figure is the global snapshots it was part of.
   const share = /\b(?:share of global snapshots|global snapshot (?:placements|appearances))\b/i.exec(text);
@@ -262,7 +251,7 @@ async function write(
     if (attempt > 0) await count("retried");
     let answer: string;
     try {
-      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.kind, span, wantsLine, spanBeforeWords(req.view, req.span), briefs), wantsLine || briefs.length ? { maxTokens: LINE_TOKENS } : undefined);
+      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.kind, span, wantsLine, briefs), wantsLine || briefs.length ? { maxTokens: LINE_TOKENS } : undefined);
       await count("calls");
     } catch (e) {
       if (!(e instanceof GateError)) throw e; // not the Gate's: `generateNote` counts it as `error`

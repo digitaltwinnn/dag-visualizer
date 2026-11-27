@@ -327,14 +327,15 @@ const GEO_READ_MS = (7 + 1 + 6) * D;
 const secondsOf = (fromMs: number, toMs: number) => (toMs - fromMs) / 1000;
 
 type TrendPill = "1h" | "24h" | "7d" | "30d" | "90d" | "1y";
-/** History's pills: the tier each is read at, its length, and whether it gets notable days (whose
- *  daily read carries a 30-day lead-in before the span, R13). `all` and a brushed range are
- *  their own cases below. */
+/** History's pills: the tier each is read at — its CHART's own (`ZOOMS`, `src/data/trendWindow.ts`),
+ *  so the note's start and end are the chart's (user, 2026-11-27) — its length, and whether it gets
+ *  notable days (whose daily read carries a 30-day lead-in before the span, R13). `all` and a
+ *  brushed range are their own cases below (a range reads `pickRangeTier`, as its chart does). */
 const TREND_PILLS: Record<TrendPill, { tier: Tier; ms: number; daily: boolean }> = {
   "1h": { tier: "5m", ms: H, daily: false },
-  "24h": { tier: "1h", ms: WINDOWS["24h"].ms, daily: false },
+  "24h": { tier: "5m", ms: WINDOWS["24h"].ms, daily: false },
   "7d": { tier: "1h", ms: WINDOWS["7d"].ms, daily: true },
-  "30d": { tier: "1d", ms: WINDOWS["30d"].ms, daily: true },
+  "30d": { tier: "1h", ms: WINDOWS["30d"].ms, daily: true },
   "90d": { tier: "1d", ms: WINDOWS["90d"].ms, daily: true },
   "1y": { tier: "1d", ms: WINDOWS["1y"].ms, daily: true },
 };
@@ -348,7 +349,7 @@ async function readTrend(c: Ctx): Promise<Read | null> {
   const facet = subject !== c.subject;
   let zoom: TrendFactsInput["zoom"];
   let cur: TrendsWindowData;
-  let prev: TrendsWindowData | null;
+  let gauges: TrendsWindowData | null = null;
   let daily: TrendsWindowData | null;
   let fromMs: number;
   let toMs: number;
@@ -362,7 +363,6 @@ async function readTrend(c: Ctx): Promise<Read | null> {
     if (!cur.buckets.length) return null;
     fromMs = cur.buckets[0]!;
     toMs = nowMs;
-    prev = null;
     daily = raw; // its unmeasured years are the (empty) lead-in
   } else {
     const range = isPill(span) ? null : rangeOf(span);
@@ -373,9 +373,10 @@ async function readTrend(c: Ctx): Promise<Read | null> {
     toMs = range ? range.toMs : nowMs;
     const tier = pill ? pill.tier : pickRangeTier(fromMs, toMs);
     const len = toMs - fromMs;
-    [cur, prev, daily] = await Promise.all([
+    [cur, gauges, daily] = await Promise.all([
       reads.span(tier, fromMs, toMs),
-      reads.span(tier, fromMs - len, fromMs),
+      // The 5-minute tier holds no node count: the gauges are read where they are written.
+      tier === "5m" ? reads.span("1h", fromMs, toMs) : Promise.resolve(null),
       // Through today, even for a range that ended before it: what came after says who really stopped.
       pill?.daily || rangeNotableCap(len) > 0 ? reads.span("1d", fromMs - LEAD_IN_MS, nowMs) : Promise.resolve(null),
     ]);
@@ -387,7 +388,7 @@ async function readTrend(c: Ctx): Promise<Read | null> {
     subject === UNLISTED_ID || silent ? reads.span("1d", nowMs - WINDOWS.all.ms, nowMs) : null,
     silent ? reads.chainReads() : null,
   ]);
-  const built = trendFacts({ subject, zoom, span: { fromMs, toMs }, cur, prev, daily, history, chainReads, shape: facet, names: c.names, blurbs: c.blurbs });
+  const built = trendFacts({ subject, zoom, span: { fromMs, toMs }, cur, gauges, daily, history, chainReads, shape: facet, names: c.names, blurbs: c.blurbs });
   return {
     built,
     spanFrom: fromMs,
