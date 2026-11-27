@@ -1,14 +1,16 @@
 // Organisation identity hues (DED submitters): the network identity API's sibling. Ruling R14:
 // organisations are only drawn beside DED and Dor, so a hue keeps MIN_HUE_GAP degrees from THOSE two
 // networks' hues alone (the catalog's other hues leave only ~17 free degrees), inside the palette's
-// allowed zones. Ruling R15: only a PALETTE of the busiest organisations (the read route's
+// allowed zones; R17 adds the chamber's structural core cyan (COLORS.core, the trail's neutral) to
+// the hues kept clear, so an organisation band never reads as the trail. Ruling R15: only a PALETTE of the busiest organisations (the read route's
 // `palette`, up to seven, busiest of all time first) carries a hue; the zones seat seven at
 // ORG_HUE_GAP apart, packed along the clear runs and assigned by palette ORDER, so the busiest
 // takes the first slot and the assignment is stable while the ranking holds. Every other
 // organisation has no hue (null) and reads neutral. Deterministic.
 import { oklchToHex } from "./palette";
 import { inAllowedZone } from "./brand";
-import { identityHueDeg, SCENE_L, SCENE_C, SCENE_L_LIGHT, SCENE_C_LIGHT } from "./identity";
+import { COLORS } from "@/src/engine/config";
+import { hexToHueDeg, identityHueDeg, SCENE_L, SCENE_C, SCENE_L_LIGHT, SCENE_C_LIGHT } from "./identity";
 import { UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
 import { DED_ID, DOR_ID } from "@/src/data/submitters";
 import type { Theme } from "@/src/theme/resolve";
@@ -25,6 +27,7 @@ let _clear: number[] | null = null;
 function clearHues(): number[] {
   if (_clear) return _clear;
   const nets = [DED_ID, DOR_ID].map(identityHueDeg).filter((h): h is number => h != null);
+  nets.push(hexToHueDeg(COLORS.core));
   const out: number[] = [];
   for (let h = 0; h < 360; h++) {
     if (inAllowedZone(h) && nets.every((n) => dist(h, n) >= MIN_HUE_GAP)) out.push(h);

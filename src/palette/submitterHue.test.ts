@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { submitterHue, submitterHues, submitterHudCss, submitterSceneHex, MIN_HUE_GAP, ORG_HUE_GAP } from "./submitterHue";
-import { identityHueDeg, SCENE_L, SCENE_C, SCENE_L_LIGHT, SCENE_C_LIGHT } from "./identity";
+import { COLORS } from "@/src/engine/config";
+import { hexToHueDeg, identityHueDeg, SCENE_L, SCENE_C, SCENE_L_LIGHT, SCENE_C_LIGHT } from "./identity";
 import { inAllowedZone } from "./brand";
 import { oklchToHex } from "./palette";
 import { DED_ID, DOR_ID } from "@/src/data/submitters";
 
 const dist = (a: number, b: number) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); };
-const NETS = [DED_ID, DOR_ID].map((n) => identityHueDeg(n) as number);
+const NETS = [...[DED_ID, DOR_ID].map((n) => identityHueDeg(n) as number), hexToHueDeg(COLORS.core)];
 const REAL = [
   "c9834e11-36ca-436f-8954-6b304e13ac6b", "ff591af5-e0dc-40e9-8e83-77e19ab66da6",
   "d61768f8-5d4f-40bc-8389-5e28fc35a69a", "567332a1-685e-4f7a-be8b-c20658e2a60b",
@@ -15,7 +16,7 @@ const REAL = [
 ];
 
 describe("submitterHue", () => {
-  it("seats the seven palette ids pairwise 24 apart, clear of DED and Dor, in the zones", () => {
+  it("seats the seven palette ids pairwise 24 apart, clear of DED, Dor and the core cyan, in the zones", () => {
     const hs = REAL.map((id) => submitterHue(id, REAL) as number);
     for (let i = 0; i < hs.length; i++) {
       expect(inAllowedZone(hs[i])).toBe(true);
