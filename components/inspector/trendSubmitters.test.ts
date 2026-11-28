@@ -66,6 +66,13 @@ describe("querySpan — the span on screen as a stable read", () => {
   it("leaves an hour-aligned span as it is", () => {
     expect(querySpan({ fromMs: 10 * H, toMs: 20 * H })).toEqual({ fromMs: 10 * H, toMs: 20 * H });
   });
+  it("always asks on hour edges, which is all the read route accepts (PR review I3)", () => {
+    for (const [fromMs, toMs] of [[1, 2], [1_795_000_000_123, 1_797_592_000_999], [7 * H - 1, 9 * H + 1], [0.5, H + 0.25]]) {
+      const q = querySpan({ fromMs: fromMs!, toMs: toMs! });
+      expect(q.fromMs % H).toBe(0);
+      expect(q.toMs % H).toBe(0);
+    }
+  });
 });
 
 const win = (over: Partial<SubmittersWindow>): SubmittersWindow => ({

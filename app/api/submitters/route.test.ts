@@ -71,10 +71,23 @@ describe("GET /api/submitters", () => {
     expect(calls.some((k) => k.includes(":1d:"))).toBe(false); // no all-time palette for devices
   });
 
-  it("picks the 1d tier for a range over 30 days", async () => {
-    const to = NOW, from = NOW - 40 * 86400000;
+  it("picks the 1d tier for a range over 30 days, and reads each daily year hash once (PR review I3)", async () => {
+    const to = Date.UTC(2026, 10, 27, 10), from = to - 40 * 86400000;
     const w = await (await get(`?net=${DED_ID}&from=${from}&to=${to}`)).json();
     expect(w.tier).toBe("1d");
+    // the range's hashes are the year hashes the all-time palette reads too: one HGETALL, not two
+    expect(calls.filter((k) => k === `sub:mainnet:${DED_ID}:1d:2026`)).toHaveLength(1);
+  });
+
+  it("rejects a from or to off an hour edge, uncached (PR review I3: the key space is the HUD's own)", async () => {
+    const h = Date.UTC(2026, 10, 26, 0);
+    for (const qs of [`from=${h + 1}&to=${h + 3 * H}`, `from=${h}&to=${h + 3 * H - 1}`, `from=${h + 0.5}&to=${h + H}`]) {
+      const r = await get(`?net=${DOR_ID}&${qs}`);
+      expect(r.status).toBe(400);
+      expect(r.headers.get("Cache-Control")).toBe("no-store");
+    }
+    expect(calls).toEqual([]); // nothing read for it
+    expect((await get(`?net=${DOR_ID}&from=${h}&to=${h + 3 * H}`)).status).toBe(200);
   });
 
   it("answers a store failure with 503 and no-store, so a CDN never caches it", async () => {

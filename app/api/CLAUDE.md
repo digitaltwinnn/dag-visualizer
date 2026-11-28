@@ -171,14 +171,21 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
 - **`/api/submitters`** (2026-11-27) is the READ route for who sent a network's data blocks: `?net=` (DED or
   Dor, anything else 400) with either `window=24h` (the 24 whole hours ending at the CURRENT
   hour — anchored at now, so a stalled sampler's missing hours read as not measured, never days-old
-  figures as the last 24 hours) or `from`/`to` epoch ms (within ten years). Answers a `SubmittersWindow` (`assemble.ts`):
+  figures as the last 24 hours) or `from`/`to` epoch ms (within ten years), each ON AN HOUR EDGE —
+  anything else is a 400 `no-store` (PR review I3): the HUD asks whole hours (`querySpan`), and an
+  arbitrary millisecond would be a fresh CDN key and a fresh read per request. Answers a `SubmittersWindow` (`assemble.ts`):
   per-bucket organisation tallies (or Dor's device counts, sketch ESTIMATES — `estimate: true`,
   ~1.6% standard error, R22: each measured bucket's count field from the same tier hashes, and the
   range's figure from the union of the measured buckets' `…:sketch:1h|1d:…` strings by MGET, so no
   device id leaves the store), the names hash, the busiest-of-all-time
   `palette`, and the measured span — a bucket outside it is null. Same idiom as `/api/trends`: reading
   searchParams keeps it per-request, `public, s-maxage=300, stale-while-revalidate=600`, the read-only
-  token, 503 `no-store` when the store is down. **It needs only HGETALL and MGET** on that token
+  token, 503 `no-store` when the store is down. **What a range costs** (ruling R24, 2026-11-28): each
+  hash it needs read once (at the daily tier the window's hashes are the year hashes the palette reads,
+  so the union is read once), and for Dor one ~7.3 KB sketch per measured bucket on the wire — about
+  2.7 MB for an uncached year at the daily tier, cached per URL. There is no monthly sketch tier: if Dor
+  ranges get heavy, the lever is a `sketch:1mo:YYYY-MM` written by the day recompute (additive, read as
+  12 sketches plus the edges' days), not a cap on the range. **It needs only HGETALL and MGET** on that token
   (probed 2026-11-28 — GET and MGET answer, PFCOUNT is refused `NOPERM`, Redis classing it a write,
   which is why R22 replaced R19's Redis HyperLogLogs with our own sketch). Which hashes and sketches a
   range reads is `readSubmitters` (`read.ts`), shared with the notes.

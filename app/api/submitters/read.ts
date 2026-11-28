@@ -35,9 +35,9 @@ export async function readSubmitters(
   const step = stepMsOf(tier);
   const keys = new Set<string>();
   for (let t = Math.floor(fromMs / step) * step; t < toMs; t += step) keys.add(subSlotOf(net, tier, t).key);
-  const read = async (ks: string[]) => {
+  const read = async (ks: Iterable<string>) => {
     const out: Record<string, StoredHash> = {};
-    await Promise.all(ks.map(async (k) => { const h = await store.hgetall(k); if (h) out[k] = h; }));
+    await Promise.all([...new Set(ks)].map(async (k) => { const h = await store.hgetall(k); if (h) out[k] = h; }));
     return out;
   };
   if (SUBMITTERS[net]!.kind === "device") {
@@ -51,6 +51,9 @@ export async function readSubmitters(
     const first = new Date(parseSpan(span)?.from ?? nowMs).getUTCFullYear();
     for (let y = first; y <= new Date(nowMs).getUTCFullYear(); y++) years.push(subSlotOf(net, "1d", Date.UTC(y, 5, 1)).key);
   }
-  const [hashes, yearHashes] = await Promise.all([read([...keys]), read(years)]);
-  return assembleSubmitters({ net, tier, fromMs, toMs, hashes, span, names, holes, yearHashes });
+  // ONE READ OF EACH HASH (PR review I3): at the daily tier the range's hashes ARE year hashes, so
+  // the window and the all-time palette read the union once and each takes its own keys from it.
+  const got = await read([...keys, ...years]);
+  const pick = (ks: Iterable<string>) => Object.fromEntries([...ks].filter((k) => k in got).map((k) => [k, got[k]!]));
+  return assembleSubmitters({ net, tier, fromMs, toMs, hashes: pick(keys), span, names, holes, yearHashes: pick(years) });
 }
