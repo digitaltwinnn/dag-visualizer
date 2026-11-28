@@ -508,7 +508,9 @@ its pure half `inspector/trendSubmitters.ts`): who sent the network's data block
 own span (the brushed range, else the window's), on the network the deck stands on (`cardNetwork`; All
 and the DAG's plane read as every network). A card slot with no rung, always present in History, no ×,
 named "Data submitters" in the slot titles. Four bodies (`submittersCardState`): under All, one row per
-network with a `SUBMITTERS` row and its count over the span ("5 organisations", "about 57 devices"), each row
+network with a `SUBMITTERS` row and its count over the span ("5 organisations", "about 57 devices") —
+a count over a span not wholly measured carries `measuredFloor`'s line for it as the row's muted second
+line (R23) — each row
 bringing that plane forward through `trendPlaneActions` and the executor (paired on `hoverFilter`, the
 Moment's rows' exemption in `cardHoverBoundary`), plain rows under a filter; a network with no row says
 "<network>'s data names no submitter this app reads, so there is no one to show" (`noSubmitterLine`,
@@ -548,7 +550,9 @@ always). Digital Evidence's organisations are a `ScheduleGroup` under Online nod
 `rangeDistinct`, rows = the History card's own `CUT_ROW`/`UnitMarks`/`TableHead` pieces through
 `activeSubmitterRows`, then "N seen since Mon YYYY" in a UTC month); Dor's devices are one "Active
 devices" Fact, counted, never named. Not yet read is the stars, unmeasured is the dash, a failed read
-says nothing (rule 10); `useSubmitters` is called only inside that component, so no other network
+says nothing (rule 10); a count over hours not all measured is a FLOOR and carries one muted line under
+it, "23 of 24 hours measured" (ruling R23, `trendSubmitters.measuredHoursLine` — none when all 24 or
+none are); `useSubmitters` is called only inside that component, so no other network
 fetches.
 
 **The node card states the same facts in every view** (user, 2026-11-23; `GeoLiveNode`): place,

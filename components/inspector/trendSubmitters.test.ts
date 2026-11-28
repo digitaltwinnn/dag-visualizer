@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { DED_ID, DOR_ID, SUBMITTERS } from "@/src/data/submitters";
 import type { SubmittersWindow } from "@/app/api/submitters/assemble";
-import { submittersCardState, submittersScope, querySpan, organisationChart, measuredFloor, noSubmitterLine, countWords, BAND_MAX } from "@/components/inspector/trendSubmitters";
+import { submittersCardState, submittersScope, querySpan, organisationChart, measuredFloor, measuredHoursLine, noSubmitterLine, countWords, BAND_MAX } from "@/components/inspector/trendSubmitters";
 
 const USDC = "DAG0S16WDgdAvh8VvroR6MWLdjmHYdzAF5S181xh";
 const carries = (id: string) => Object.hasOwn(SUBMITTERS, id);
@@ -187,5 +187,32 @@ describe("measuredFloor — the line under the chart when the range reaches befo
   it("a hole inside the range is said, and is never read as the start of measuring (R20)", () => {
     const holed = win({ distinct: [null, 0, 0], holes: [{ from: 0, to: H }] });
     expect(measuredFloor(holed, stamp)).toBe("Part of this range is not measured");
+  });
+});
+
+describe("measuredHoursLine — the floor line under a 24-hour count (ruling R23)", () => {
+  const day = (k: number) => win({
+    buckets: Array.from({ length: 24 }, (_, i) => i * H),
+    distinct: Array.from({ length: 24 }, (_, i) => (i < k ? 2 : null)),
+    measured: { from: 0, to: k * H },
+  });
+  it("all 24 measured: no line", () => {
+    expect(measuredHoursLine(day(24))).toBeNull();
+  });
+  it("some measured: the count is a floor, and says of how many hours", () => {
+    expect(measuredHoursLine(day(23))).toBe("23 of 24 hours measured");
+    expect(measuredHoursLine(day(1))).toBe("1 of 24 hours measured");
+  });
+  it("none measured: no line — that state already reads as not measured", () => {
+    expect(measuredHoursLine(day(0))).toBeNull();
+  });
+  it("an hour in a hole is not measured, wherever it falls", () => {
+    const holed = win({
+      buckets: Array.from({ length: 24 }, (_, i) => i * H),
+      distinct: Array.from({ length: 24 }, (_, i) => (i === 5 ? null : 0)),
+      measured: { from: 0, to: 24 * H },
+      holes: [{ from: 5 * H, to: 6 * H }],
+    });
+    expect(measuredHoursLine(holed)).toBe("23 of 24 hours measured");
   });
 });

@@ -133,3 +133,16 @@ export function measuredFloor(w: SubmittersWindow, stamp: (ms: number) => string
   }
   return w.holes.length ? "Part of this range is not measured" : null;
 }
+
+/** THE FLOOR LINE UNDER A 24-HOUR COUNT (ruling R23, rule 10): a count over the last 24 hours counts
+ *  only the hours measured, so when some of them are not — the newest hour before the run passes it,
+ *  the first day after deploy, a hole — it is a floor and says so, "23 of 24 hours measured", with
+ *  the number itself unchanged. Null when every hour is measured, and when none is (that state
+ *  already reads as not measured). An hour is measured exactly where the window's `distinct` holds a
+ *  value: the read side sets it from its one rule (`assemble.bucketMeasured` — inside the span, in
+ *  no hole), so this counts that rule's answer rather than restating it. */
+export function measuredHoursLine(w: Pick<SubmittersWindow, "distinct">): string | null {
+  const n = w.distinct.length;
+  const k = w.distinct.filter((v) => v != null).length;
+  return k === 0 || k === n ? null : `${k} of ${n} hours measured`;
+}

@@ -189,13 +189,19 @@ function NetworkRow({ id, q, on, interactive, pair }: { id: string; q: { fromMs:
         : error
           ? "read failed"
           : "…";
+  // A count over a window not wholly measured is a floor: the row's second line says how, in the
+  // card's own words (`measuredFloor`, R23). A row with no count already reads "not measured".
+  const floor = count != null ? measuredFloor(data!, (ms) => bucketStamp(ms, data!.stepMs)) : null;
   const body = (
-    <span className="flex items-baseline justify-between gap-2 w-full">
-      <span className="min-w-0 inline-flex items-center gap-1.5">
-        <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full flex-none" style={{ background: hue }} />
-        <span className="min-w-0 truncate text-foreground-dim">{net?.name ?? id}</span>
+    <span className="flex flex-col w-full">
+      <span className="flex items-baseline justify-between gap-2 w-full">
+        <span className="min-w-0 inline-flex items-center gap-1.5">
+          <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full flex-none" style={{ background: hue }} />
+          <span className="min-w-0 truncate text-foreground-dim">{net?.name ?? id}</span>
+        </span>
+        <span className={cn("flex-none tabular-nums", count != null ? "text-foreground" : "text-muted-foreground")}>{figure}</span>
       </span>
-      <span className={cn("flex-none tabular-nums", count != null ? "text-foreground" : "text-muted-foreground")}>{figure}</span>
+      {floor && <span className="text-label text-muted-foreground">{floor}</span>}
     </span>
   );
   if (!interactive) return <div className={cn("text-label", TABLE_ROW)}>{body}</div>;

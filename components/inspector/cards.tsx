@@ -36,6 +36,7 @@ import { NODE_ID_GLYPHS, networkMark } from "@/components/explorer/nodeRow";
 import { IDENT_INK } from "@/components/identInk";
 import { useFeedRead } from "@/components/useFeedRead";
 import useSubmitters from "@/components/useSubmitters";
+import { measuredHoursLine } from "@/components/inspector/trendSubmitters";
 import { SUBMITTERS } from "@/src/data/submitters";
 import { submitterHudCss } from "@/src/palette/submitterHue";
 import { utcMonthYear } from "@/src/util/localTime";
@@ -522,6 +523,9 @@ function ActiveSubmitters({ id }: { id: string }) {
   const label = org ? "Active organisations" : "Active devices";
   const count = data?.rangeDistinct ?? null;
   const rows = useMemo(() => (data && org && count != null ? activeSubmitterRows(data) : []), [data, org, count]);
+  // A count over hours not all measured is a FLOOR, and says so under itself (R23).
+  const partial = data ? measuredHoursLine(data) : null;
+  const floorLine = partial && <p className="m-0 mt-0.5 text-label text-muted-foreground tabular-nums">{partial}</p>;
   if (!data && error) return null; // a failed read says nothing
   if (!data)
     return (
@@ -551,6 +555,7 @@ function ActiveSubmitters({ id }: { id: string }) {
               })}
             </div>
           </ScheduleGroup>
+          {floorLine}
           {data.seenTotal > 0 && (
             <p className="m-0 mt-1 text-label text-muted-foreground tabular-nums">
               {`${data.seenTotal.toLocaleString()} seen${data.firstSeenMs != null ? ` since ${utcMonthYear(data.firstSeenMs)}` : ""}`}
@@ -559,7 +564,10 @@ function ActiveSubmitters({ id }: { id: string }) {
         </>
       ) : (
         // Dor's count is a HyperLogLog estimate (R19), so it reads "about N".
-        <Fact label={label}>{count != null ? <b className="font-mono font-bold">{`${data.estimate ? "about " : ""}${count.toLocaleString()}`}</b> : <Empty why="Not measured over the last 24 hours" />}</Fact>
+        <>
+          <Fact label={label}>{count != null ? <b className="font-mono font-bold">{`${data.estimate ? "about " : ""}${count.toLocaleString()}`}</b> : <Empty why="Not measured over the last 24 hours" />}</Fact>
+          {floorLine}
+        </>
       )}
     </div>
   );
