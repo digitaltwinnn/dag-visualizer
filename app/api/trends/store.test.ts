@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The Upstash client faked at the module: what `wrap` sends, and in which shape.
 const calls: unknown[][] = [];
@@ -24,11 +24,17 @@ vi.mock("@upstash/redis", () => ({
 import { MGET_CHUNK, writeStore } from "./store";
 
 describe("the store's string reads and writes (R22: Dor's sketches, no PF command)", () => {
+  const saved = { url: process.env.UPSTASH_KV_REST_API_URL, token: process.env.UPSTASH_KV_REST_API_TOKEN };
+  const restore = (k: string, v: string | undefined) => { if (v === undefined) delete process.env[k]; else process.env[k] = v; };
   beforeEach(() => {
     calls.length = 0;
     strings.clear();
     process.env.UPSTASH_KV_REST_API_URL = "https://x";
     process.env.UPSTASH_KV_REST_API_TOKEN = "t";
+  });
+  afterEach(() => {
+    restore("UPSTASH_KV_REST_API_URL", saved.url);
+    restore("UPSTASH_KV_REST_API_TOKEN", saved.token);
   });
 
   it("MGET: no keys is no request; a long list is chunked at MGET_CHUNK and comes back in order", async () => {

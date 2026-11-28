@@ -215,6 +215,10 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   `{hash}` cursor, the trends fill's), since the list pages only from its tip. A read that still fails
   after `retrying` stops the walk at its hour; the state file (`.walk-submitters.<net>.json`,
   gitignored) resumes it. Run it AFTER the sampler's first run (no span, it refuses).
+  An undecodable Dor hour sketch fails the day's flush (R22, never replaced by an empty one); before
+  span.from it is the walk's own territory, so re-walking that day from its start (`--from=<day>`,
+  deleting the state file) SETs a fresh sketch and the flush succeeds — only sampler-owned hours and
+  Dor's sampler-side keys need a hand fix.
   **`--holes`** walks the holes instead (`walkHoles`): each hole the sampler has moved past, its hours
   SET to their full tally, then under the lock its days' 1d recomputed and its field deleted in one
   transaction; a hole the sampler is still inside is left for a later run. DED's names

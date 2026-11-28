@@ -26,7 +26,8 @@ export function subSlotOf(netId: string, tier: SubTier, tsMs: number): { key: st
  *  network per UTC hour (`sub:mainnet:<net>:sketch:1h:YYYY-MM-DD-HH`) and per UTC day
  *  (`…:sketch:1d:YYYY-MM-DD`), holding `sketch.ts`'s `hll12:` encoding of the bucket's device ids.
  *  Measured, one hour of Dor holds ~1,400 distinct devices, ≈1M per-device fields in a month hash; a
- *  sketch is ~5.5 KB and its count carries ~1.6% standard error. A plain string because the read
+ *  sketch is ~5.5 KB stored (~7.3 KB on the wire: the client base64-encodes responses again) and its
+ *  count carries ~1.6% standard error. A plain string because the read
  *  route's read-only token may GET/MGET it, where it is refused PFCOUNT. */
 export function subSketchKeyOf(netId: string, tier: SubTier, tsMs: number): string {
   const step = stepMsOf(tier);

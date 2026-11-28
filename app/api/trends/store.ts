@@ -29,7 +29,9 @@ export interface TrendsStore {
   applyWrites(writes: TrendsWrite[]): Promise<void>;
 }
 
-/** Keys per MGET request: a device sketch is ~5.5 KB, so a request stays near half a megabyte. */
+/** Keys per MGET request. A device sketch is ~5.5 KB stored, but the client's default
+ *  `responseEncoding: "base64"` encodes every value again in transit, so it is ~7.3 KB on the wire and
+ *  a full chunk ~730 KB. */
 export const MGET_CHUNK = 100;
 
 /** A string value as stored. `automaticDeserialization` stays on (the hashes rely on it): the only
