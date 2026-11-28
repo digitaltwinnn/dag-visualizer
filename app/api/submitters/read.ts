@@ -1,6 +1,6 @@
 import { SUBMITTERS } from "@/src/data/submitters";
 import { stepMsOf } from "../trends/keys";
-import type { TrendsStore } from "../trends/store";
+import type { StoredHash, TrendsStore } from "../trends/store";
 import { assembleSubmitters, measuredSketchKeys, parseSpan, windowRange24h, type SubmittersWindow } from "./assemble";
 import { subHolesKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf, type SubTier } from "./keys";
 
@@ -36,7 +36,7 @@ export async function readSubmitters(
   const keys = new Set<string>();
   for (let t = Math.floor(fromMs / step) * step; t < toMs; t += step) keys.add(subSlotOf(net, tier, t).key);
   const read = async (ks: string[]) => {
-    const out: Record<string, Record<string, string>> = {};
+    const out: Record<string, StoredHash> = {};
     await Promise.all(ks.map(async (k) => { const h = await store.hgetall(k); if (h) out[k] = h; }));
     return out;
   };

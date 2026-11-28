@@ -5,6 +5,9 @@
 // a name is added or updated, never deleted, and a `ded` name (the organisation's own registry)
 // replaces a `dagscan` one, never the reverse. Stored in `sub:mainnet:<DED>:names`
 // (`keys.ts` `subNamesKeyOf`), one field per orgId, value JSON `{ name, source, namedAt }`.
+// ⚠️ READ BACK, A VALUE IS AN OBJECT: `@upstash/redis` JSON-parses every HGETALL value, so the
+// stored JSON string arrives as `{ name, source, namedAt }` (a fake that hands back strings hid it;
+// `trends/fakeStore.ts` deserialises the client's way now). `storedName` reads either form.
 
 export type NameSource = "ded" | "dagscan";
 
@@ -36,19 +39,19 @@ export function parseDagscanSummary(body: unknown): Record<string, string> {
   return out;
 }
 
-function stored(v: string | undefined): { name: string; source: NameSource } | null {
+/** A stored name, as the client hands it back (an object) or as stored (its JSON string); null when
+ *  it is neither a readable `{ name, source }` nor present. The ONE reader of a stored name: the
+ *  merge below and the read side (`assemble.ts`) both ask it. */
+export function storedName(v: unknown): { name: string; source: NameSource } | null {
   if (v == null) return null;
-  try {
-    const p = JSON.parse(v) as unknown;
-    if (isObj(p) && text(p.name) && (p.source === "ded" || p.source === "dagscan")) return { name: p.name as string, source: p.source };
-  } catch { /* unreadable: replaced */ }
+  let p: unknown = v;
+  if (typeof v === "string") {
+    try { p = JSON.parse(v); } catch { return null; /* unreadable: replaced */ }
+  }
+  if (isObj(p) && text(p.name) && (p.source === "ded" || p.source === "dagscan")) return { name: p.name as string, source: p.source };
   return null;
 }
 
-/** The names hash after `seen` (orgId → name) from `source`: every previous key kept, a new or
- *  changed name written as `{ name, source, namedAt: nowMs }` (the name `clean`ed — it reaches the
- *  notes' prompts — and skipped when nothing is left), an unchanged one left byte-identical,
- *  and a `dagscan` name never written over a `ded` one. */
 /** The longest name kept: a name is a card's label and a note's word, never a paragraph. */
 const NAME_MAX = 80;
 // C0, DEL and C1 controls: a name from DED's API or dagscan goes into the notes' prompts and the cards.
@@ -61,12 +64,18 @@ function clean(name: string): string {
   return name.replace(CONTROL_RE, "").replace(/\s+/g, " ").trim().slice(0, NAME_MAX).trim();
 }
 
-export function mergeNames(prev: Record<string, string>, seen: Record<string, string>, source: NameSource, nowMs: number): Record<string, string> {
-  const out = { ...prev };
+/** THE NAMES TO WRITE after `seen` (orgId → name) from `source`, against the stored hash `prev` (as
+ *  HGETALL hands it back): only a new or changed name, as `{ name, source, namedAt: nowMs }` JSON (the
+ *  name `clean`ed — it reaches the notes' prompts — and skipped when nothing is left). An unchanged
+ *  name is not written (its `namedAt` keeps), a `dagscan` name is never written over a `ded` one, and a
+ *  stored field it does not write is left as it is (an HSET of the answer drops nothing). The sampler
+ *  and the seed (`seedNames`) both write exactly this. */
+export function nameWrites(prev: Record<string, unknown>, seen: Record<string, string>, source: NameSource, nowMs: number): Record<string, string> {
+  const out: Record<string, string> = {};
   for (const [id, raw] of Object.entries(seen)) {
     const name = clean(raw);
     if (!name) continue;
-    const p = stored(prev[id]);
+    const p = storedName(prev[id]);
     if (p && p.source === "ded" && source === "dagscan") continue;
     if (p && p.name === name && p.source === source) continue;
     out[id] = JSON.stringify({ name, source, namedAt: nowMs });

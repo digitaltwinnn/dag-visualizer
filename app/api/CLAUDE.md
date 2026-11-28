@@ -201,8 +201,13 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   and records the hours it could not read, `[hour of the old to, end of the hour of the first new
   record)`, in `sub:…:holes` (field = start ms, value = end ms; `bucket.holeOf`); the read side nulls
   every bucket overlapping one. DED's names come from DED's public API (`/v1/fingerprints/latest`), once a
-  run. Production-only and fail-closed like the trends sampler; no `force-dynamic`, which would bypass
-  the `unstable_cache` behind `cachedL0Url`.
+  run. ⚠️ **A hash value comes back PARSED** (PR review I1, 2026-11-28): `@upstash/redis` JSON-parses
+  every HGETALL and HMGET value, so a count is a number and a stored name an OBJECT. The store's
+  `hgetall` is typed `StoredHash` (`unknown` values) for that reason, `names.ts` `storedName` reads a
+  name in either form, and the tests share `app/api/trends/fakeStore.ts`, which hands values back the
+  client's way and is held to the real client by `fakeStore.test.ts` — a fake that returns strings
+  hides a reader that assumes them. Production-only and fail-closed like the trends sampler; no
+  `force-dynamic`, which would bypass the `unstable_cache` behind `cachedL0Url`.
   **Back-filling submitters** is `scripts/walk-submitters.ts --net=ded|dor [--from=YYYY-MM-DD]`
   (defaults: DED 2025-09-15, Dor today − 90 days), a thin CLI over `walkRange` (`runSubmitters.ts`,
   where the discipline is tested): oldest hour first up to the span's `from` and NEVER past it — the

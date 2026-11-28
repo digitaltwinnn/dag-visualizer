@@ -46,12 +46,12 @@
 import { decodeSnapshotRoot } from "../snapshot/decodeChannel";
 import type { MetaRec } from "../trends/bucketing";
 import { listSince, type ChainPage } from "../trends/fetchSince";
-import type { TrendsStore, TrendsWrite } from "../trends/store";
+import type { StoredHash, TrendsStore, TrendsWrite } from "../trends/store";
 import { DED_ID, SUBMITTERS } from "@/src/data/submitters";
 import { bucketDevices, bucketSubmitters, holeOf, nextSpan, type DeviceAdds } from "./bucket";
 import { parseHoles } from "./assemble";
 import { subField, subHolesKeyOf, subLockKeyOf, subNamesKeyOf, subSketchKeyOf, subSlotOf, subSpanKeyOf, type SubTier } from "./keys";
-import { mergeNames, parseDedLatest } from "./names";
+import { nameWrites, parseDedLatest, type NameSource } from "./names";
 import { readL0Snapshots } from "./readL0";
 import { addIds, decodeSketch, encodeSketch, estimate, mergeInto, newSketch, type Sketch } from "./sketch";
 
@@ -186,7 +186,7 @@ interface NetRun {
   hole: { from: number; to: number } | null;
 }
 
-async function runNet(deps: SubmittersDeps, net: string, prevSpan: Record<string, string> | null, deadlineMs: number): Promise<NetRun> {
+async function runNet(deps: SubmittersDeps, net: string, prevSpan: StoredHash | null, deadlineMs: number): Promise<NetRun> {
   const page = (limit: number, next?: string) => deps.pageMeta(net, limit, next);
   const cursor = prevSpan?.cursor != null ? Number(prevSpan.cursor) : null;
   const prev = prevSpan?.from != null && prevSpan.to != null ? { from: Number(prevSpan.from), to: Number(prevSpan.to) } : null;
@@ -282,8 +282,7 @@ export async function runSubmitters(deps: SubmittersDeps): Promise<SubmittersRes
         // counts nothing (it ran unguarded, and one throw dropped every network's reads).
         const prev = await store.hgetall(subNamesKeyOf(DED_ID)).then((h) => h ?? {}, () => null);
         if (prev) {
-          const merged = mergeNames(prev, seen, "ded", deps.now());
-          const changed = Object.fromEntries(Object.entries(merged).filter(([id, v]) => prev[id] !== v));
+          const changed = nameWrites(prev, seen, "ded", deps.now());
           names = Object.keys(changed).length;
           if (names) writes.push({ key: subNamesKeyOf(DED_ID), map: changed, ttlS: null });
         }
@@ -360,6 +359,24 @@ export async function withSubmittersLock<T>(store: TrendsStore, fn: () => Promis
   } finally {
     await store.releaseLock(subLockKeyOf());
   }
+}
+
+/** THE ONE-OFF NAMES SEED (`scripts/seed-ded-names.ts`): `seen` (orgId → name) from `source` merged
+ *  into DED's names hash under the sampler's lock, so a run's own names write cannot interleave —
+ *  exactly the sampler's rule (`nameWrites`: never over a `ded` name, an unchanged one not written).
+ *  Answers the number of names written. */
+export async function seedNames(
+  store: TrendsStore,
+  seen: Record<string, string>,
+  source: NameSource,
+  nowMs: number,
+  sleep?: (ms: number) => Promise<void>,
+): Promise<number> {
+  return withSubmittersLock(store, async () => {
+    const changed = nameWrites((await store.hgetall(subNamesKeyOf(DED_ID))) ?? {}, seen, source, nowMs);
+    if (Object.keys(changed).length) await store.hset(subNamesKeyOf(DED_ID), changed);
+    return Object.keys(changed).length;
+  }, sleep);
 }
 
 /** The records with `a ≤ ts < b`, oldest first: paged newest-first from the cursor at `b`. */

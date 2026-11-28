@@ -10,9 +10,20 @@ import { Redis } from "@upstash/redis";
  *  EXPIRE. A key is a hash or a string, never both. */
 export interface TrendsWrite { key: string; map: Record<string, number | string>; ttlS: number | null; hdel?: string[]; value?: string }
 
+/** A hash field's value as the client hands it back. `@upstash/redis` JSON-parses every HGETALL and
+ *  HMGET value (`automaticDeserialization`, on): a stored "42" comes back the NUMBER 42, a stored JSON
+ *  object an OBJECT, and only a value that does not parse (or, on HGETALL, a number that is not a safe
+ *  integer) the raw string. So a reader never assumes a string: `Number(v)` for a count, and a JSON
+ *  field read in either form (`names.ts` `stored`). The test fake does the same
+ *  (`fakeStore.ts`, pinned to the real client by `fakeStore.test.ts`). */
+export type HashValue = unknown;
+/** One hash as HGETALL hands it back (`HashValue`). */
+export type StoredHash = Record<string, HashValue>;
+
 export interface TrendsStore {
-  hgetall(key: string): Promise<Record<string, string> | null>;
-  hmget(key: string, fields: string[]): Promise<(string | null)[]>;
+  hgetall(key: string): Promise<StoredHash | null>;
+  /** Each field's value in `fields`' order, null where absent. */
+  hmget(key: string, fields: string[]): Promise<HashValue[]>;
   hset(key: string, map: Record<string, string | number>): Promise<void>;
   expire(key: string, s: number): Promise<void>;
   /** GET: a string key's value, null when absent. */
@@ -47,11 +58,11 @@ function client(token: string | undefined): Redis {
 function wrap(r: Redis): TrendsStore {
   return {
     async hgetall(key) {
-      return (await r.hgetall<Record<string, string>>(key)) ?? null;
+      return (await r.hgetall<StoredHash>(key)) ?? null;
     },
     async hmget(key, fields) {
       if (!fields.length) return [];
-      const res = await r.hmget<Record<string, string | null>>(key, ...fields);
+      const res = await r.hmget<Record<string, HashValue>>(key, ...fields);
       return fields.map((f) => (res ? (res[f] ?? null) : null));
     },
     async hset(key, map) {

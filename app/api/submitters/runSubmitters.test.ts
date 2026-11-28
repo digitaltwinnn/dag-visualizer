@@ -1,47 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { runSubmitters, walkHoles, walkRange, type SubmittersDeps, type WalkDeps } from "./runSubmitters";
+import { runSubmitters, seedNames, walkHoles, walkRange, type SubmittersDeps, type WalkDeps } from "./runSubmitters";
 import { assembleSubmitters } from "./assemble";
 import { subSketchKeyOf, subHolesKeyOf, subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
 import { DED_ID, DOR_ID } from "@/src/data/submitters";
 import type { MetaRec } from "../trends/bucketing";
 import type { ChainPage } from "../trends/fetchSince";
-import type { TrendsStore, TrendsWrite } from "../trends/store";
+import type { TrendsStore } from "../trends/store";
+import { fakeStore } from "../trends/fakeStore";
 import { addIds, decodeSketch, encodeSketch, newSketch } from "./sketch";
 
-// In-memory TrendsStore (runSample.test.ts's), counting transactions. String keys (Dor's device
-// sketches, R22) live apart from the hashes: a key is one or the other.
-function memStore(): TrendsStore & { data: Map<string, Map<string, string>>; str: Map<string, string>; locked: boolean; applies: TrendsWrite[][] } {
-  const data = new Map<string, Map<string, string>>();
-  const str = new Map<string, string>();
-  const s = {
-    data, str, locked: false, applies: [] as TrendsWrite[][],
-    async get(key: string) { return str.get(key) ?? null; },
-    async mget(keys: string[]) { return keys.map((k) => str.get(k) ?? null); },
-    async hgetall(key: string) { const h = data.get(key); return h ? Object.fromEntries(h) : null; },
-    async hmget(key: string, fields: string[]) { const h = data.get(key); return fields.map((f) => h?.get(f) ?? null); },
-    async hset(key: string, map: Record<string, string | number>) {
-      let h = data.get(key);
-      if (!h) data.set(key, (h = new Map()));
-      for (const [f, v] of Object.entries(map)) h.set(f, String(v));
-    },
-    async expire() {},
-    async acquireLock() { if (s.locked) return false; s.locked = true; return true; },
-    async releaseLock() { s.locked = false; },
-    async applyWrites(writes: TrendsWrite[]) {
-      s.applies.push(writes);
-      for (const w of writes) {
-        let h = data.get(w.key);
-        if (!h) data.set(w.key, (h = new Map()));
-        for (const [f, v] of Object.entries(w.map)) h.set(f, String(v));
-        for (const f of w.hdel ?? []) h.delete(f);
-        if (!h.size) data.delete(w.key);
-        if (w.value != null) str.set(w.key, w.value);
-      }
-    },
-  };
-  return s;
-}
-
+// The shared in-memory store (`trends/fakeStore.ts`): values stored as Redis holds them and handed
+// back as `@upstash/redis` does — a count as a number, DED's names as objects (PR review I1).
 const MIN = 60000, HOUR = 3600000;
 /** Two organisations (ids are UUIDs: `submitters.ts` counts no other shape). */
 const O1 = "00000000-0000-4000-8000-000000000001", O2 = "00000000-0000-4000-8000-000000000002";
@@ -102,14 +71,14 @@ function deps(store: TrendsStore, over: Partial<SubmittersDeps> = {}): Submitter
   };
 }
 
-const span = (s: ReturnType<typeof memStore>, net = DED_ID) => s.data.get(subSpanKeyOf(net));
-const h1 = (s: ReturnType<typeof memStore>, ts: number) => s.data.get(subSlotOf(DED_ID, "1h", ts).key);
-const subData = (s: ReturnType<typeof memStore>) =>
+const span = (s: ReturnType<typeof fakeStore>, net = DED_ID) => s.data.get(subSpanKeyOf(net));
+const h1 = (s: ReturnType<typeof fakeStore>, ts: number) => s.data.get(subSlotOf(DED_ID, "1h", ts).key);
+const subData = (s: ReturnType<typeof fakeStore>) =>
   [...s.data].filter(([k]) => k.includes(":1h:") || k.includes(":1d:")).map(([k, h]) => [k, Object.fromEntries([...h].sort())]);
 
 describe("runSubmitters", () => {
   it("first run: reads from the start of the previous UTC hour, buckets by timestamp, ONE transaction", async () => {
-    const store = memStore();
+    const store = fakeStore();
     const res = await runSubmitters(deps(store));
     // 13:00 … 14:09 = ordinals 1060 … 1129.
     expect(res.read[DED_ID]).toBe(70);
@@ -132,10 +101,10 @@ describe("runSubmitters", () => {
 
   it("an L0 failure mid-batch counts the prefix only, and the next run resumes with no double count", async () => {
     // A clean run over the same records.
-    const clean = memStore();
+    const clean = fakeStore();
     await runSubmitters(deps(clean));
 
-    const store = memStore();
+    const store = fakeStore();
     let down = true;
     const fetchSnap = async (_net: string, o: number) => {
       if (down && o === 1062) throw new Error("L0 502"); // the 3rd record of the batch
@@ -160,7 +129,7 @@ describe("runSubmitters", () => {
   });
 
   it("a held lock skips the run and writes nothing", async () => {
-    const store = memStore();
+    const store = fakeStore();
     store.locked = true;
     const res = await runSubmitters(deps(store));
     expect(res.skipped).toBe("locked");
@@ -169,7 +138,7 @@ describe("runSubmitters", () => {
   });
 
   it("takes the lock on the sub family's own key", async () => {
-    const store = memStore();
+    const store = fakeStore();
     const keys: string[] = [];
     store.acquireLock = async (k: string) => { keys.push(k); return true; };
     await runSubmitters(deps(store));
@@ -177,7 +146,7 @@ describe("runSubmitters", () => {
   });
 
   it("a warm run contiguous by ordinal extends the span; a gap keeps its from and records a hole", async () => {
-    const store = memStore();
+    const store = fakeStore();
     let tip = 1100;
     await runSubmitters(deps(store, { pageMeta: pager(() => tip) }));
     expect(span(store)!.get("cursor")).toBe("1100");
@@ -189,7 +158,7 @@ describe("runSubmitters", () => {
 
     // A hole: the chain's list no longer reaches the cursor (records 1130… are absent; the
     // stored cursor is set back past what the pager can prove).
-    const gapped = memStore();
+    const gapped = fakeStore();
     await gapped.hset(subSpanKeyOf(DED_ID), { from: PREV_HOUR - 5 * HOUR, to: PREV_HOUR - 4 * HOUR, cursor: 900 });
     const res = await runSubmitters(deps(gapped));
     expect(res.read[DED_ID]).toBe(130);
@@ -203,7 +172,7 @@ describe("runSubmitters", () => {
   });
 
   it("a second gap from the same hour keeps the hole's later end", async () => {
-    const store = memStore();
+    const store = fakeStore();
     await store.hset(subSpanKeyOf(DED_ID), { from: PREV_HOUR - 5 * HOUR, to: PREV_HOUR - 4 * HOUR, cursor: 900 });
     await store.hset(subHolesKeyOf(DED_ID), { [String(PREV_HOUR - 4 * HOUR)]: String(PREV_HOUR + 5 * HOUR) });
     await runSubmitters(deps(store));
@@ -211,31 +180,31 @@ describe("runSubmitters", () => {
   });
 
   it("a contiguous run writes no hole", async () => {
-    const store = memStore();
+    const store = fakeStore();
     await runSubmitters(deps(store, { pageMeta: pager(() => 1100) }));
     await runSubmitters(deps(store));
     expect(store.data.has(subHolesKeyOf(DED_ID))).toBe(false);
   });
 
   it("maxRecs reads the OLDEST records and leaves the rest, the span staying contiguous", async () => {
-    const store = memStore();
+    const store = fakeStore();
     await runSubmitters(deps(store, { maxRecs: 50 }));
     expect(span(store)!.get("cursor")).toBe("1109");
     expect(span(store)!.get("to")).toBe(String(tsOf(1109)));
     const res = await runSubmitters(deps(store, { maxRecs: 50 }));
     expect(res.read[DED_ID]).toBe(20);
     expect(span(store)!.get("from")).toBe(String(PREV_HOUR));
-    const clean = memStore();
+    const clean = fakeStore();
     await runSubmitters(deps(clean));
     expect(subData(store)).toEqual(subData(clean));
   });
 
   it("a deadline passed mid-batch commits the prefix as a truncation, and the next run resumes to clean totals", async () => {
-    const clean = memStore();
+    const clean = fakeStore();
     await runSubmitters(deps(clean));
 
     // A slow L0: each read costs the fake clock 10 s; the run's budget is 100 s.
-    const store = memStore();
+    const store = fakeStore();
     let clock = NOW;
     const slow = { now: () => clock, fetchSnap: async (_n: string, o: number) => { clock += 10000; return root(o); } };
     const res = await runSubmitters(deps(store, { ...slow, deadlineMs: NOW + 100000, pool: 1 }));
@@ -256,7 +225,7 @@ describe("runSubmitters", () => {
   });
 
   it("a network whose list cannot be read reports -1 and moves nothing; the others still commit", async () => {
-    const store = memStore();
+    const store = fakeStore();
     const OTHER = "DAG0other";
     const base = pager(() => 1129);
     const res = await runSubmitters(deps(store, {
@@ -270,7 +239,7 @@ describe("runSubmitters", () => {
   });
 
   it("no submitters in a record writes no empty hash", async () => {
-    const store = memStore();
+    const store = fakeStore();
     await runSubmitters(deps(store, { fetchSnap: async (_n, o) => ({ value: { ordinal: o } }) }));
     expect(store.applies).toHaveLength(1);
     expect(store.applies[0].map((w) => w.key)).toEqual([subSpanKeyOf(DED_ID)]);
@@ -278,7 +247,7 @@ describe("runSubmitters", () => {
   });
 
   it("DED's names ride the same transaction, only those that changed", async () => {
-    const store = memStore();
+    const store = fakeStore();
     await store.hset(subNamesKeyOf(DED_ID), { o1: JSON.stringify({ name: "Open Poker", source: "ded", namedAt: 1 }) });
     const res = await runSubmitters(deps(store, {
       dedLatest: async () => ({ data: [{ orgId: "o1", orgName: "Open Poker" }, { orgId: "o2", orgName: "Gate AI" }] }),
@@ -290,8 +259,54 @@ describe("runSubmitters", () => {
     expect(JSON.parse(String(w.map.o2))).toEqual({ name: "Gate AI", source: "ded", namedAt: NOW });
   });
 
+  // THE NAMES THROUGH THE REAL CLIENT'S SHAPES (PR review I1): the fake hands a stored name back as an
+  // OBJECT, as `@upstash/redis` does, so these hold on production's client.
+  describe("DED's names, read back as the client hands them", () => {
+    const stored = (name: string, source: "ded" | "dagscan", namedAt: number) => JSON.stringify({ name, source, namedAt });
+    const namesOf = (s: ReturnType<typeof fakeStore>) => Object.fromEntries(s.data.get(subNamesKeyOf(DED_ID)) ?? []);
+
+    it("a stored ded name survives a sampler run unchanged: nothing written, namedAt not bumped", async () => {
+      const store = fakeStore();
+      await store.hset(subNamesKeyOf(DED_ID), { o1: stored("Open Poker", "ded", 1) });
+      const before = namesOf(store);
+      const res = await runSubmitters(deps(store, { dedLatest: async () => ({ data: [{ orgId: "o1", orgName: "Open Poker" }] }) }));
+      expect(res.names).toBe(0);
+      expect(store.applies.flat().some((w) => w.key === subNamesKeyOf(DED_ID))).toBe(false);
+      expect(namesOf(store)).toEqual(before);
+    });
+
+    it("a stored ded name survives a seed run unchanged, and the seed adds the names it alone knows", async () => {
+      const store = fakeStore();
+      await store.hset(subNamesKeyOf(DED_ID), { o1: stored("Open Poker", "ded", 1) });
+      const n = await seedNames(store, { o1: "OpenPoker (dagscan)", o3: "Lotto Works" }, "dagscan", NOW);
+      expect(n).toBe(1);
+      expect(namesOf(store)).toEqual({ o1: stored("Open Poker", "ded", 1), o3: stored("Lotto Works", "dagscan", NOW) });
+      expect(store.locked).toBe(false);
+      // a second seed writes nothing: every name it knows is held
+      expect(await seedNames(store, { o1: "OpenPoker (dagscan)", o3: "Lotto Works" }, "dagscan", NOW + 1)).toBe(0);
+      expect(namesOf(store).o3).toBe(stored("Lotto Works", "dagscan", NOW));
+    });
+
+    it("a dagscan name never overwrites a ded one; a ded name does replace a dagscan one", async () => {
+      const store = fakeStore();
+      await store.hset(subNamesKeyOf(DED_ID), { o1: stored("Open Poker", "ded", 1), o2: stored("Gate ai", "dagscan", 1) });
+      await seedNames(store, { o1: "Open poker", o2: "Gate AI?" }, "dagscan", NOW);
+      expect(namesOf(store).o1).toBe(stored("Open Poker", "ded", 1));
+      await runSubmitters(deps(store, { dedLatest: async () => ({ data: [{ orgId: "o2", orgName: "Gate AI" }] }) }));
+      expect(namesOf(store)).toEqual({ o1: stored("Open Poker", "ded", 1), o2: stored("Gate AI", "ded", NOW) });
+    });
+
+    it("seedNames waits for a sampler run holding the lock", async () => {
+      const store = fakeStore();
+      store.locked = true;
+      let waits = 0;
+      expect(await seedNames(store, { o1: "Open Poker" }, "dagscan", NOW, async () => { waits++; store.locked = false; })).toBe(1);
+      expect(waits).toBe(1);
+    });
+  });
+
   it("Dor: device ids go into the hour's and the day's SKETCH and their count fields, in the one transaction (R22)", async () => {
-    const store = memStore();
+    const store = fakeStore();
     const res = await runSubmitters(deps(store, { nets: [DOR_ID], fetchSnap: async (_n, o) => dorRoot(o) }));
     expect(res.read[DOR_ID]).toBe(70);
     expect(store.applies).toHaveLength(1);
@@ -307,7 +322,7 @@ describe("runSubmitters", () => {
   });
 
   it("Dor: a later run MERGES its ids into the stored sketches, and the count follows the union (R22)", async () => {
-    const store = memStore();
+    const store = fakeStore();
     let tip = 1125;
     const d = { nets: [DOR_ID], pageMeta: pager(() => tip), fetchSnap: async (_n: string, o: number) => dorRoot(o) };
     const other = [dev(7).slice(0, 16), dev(8).slice(0, 16)];
@@ -324,7 +339,7 @@ describe("runSubmitters", () => {
   });
 
   it("Dor: an undecodable stored sketch fails Dor's run alone — nothing of Dor written, its cursor kept; DED commits", async () => {
-    const store = memStore();
+    const store = fakeStore();
     let tip = 1125;
     const fetchSnap = async (n: string, o: number) => (n === DOR_ID ? dorRoot(o) : root(o));
     const d = { nets: [DED_ID, DOR_ID], pageMeta: pager(() => tip), fetchSnap };
@@ -343,7 +358,7 @@ describe("runSubmitters", () => {
   });
 
   it("a names-hash read that throws costs the run nothing: names are optional", async () => {
-    const store = memStore();
+    const store = fakeStore();
     const hgetall = store.hgetall.bind(store);
     store.hgetall = async (k: string) => { if (k === subNamesKeyOf(DED_ID)) throw new Error("upstash 502"); return hgetall(k); };
     const res = await runSubmitters(deps(store, { dedLatest: async () => ({ data: [{ orgId: O1, orgName: "Open Poker" }] }) }));
@@ -354,7 +369,7 @@ describe("runSubmitters", () => {
   });
 
   it("a names read that fails costs the run nothing", async () => {
-    const store = memStore();
+    const store = fakeStore();
     const res = await runSubmitters(deps(store, { dedLatest: async () => { throw new Error("ded down"); } }));
     expect(res.names).toBe(0);
     expect(span(store)!.get("cursor")).toBe("1129");
@@ -393,15 +408,15 @@ describe("walkRange", () => {
     store, pageMeta: wPager, cursorAt, fetchSnap: walkSnap, pool: 3, sleep: async () => {}, ...over,
   });
   async function sampled() {
-    const store = memStore();
+    const store = fakeStore();
     await runSubmitters({ store, nets: [DED_ID], pageMeta: wPager, fetchSnap: async (_n, o) => root(o), now: () => NOW_W });
     return store;
   }
-  const field = (s: ReturnType<typeof memStore>, tier: "1h" | "1d", ts: number, id: string) => {
+  const field = (s: ReturnType<typeof fakeStore>, tier: "1h" | "1d", ts: number, id: string) => {
     const { key, bucket } = subSlotOf(DED_ID, tier, ts);
     return s.data.get(key)?.get(`${bucket}|${id}`);
   };
-  const sum1h = (s: ReturnType<typeof memStore>, day: number, id: string) => {
+  const sum1h = (s: ReturnType<typeof fakeStore>, day: number, id: string) => {
     let t = 0;
     for (let h = 0; h < 24; h++) t += Number(field(s, "1h", day + h * HOUR, id) ?? 0);
     return String(t);
@@ -492,7 +507,7 @@ describe("walkRange", () => {
   });
 
   it("refuses without a measured span: the sampler must run first", async () => {
-    await expect(walkRange(wdeps(memStore()), DED_ID, D0, SPAN_FROM, progress)).rejects.toThrow(/span/);
+    await expect(walkRange(wdeps(fakeStore()), DED_ID, D0, SPAN_FROM, progress)).rejects.toThrow(/span/);
   });
 
   it("walkHoles fills a hole's hours, recomputes its days, deletes the hole, and its buckets read measured", async () => {
@@ -506,7 +521,7 @@ describe("walkRange", () => {
     for (const f of [...store.data.get(k1h)!.keys()]) if (f.startsWith("26-05|") || f.startsWith("26-06|")) store.data.get(k1h)!.delete(f);
     await store.hset(subSlotOf(DED_ID, "1d", D1).key, { [`11-26|${O1}`]: 1 });
     await store.hset(subHolesKeyOf(DED_ID), { [String(D1 + 5 * HOUR)]: String(D1 + 7 * HOUR) });
-    const read = (s: ReturnType<typeof memStore>) => assembleSubmitters({
+    const read = (s: ReturnType<typeof fakeStore>) => assembleSubmitters({
       net: DED_ID, tier: "1h", fromMs: D1, toMs: D1 + 24 * HOUR,
       hashes: { [k1h]: Object.fromEntries(s.data.get(k1h)!) },
       span: Object.fromEntries(span(s)!), names: null,
@@ -541,7 +556,7 @@ describe("walkRange", () => {
 
   it("Dor: the walk SETs each hour's sketch from its own ids, the day as the union of its hours, with count fields — idempotent (R22)", async () => {
     const dorSnap = async (_n: string, o: number) => { if (wTs(o) >= SPAN_FROM) throw new Error(`read a sampler record: ${o}`); return dorRoot(o); };
-    const store = memStore();
+    const store = fakeStore();
     await runSubmitters({ store, nets: [DOR_ID], pageMeta: wPager, fetchSnap: async (_n, o) => dorRoot(o), now: () => NOW_W });
     // A stale hour sketch the walk must overwrite, never merge with (the SET discipline).
     store.str.set(subSketchKeyOf(DOR_ID, "1h", D0), encodeSketch(addIds(newSketch(), ["stale"])));
@@ -561,7 +576,7 @@ describe("walkRange", () => {
   });
 
   it("Dor: the day sketch is the merge of its hour sketches, the boundary day's sampler hours included (R22)", async () => {
-    const store = memStore();
+    const store = fakeStore();
     await runSubmitters({ store, nets: [DOR_ID], pageMeta: wPager, fetchSnap: async (_n, o) => dorRoot(o), now: () => NOW_W });
     // Only the sampler's 14:00 hour carries a device the walk's hours never see.
     store.str.set(subSketchKeyOf(DOR_ID, "1h", D2 + 14 * HOUR), encodeSketch(addIds(newSketch(), [...DEVICES, "beef"])));

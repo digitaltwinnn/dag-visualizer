@@ -5,6 +5,8 @@ import { METAGRAPHS } from "@/src/engine/config";
 import type { NoteReads } from "./sources";
 import type { SubmittersWindow } from "../submitters/assemble";
 import { addIds, encodeSketch, newSketch } from "../submitters/sketch";
+import { subField, subNamesKeyOf, subSketchKeyOf, subSlotOf, subSpanKeyOf } from "../submitters/keys";
+import { fakeStore } from "../trends/fakeStore";
 import type { ChannelSnapRow } from "@/src/data/types";
 
 // The builders are mocked here: these tests pin what `factsFor` READS (the per-view table: tiers
@@ -724,27 +726,28 @@ describe("who submitted the data", () => {
 
   const SEVEN = encodeSketch(addIds(newSketch(), ["a", "b", "c", "d", "e", "f", "g"]));
   it("storeReads reads the sub: family through the store, at the range's tier, and nothing for a network with no submitter table", async () => {
-    const asked: string[] = [];
-    const store = {
-      async hgetall(key: string) {
-        asked.push(key);
-        return key.endsWith(":span") ? { from: String(NOW - 30 * D), to: String(NOW - H) } : null;
-      },
-      async mget(keys: string[]) { asked.push(...keys.map((k) => `mget:${k}`)); return keys.map(() => SEVEN); },
-    };
+    // The shared fake hands values back as `@upstash/redis` does (PR review I1/M12): the span's stamps
+    // and the counts as numbers, a stored name as an object.
+    const store = fakeStore();
+    const ORG = "00000000-0000-4000-8000-000000000001";
+    for (const net of [DED, DOR]) await store.hset(subSpanKeyOf(net), { from: NOW - 100 * D, to: NOW - H, cursor: 9 });
+    await store.hset(subNamesKeyOf(DED), { [ORG]: JSON.stringify({ name: "Open Poker", source: "ded", namedAt: 1 }) });
+    const hour = subSlotOf(DED, "1h", NOW - 3 * H);
+    await store.hset(hour.key, { [subField(hour.bucket, ORG)]: 3 });
+    for (let t = NOW - 90 * D; t < NOW; t += D) store.str.set(subSketchKeyOf(DOR, "1d", t), SEVEN);
     const reads = storeReads(NOW, store);
-    const w = await reads.submitters!(DED, NOW - 7 * D, NOW);
-    expect(w).toMatchObject({ net: DED, tier: "1h", kind: "organisation" });
-    expect(asked).toEqual(expect.arrayContaining([`sub:mainnet:${DED}:span`, `sub:mainnet:${DED}:names`, `sub:mainnet:${DED}:1h:2026-10`]));
-    expect(asked.some((k) => k.includes(":1d:"))).toBe(false); // the notes need no all-time palette
-    asked.length = 0;
+    const w = (await reads.submitters!(DED, NOW - 7 * D, NOW))!;
+    expect(w).toMatchObject({ net: DED, tier: "1h", kind: "organisation", names: { [ORG]: "Open Poker" }, totals: [{ id: ORG, updates: 3 }] });
+    expect(store.asked).toEqual(expect.arrayContaining([`sub:mainnet:${DED}:span`, `sub:mainnet:${DED}:names`, `sub:mainnet:${DED}:1h:2026-10`]));
+    expect(store.asked.some((k) => k.includes(":1d:"))).toBe(false); // the notes need no all-time palette
+    store.asked.length = 0;
     const dor = (await reads.submitters!(DOR, NOW - 90 * D, NOW))!;
     expect(dor.tier).toBe("1d");
     expect(dor).toMatchObject({ estimate: true, rangeDistinct: 7 }); // Dor (R22): its sketches by MGET
-    expect(asked).toContain(`mget:sub:mainnet:${DOR}:sketch:1d:2026-10-20`);
-    expect(asked).toContain(`sub:mainnet:${DOR}:1d:2026`); // the daily count fields
-    asked.length = 0;
+    expect(store.asked).toContain(`mget:sub:mainnet:${DOR}:sketch:1d:2026-10-20`);
+    expect(store.asked).toContain(`sub:mainnet:${DOR}:1d:2026`); // the daily count fields
+    store.asked.length = 0;
     expect(await reads.submitters!(USDC, NOW - 7 * D, NOW)).toBeNull();
-    expect(asked).toEqual([]);
+    expect(store.asked).toEqual([]);
   });
 });

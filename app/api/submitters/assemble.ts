@@ -7,6 +7,8 @@ import { SUBMITTERS, type SubmitterKind } from "@/src/data/submitters";
 import { stepMsOf } from "../trends/keys";
 import { subSketchKeyOf, subSlotOf, type SubTier } from "./keys";
 import { decodeSketch, estimate, mergeInto, newSketch } from "./sketch";
+import type { StoredHash } from "../trends/store";
+import { storedName } from "./names";
 
 /** How many organisations carry a hue of their own (the palette); every other one reads neutral. */
 export const ORG_PALETTE_MAX = 7;
@@ -51,34 +53,36 @@ export interface AssembleInput {
   tier: SubTier;
   fromMs: number;
   toMs: number;
-  hashes: Record<string, Record<string, string>>;
-  span: Record<string, string> | null;
-  names: Record<string, string> | null;
+  /** Hashes as the client hands them back (`StoredHash`: a count may be a number). */
+  hashes: Record<string, StoredHash>;
+  span: StoredHash | null;
+  names: StoredHash | null;
   /** The holes hash (`subHolesKeyOf`): field = start ms, value = end ms. */
-  holes?: Record<string, string> | null;
+  holes?: StoredHash | null;
   /** Devices (R22): the stored values of `measuredSketchKeys`' keys (MGET), null where absent. */
   sketches?: (string | null)[] | null;
   /** Every 1d year hash, for "N seen since <month year>". */
-  yearHashes?: Record<string, Record<string, string>>;
+  yearHashes?: Record<string, StoredHash>;
 }
 
-const num = (s: string | undefined): number | null => {
-  if (s === undefined) return null;
+/** A stored count or stamp as a number, whichever form the client handed it back in. */
+const num = (s: unknown): number | null => {
+  if (s == null || (typeof s !== "string" && typeof s !== "number")) return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
 };
 
 /** The measured span as numbers, or null when the sampler has not committed one. */
-export function parseSpan(span: Record<string, string> | null): { from: number; to: number } | null {
+export function parseSpan(span: StoredHash | null): { from: number; to: number } | null {
   const from = num(span?.from), to = num(span?.to);
   return from !== null && to !== null && to > from ? { from, to } : null;
 }
 
 /** The holes hash as spans, ascending; an unreadable field is no hole. */
-export function parseHoles(raw: Record<string, string> | null | undefined): { from: number; to: number }[] {
+export function parseHoles(raw: StoredHash | null | undefined): { from: number; to: number }[] {
   const out: { from: number; to: number }[] = [];
   for (const [f, v] of Object.entries(raw ?? {})) {
-    const from = num(f), to = num(String(v));
+    const from = num(f), to = num(v);
     if (from !== null && to !== null && to > from) out.push({ from, to });
   }
   return out.sort((a, b) => a.from - b.from);
@@ -105,8 +109,8 @@ export function measuredSketchKeys(
   tier: SubTier,
   fromMs: number,
   toMs: number,
-  span: Record<string, string> | null,
-  holesRaw: Record<string, string> | null | undefined,
+  span: StoredHash | null,
+  holesRaw: StoredHash | null | undefined,
 ): string[] {
   const step = stepMsOf(tier);
   const measured = parseSpan(span), holes = parseHoles(holesRaw);
@@ -135,26 +139,24 @@ export function windowRange24h(nowMs: number): { fromMs: number; toMs: number } 
   return { fromMs: toMs - 24 * H, toMs };
 }
 
-function parseNames(raw: Record<string, string> | null): Record<string, string> {
+function parseNames(raw: StoredHash | null): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [id, v] of Object.entries(raw ?? {})) {
-    try {
-      const o = typeof v === "string" ? JSON.parse(v) : v;
-      if (o && typeof o.name === "string" && o.name) out[id] = o.name;
-    } catch { /* an unreadable value names no one */ }
+    const n = storedName(v); // an unreadable value names no one
+    if (n) out[id] = n.name;
   }
   return out;
 }
 
 /** `[bucket, id, count]` for every field of a hash whose bucket label is `bucket`. */
-function readBucket(h: Record<string, string> | undefined, bucket: string): Map<string, number> {
+function readBucket(h: StoredHash | undefined, bucket: string): Map<string, number> {
   const out = new Map<string, number>();
   if (!h) return out;
   for (const [f, v] of Object.entries(h)) {
     const bar = f.indexOf("|");
     if (bar < 0 || f.slice(0, bar) !== bucket) continue;
     const id = f.slice(bar + 1);
-    if (id) out.set(id, num(String(v)) ?? 0);
+    if (id) out.set(id, num(v) ?? 0);
   }
   return out;
 }
@@ -196,7 +198,7 @@ export function assembleSubmitters(input: AssembleInput): SubmittersWindow {
         if (!isMeasured[i]) return null;
         const { key, bucket } = subSlotOf(net, tier, t);
         const v = hashes[key]?.[bucket]; // a number when the client deserialised it
-        return v == null ? 0 : (num(String(v)) ?? 0);
+        return v == null ? 0 : (num(v) ?? 0);
       }),
       rangeDistinct: union,
       estimate: true,
@@ -233,7 +235,7 @@ export function assembleSubmitters(input: AssembleInput): SubmittersWindow {
         if (bar < 0) continue;
         const oid = f.slice(bar + 1);
         seen.add(oid);
-        allTime.set(oid, (allTime.get(oid) ?? 0) + (num(String(h[f])) ?? 0));
+        allTime.set(oid, (allTime.get(oid) ?? 0) + (num(h[f]) ?? 0));
         const [mo, da] = f.slice(0, bar).split("-").map(Number);
         const ms = Date.UTC(year, mo - 1, da);
         if (Number.isFinite(ms) && (firstSeenMs === null || ms < firstSeenMs)) firstSeenMs = ms;

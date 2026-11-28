@@ -6,6 +6,7 @@
 import { fieldOf, slotsInWindow, stepMsOf, type Tier } from "./keys";
 import { opOf } from "./merge";
 import { foldLineage } from "@/src/net/lineage";
+import type { StoredHash } from "./store";
 
 export type WindowId = "24h" | "7d" | "30d" | "90d" | "180d" | "1y" | "all";
 export const WINDOWS: Record<WindowId, { tier: Tier; ms: number }> = {
@@ -42,7 +43,7 @@ export interface TrendsPayload {
 
 export function assemble(
   window: WindowId, nowMs: number,
-  hashes: Record<string, Record<string, string>>,
+  hashes: Record<string, StoredHash>,
 ): TrendsPayload {
   const { tier, ms } = WINDOWS[window];
   return assembleSpan(window, tier, nowMs - ms, nowMs, nowMs, hashes);
@@ -54,7 +55,7 @@ export function assemble(
  *  absent counter → 0, covered + absent gauge → null. */
 export function assembleSpan(
   window: WindowId | "tile", tier: Tier, startMs: number, endMs: number, nowMs: number,
-  hashes: Record<string, Record<string, string>>,
+  hashes: Record<string, StoredHash>,
 ): TrendsPayload {
   // slotsInWindow is END-INCLUSIVE (the rolling windows want their newest bucket); a SPAN is
   // half-open [start, end) so adjacent tiles can never share a boundary bucket — stitching

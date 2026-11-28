@@ -20,7 +20,7 @@ import { METAGRAPHS } from "@/src/engine/config";
 import { assembleSpan, WINDOWS } from "../trends/assemble";
 import { explorerReader, locateRows, type ChainReader } from "./snapshotAt";
 import { chainReadsOf, cursorKeyOf, geoSitesSlotOf, geoSlotOf, ispNamesKeyOf, slotsInWindow, type Tier } from "../trends/keys";
-import { readStore, type TrendsStore } from "../trends/store";
+import { readStore, type StoredHash, type TrendsStore } from "../trends/store";
 import type { SubmittersWindow } from "../submitters/assemble";
 import { readSubmitters } from "../submitters/read";
 import { SUBMITTERS } from "@/src/data/submitters";
@@ -84,7 +84,7 @@ export async function readSpan(
 ): Promise<TrendsWindowData> {
   // `slotsInWindow` is end-INCLUSIVE and the span half-open, as `assembleSpan` reads it.
   const keys = [...new Set(slotsInWindow(tier, fromMs, toMs - 1).map((s) => s.key))];
-  const hashes: Record<string, Record<string, string>> = {};
+  const hashes: Record<string, StoredHash> = {};
   await Promise.all(keys.map(async (k) => {
     const h = await store.hgetall(k);
     if (h) hashes[k] = h;
@@ -111,7 +111,7 @@ export async function readGeoDays(
     Promise.all(months.map((m) => store.hgetall(geoSitesSlotOf(m).key))),
   ]);
   /** A hash's fields into `out`, by day, inside the window. */
-  const regroup = (h: Record<string, string> | null, year: number, out: Record<string, Record<string, number>>) => {
+  const regroup = (h: StoredHash | null, year: number, out: Record<string, Record<string, number>>) => {
     for (const [field, raw] of Object.entries(h ?? {})) {
       const bar = field.indexOf("|");
       if (bar < 0) continue;
@@ -153,7 +153,7 @@ export async function geoInputs(nowMs: number, reads: NoteReads): Promise<GeoDay
 /** The default reads for ONE note, or one warm pass: the trends store's read client, each hash read
  *  at most once (a History note's span and its days can read the same daily year-hash). */
 export function storeReads(nowMs: number, store: HashReader & Partial<Pick<TrendsStore, "mget">> = readStore()): NoteReads {
-  const seen = new Map<string, Promise<Record<string, string> | null>>();
+  const seen = new Map<string, Promise<StoredHash | null>>();
   const once: HashReader = {
     hgetall(key) {
       let p = seen.get(key);
