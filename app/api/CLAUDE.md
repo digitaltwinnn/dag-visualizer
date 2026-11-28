@@ -172,19 +172,26 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   Dor, anything else 400) with either `window=24h` (the 24 whole hours ending at the CURRENT
   hour — anchored at now, so a stalled sampler's missing hours read as not measured, never days-old
   figures as the last 24 hours) or `from`/`to` epoch ms (within ten years). Answers a `SubmittersWindow` (`assemble.ts`):
-  per-bucket organisation tallies (or Dor's device counts, HyperLogLog ESTIMATES — `estimate: true`,
-  ~0.81% standard error, R19: PFCOUNT of each measured bucket's `…:hll:1h|1d:…` key and of their
-  union, so no device id leaves the store), the names hash, the busiest-of-all-time
+  per-bucket organisation tallies (or Dor's device counts, sketch ESTIMATES — `estimate: true`,
+  ~1.6% standard error, R22: each measured bucket's count field from the same tier hashes, and the
+  range's figure from the union of the measured buckets' `…:sketch:1h|1d:…` strings by MGET, so no
+  device id leaves the store), the names hash, the busiest-of-all-time
   `palette`, and the measured span — a bucket outside it is null. Same idiom as `/api/trends`: reading
   searchParams keeps it per-request, `public, s-maxage=300, stale-while-revalidate=600`, the read-only
-  token, 503 `no-store` when the store is down. Which hashes a range reads is `readSubmitters`
-  (`read.ts`), shared with the notes.
+  token, 503 `no-store` when the store is down. **It needs only HGETALL and MGET** on that token
+  (probed 2026-11-28 — GET and MGET answer, PFCOUNT is refused `NOPERM`, Redis classing it a write,
+  which is why R22 replaced R19's Redis HyperLogLogs with our own sketch). Which hashes and sketches a
+  range reads is `readSubmitters` (`read.ts`), shared with the notes.
 - **`/api/submitters/sample`** (2026-11-27) is the Vercel-Cron sampler (quarter-hourly at 3,18,33,48,
   `CRON_SECRET` auth) for WHO SUBMITS a data block: Digital Evidence's organisations (`orgId`) and Dor's
   devices (`publicId`), the two networks in `src/data/submitters.ts`. Its own key family `sub:mainnet:`
-  (1h and 1d tiers, `app/api/submitters/keys.ts`; Dor's devices are HyperLogLog keys per UTC hour and
-  day, PFADDed in the run's one transaction, R19 — one hour of Dor is ~1,400 devices, too many to keep a
-  field each) — outside `t:` on purpose: a rebuild wipes `t:`, and
+  (1h and 1d tiers, `app/api/submitters/keys.ts`; Dor's devices are a SKETCH per UTC hour and day, our
+  own HyperLogLog stored as a plain `hll12:` string, R22 — one hour of Dor is ~1,400 devices, too many to
+  keep a field each: each run GETs the touched sketches, adds its ids, and SETs them with the bucket's
+  count field in its one transaction; a stored sketch that will not decode fails Dor's run alone,
+  `unreadable` in the answer, never overwritten with an empty one). The family's store commands are
+  hashes (HSET / HGETALL / HMGET / HDEL), strings (SET / GET / MGET) and EXPIRE — no PF command
+  anywhere. It sits outside `t:` on purpose: a rebuild wipes `t:`, and
   per-organisation series would ride every History payload. Its own lock and cursor, so it never waits on
   the trends sampler. It pages the explorer's snapshot list since the cursor, then reads each snapshot
   from the network's OWN L0 by ordinal (200 s read budget inside `maxDuration` 300; the prefix read is
@@ -199,10 +206,11 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   **Back-filling submitters** is `scripts/walk-submitters.ts --net=ded|dor [--from=YYYY-MM-DD]`
   (defaults: DED 2025-09-15, Dor today − 90 days), a thin CLI over `walkRange` (`runSubmitters.ts`,
   where the discipline is tested): oldest hour first up to the span's `from` and NEVER past it — the
-  sampler owns those hours; each hour written as a SET of its full tally (Dor's: a PFADD into the hour's
-  and the day's HLL, idempotent by nature), so a rerun is idempotent;
-  each day's 1d recomputed from ALL its stored 1h fields (1d = Σ1h, the boundary day's sampler hours
-  included, under the sampler's lock); `from` lowered to the walk's start only once the walk reaches it
+  sampler owns those hours; each hour written as a SET of its full tally (Dor's: the hour's sketch
+  built from its ids alone and SET with its count), so a rerun is idempotent;
+  each day's 1d recomputed from ALL its stored 1h fields (1d = Σ1h; Dor's day sketch the merge of its
+  24 hour sketches, day = ∪ hours — the boundary day's sampler hours included, under the sampler's
+  lock); `from` lowered to the walk's start only once the walk reaches it
   contiguously, under the same lock. A day's records are found by seeking (`seekBoundary` + a crafted
   `{hash}` cursor, the trends fill's), since the list pages only from its tip. A read that still fails
   after `retrying` stops the walk at its hour; the state file (`.walk-submitters.<net>.json`,
@@ -303,7 +311,8 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   **Submitter facts** (2026-11-27): a DED or Dor History/Data note also states who submitted — DED's
   organisations (named, with their start/end inside the span, `readSubmitters` through
   `NoteReads.submitters`) and Dor's active devices (counted, never named; over a History span an
-  estimate, its facts labelled "about" and the prompt asking for "about N", R19). A failed or absent
+  estimate, its facts labelled "about" and the prompt asking for "about N", R19; read from the
+  sketches, R22). A failed or absent
   `sub:` read is no submitter data, and the note is written as before; the Data blocks note states no
   organisation when no names were read. The gate is actor-scoped for SHARES AND CHANGES only: a share
   or a % / multiplier labelled with an organisation is held to the sentence that names that

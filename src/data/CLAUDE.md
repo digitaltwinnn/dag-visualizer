@@ -329,11 +329,24 @@ the block's other figures never depend on it.
 **Dor is counted, not named.** A device id is cut to `DEVICE_ID_LEN` and only ever counted, never given
 a name, a colour or a breakdown — a device is not a party anyone can name. **The count over time is an
 ESTIMATE** (ruling R19, 2026-11-27): measured, one hour of Dor holds ~1,400 distinct devices, which as
-per-device hash fields came to ~1M fields per month hash. So the sampler and the walk PFADD each
-bucket's ids into a HyperLogLog per UTC hour and per UTC day (`sub:mainnet:<DOR>:hll:1h:YYYY-MM-DD-HH`,
-`…:hll:1d:YYYY-MM-DD`, `keys.subHllKeyOf`); a bucket's count is PFCOUNT of its key and a range's is
-PFCOUNT over every measured bucket's key — the UNION, a device seen in two hours one device — with
-Redis's ~0.81% standard error. No device id leaves the store. Every surface says so: the window
+per-device hash fields came to ~1M fields per month hash. **The estimate is our OWN HyperLogLog**
+(ruling R22, 2026-11-28, `app/api/submitters/sketch.ts`): p = 12 (4,096 one-byte registers, ~1.6%
+standard error), sha256 of each id, stored as a plain string `hll12:<base64>` per UTC hour and per
+UTC day (`sub:mainnet:<DOR>:sketch:1h:YYYY-MM-DD-HH`, `…:sketch:1d:YYYY-MM-DD`, `keys.subSketchKeyOf`).
+Why not Redis's own HLL: the public read route runs on the READ-ONLY token, and that token is refused
+PFCOUNT (Redis classes it a write — it caches its count in the key); GET and MGET it may do. The
+format is fixed forever once shipped. Beside each sketch, in the same transaction, the bucket's
+COUNT FIELD — `estimate()` of that sketch — sits in the tier hash DED's fields live in (`subSlotOf`;
+a Dor field is the bucket label alone, `DD-HH` / `MM-DD`, where DED's always holds a `|`), so a
+bucket's line is a plain HGETALL. **The day is the union of its hours**: the sampler adds the same
+ids to both, and the walk rebuilds the day as the merge of its 24 hour sketches — the devices' form
+of 1d = Σ1h. **A range's figure is the estimate of the UNION** of its measured buckets' sketches
+(a device seen in two hours is one device), fetched by MGET: on the daily tier each measured day's
+sketch; on the hourly tier each UTC day's DAY sketch when all 24 of its hours lie in the range and
+are measured, else that day's measured hours (`assemble.measuredSketchKeys`). An absent sketch is no
+devices; one that will not decode makes the range's figure null (not measured, never a guess), while
+the buckets' lines still read — and on the write side it fails Dor's sampler run rather than being
+replaced by an empty one, which would drop its history silently. No device id leaves the store. Every surface says so: the window
 carries `estimate: true`, and History's line and "about N devices checked in", the Metagraph card's
 "Active devices" and the notes' device facts all read "about N". One data block's own "Checked in by
 N devices" is exact (its ids are in hand), and so is the Data blocks note's count over the live window.

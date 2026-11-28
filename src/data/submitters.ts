@@ -6,8 +6,9 @@
 // Mechanical like `payloadKinds`: the id is read off the update's own field; an update without one
 // (a missing field, a non-object, an empty string, an id of the wrong shape) has no submitter and is simply not counted — the
 // block's other figures never depend on it. Dor's device ids are cut to `DEVICE_ID_LEN`: devices
-// are counted, never named or broken down — exactly within one block, and over time as a HyperLogLog
-// estimate (ruling R19, `app/api/submitters/keys.ts` `subHllKeyOf`).
+// are counted, never named or broken down — exactly within one block, and over time as an estimate
+// (ruling R19) from our own HyperLogLog sketch (R22, `app/api/submitters/sketch.ts`, keyed by
+// `app/api/submitters/keys.ts` `subSketchKeyOf`).
 
 export type SubmitterKind = "organisation" | "device";
 

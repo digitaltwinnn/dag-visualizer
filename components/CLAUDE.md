@@ -508,7 +508,7 @@ its pure half `inspector/trendSubmitters.ts`): who sent the network's data block
 own span (the brushed range, else the window's), on the network the deck stands on (`cardNetwork`; All
 and the DAG's plane read as every network). A card slot with no rung, always present in History, no ×,
 named "Data submitters" in the slot titles. Four bodies (`submittersCardState`): under All, one row per
-network with a `SUBMITTERS` row and its count over the span ("5 organisations", "57 devices"), each row
+network with a `SUBMITTERS` row and its count over the span ("5 organisations", "about 57 devices"), each row
 bringing that plane forward through `trendPlaneActions` and the executor (paired on `hoverFilter`, the
 Moment's rows' exemption in `cardHoverBoundary`), plain rows under a filter; a network with no row says
 "<network>'s data names no submitter this app reads, so there is no one to show" (`noSubmitterLine`,
@@ -517,7 +517,7 @@ Digital Evidence draws the span's TOTAL batches per bucket with its organisation
 partition it (ruling R4 — the top five palette members by the span's totals in their own hue,
 `TrendBand.hue`, every other one "Other (n)" in the neutral), the bands' share table as its key (the
 chart's own legend is off — `TrendChart legend`) and "N active of M seen"; Dor its devices per bucket
-and "N devices checked in", never named. A bucket outside the sampler's measured span (or in a hole, R20) is null,
+and "about N devices checked in" (an estimate, R19), never named. A bucket outside the sampler's measured span (or in a hole, R20) is null,
 and the line under the chart says every way a bucket is not measured (`measuredFloor`): "Not measured
 since <stamp>" when the range runs past where the sampler stopped, "Measured by the hour; this hour is
 still being read." on the 1h pill (its one bucket is the one being written), "Not measured before
