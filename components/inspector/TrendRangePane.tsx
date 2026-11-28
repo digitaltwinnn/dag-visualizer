@@ -14,7 +14,7 @@ import { useAiNote } from "@/components/notes/useAiNote";
 import { rangeCardNoteReq } from "@/components/notes/subjectNote";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
-import { spanWord } from "@/src/data/trendSeries";
+import { TREND_METRICS, spanWord } from "@/src/data/trendSeries";
 import { spanPhrase, windowSpan } from "@/src/data/trendWindow";
 import { ageWords } from "@/src/util/relativeAge";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
@@ -149,7 +149,12 @@ export default function TrendRangePane({
             <Fact label="Length">{ageWords(span.toMs - span.fromMs)}</Fact>
             {headValue != null ? (
               <Fact label={spanWord(metric)}>
-                <span className="tabular-nums">{format(headValue)}</span>
+                {/* An amount names its currency (user, 2026-11-28: "should say $DAG not just the
+                    number") — the label says "Average per day", not what the figure is in. */}
+                <span className="tabular-nums">
+                  {format(headValue)}
+                  {TREND_METRICS[metric].currency && ` ${TREND_METRICS[metric].currency}`}
+                </span>
               </Fact>
             ) : noReading ? (
               <Fact label={spanWord(metric)}>

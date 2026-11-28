@@ -8,7 +8,7 @@ import useTrendsSlice from "@/components/useTrendsSlice";
 import ExplorerFoot from "@/components/explorer/ExplorerFoot";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { GLOBAL_READING, METRIC_ORDER, metricLabel, metricUnit, spanWord } from "@/src/data/trendSeries";
+import { GLOBAL_READING, METRIC_ORDER, TREND_METRICS, metricLabel, metricUnit, spanWord } from "@/src/data/trendSeries";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
@@ -145,7 +145,10 @@ export default function TrendExplore() {
           name: "DAG",
           // A sentence, so a caption under the name rather than a chip beside it (ExplorerRow's
           // plain-row rule).
-          tag: isTotal ? "sum of the networks below" : undefined,
+          // An amount names its currency here too (user, 2026-11-28: the sum "should make it
+          // clear its $DAG"): in the caption, since the figure column is the level's shared width
+          // and a suffix there would cut every row's bar.
+          tag: isTotal ? `sum of the networks below${TREND_METRICS[metric].currency ? `, in ${TREND_METRICS[metric].currency}` : ""}` : undefined,
           hue: total.hue,
           figure:
             slice.stale ? <NodeStars count={3} /> : total.head != null ? format(total.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" aria-label={NO_READING}>—</span>,
