@@ -326,7 +326,8 @@ Digital Evidence's updates are `MetagraphBatchMessage`s carrying an `orgId` — 
 answers null: absent is absent, never a guess (rule 10). An update naming no submitter is not counted;
 the block's other figures never depend on it.
 
-**Dor is counted, not named.** A device id is cut to `DEVICE_ID_LEN` and only ever counted, never given
+**Dor is counted, not named.** A device id is lower-cased and cut to `DEVICE_ID_LEN` — a spelling that is part of the sketch's
+fixed-forever format (ruling R25) — and only ever counted, never given
 a name, a colour or a breakdown — a device is not a party anyone can name. **The count over time is an
 ESTIMATE** (ruling R19, 2026-11-27): measured, one hour of Dor holds ~1,400 distinct devices, which as
 per-device hash fields came to ~1M fields per month hash. **The estimate is our OWN HyperLogLog**

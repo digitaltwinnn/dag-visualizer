@@ -9,6 +9,9 @@
 // - Precision p = 12: m = 4096 registers, one byte each. Standard error 1.04/√m ≈ 1.6%.
 // - Hash: sha256 of the id (utf8), its first 8 bytes as two unsigned 32-bit ints. Register = the top
 //   12 bits; rank = the leading zeros of the following 52 bits + 1, capped at 53.
+// - The id: Dor's `publicId` as `SUBMITTERS[DOR].read` spells it (`src/data/submitters.ts`, ruling
+//   R25) — lower-cased, then cut to its first `DEVICE_ID_LEN` (16) characters. The spelling is part of
+//   the format: hashed differently, every device would count twice across the change.
 // - Encoding: `"hll12:" + base64(registers)`. The prefix versions the format AND keeps the value from
 //   ever parsing as JSON, which `@upstash/redis` would otherwise auto-deserialise on GET/MGET.
 import { createHash } from "node:crypto";

@@ -9,6 +9,12 @@
 // are counted, never named or broken down — exactly within one block, and over time as an estimate
 // (ruling R19) from our own HyperLogLog sketch (R22, `app/api/submitters/sketch.ts`, keyed by
 // `app/api/submitters/keys.ts` `subSketchKeyOf`).
+//
+// ⚠️ A DOR ID'S SPELLING IS PART OF THE SKETCH'S FIXED-FOREVER FORMAT (ruling R25): the sketch hashes
+// the id exactly as `read` answers it — LOWER-CASED, then cut to its first `DEVICE_ID_LEN` (16)
+// characters — so the same device in two cases is one device. A change to either the case or the cut
+// hashes every device differently from the stored sketches, and every union across the change counts
+// each device twice. Never change them in place; a new spelling takes a new sketch prefix.
 
 export type SubmitterKind = "organisation" | "device";
 
@@ -24,7 +30,7 @@ export interface SubmitterSpec {
 export const DED_ID = "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M";
 export const DOR_ID = "DAG0CyySf35ftDQDQBnd1bdQ9aPyUdacMghpnCuM";
 
-/** Dor device ids are stored truncated to this many characters. */
+/** Dor device ids are lower-cased and cut to this many characters — fixed forever (the header, R25). */
 export const DEVICE_ID_LEN = 16;
 
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -52,7 +58,8 @@ export const SUBMITTERS: Readonly<Record<string, SubmitterSpec>> = {
     read: (u) => {
       if (!isObj(u)) return null;
       const id = text(u.publicId);
-      return id !== null && HEX_RE.test(id) ? id.slice(0, DEVICE_ID_LEN) : null;
+      // lower-cased, then cut (R25): the spelling the sketches hash, fixed forever (header)
+      return id !== null && HEX_RE.test(id) ? id.toLowerCase().slice(0, DEVICE_ID_LEN) : null;
     },
   },
 };

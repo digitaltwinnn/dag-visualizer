@@ -14,6 +14,13 @@ describe("submitterOf", () => {
     expect(id).toBe("8e25d1c3a0a6d54b");
     expect(id).toHaveLength(DEVICE_ID_LEN);
   });
+  it("lower-cases a Dor device id before the cut: the same device in two cases is one device (R25)", () => {
+    const lower = "8e25d1c3a0a6d54be2c3719750d210185bacfe3b";
+    expect(submitterOf(DOR_ID, { publicId: lower.toUpperCase() })).toBe("8e25d1c3a0a6d54b");
+    expect(tallySubmitters(DOR_ID, [{ publicId: lower }, { publicId: lower.toUpperCase() }, { publicId: "8E25d1C3a0a6D54bFFFF" }])).toEqual([
+      { id: "8e25d1c3a0a6d54b", updates: 3 },
+    ]);
+  });
   it("answers null for missing fields and non-object values", () => {
     for (const v of [{}, { MetagraphBatchMessage: {} }, null, "x", [], 7, undefined]) {
       expect(submitterOf(DED_ID, v)).toBeNull();
@@ -30,7 +37,7 @@ describe("submitterOf", () => {
     expect(submitterOf(DOR_ID, { publicId: "8e25d1c3|a0a6d54b" })).toBeNull();
     expect(submitterOf(DOR_ID, { publicId: "not-hex-at-all" })).toBeNull();
     expect(submitterOf(DOR_ID, { publicId: "z".repeat(1 << 20) })).toBeNull();
-    expect(submitterOf(DOR_ID, { publicId: "F".repeat(1 << 20) })).toBe("F".repeat(DEVICE_ID_LEN)); // hex, then the cut
+    expect(submitterOf(DOR_ID, { publicId: "F".repeat(1 << 20) })).toBe("f".repeat(DEVICE_ID_LEN)); // hex, lower-cased, then the cut
     expect(submitterOf(DOR_ID, { publicId: 12345 })).toBeNull();
   });
   it("answers null for an unlisted network", () => {
