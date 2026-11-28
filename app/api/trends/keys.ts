@@ -107,7 +107,7 @@ export function cursorKeyOf(): string {
 export const chainReadField = (id: string): string => `read.${id}`;
 
 /** Each chain's last read (ms), from the cursor hash. */
-export function chainReadsOf(cursor: Record<string, string | number> | null): Record<string, number> {
+export function chainReadsOf(cursor: Record<string, unknown> | null): Record<string, number> {
   const reads: Record<string, number> = {};
   for (const [field, at] of Object.entries(cursor ?? {})) {
     const id = /^read\.(.+)$/.exec(field)?.[1];

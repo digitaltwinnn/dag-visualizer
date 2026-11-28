@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-// The five REACT → ENGINE publish channels (2026-08-19; the fourth 2026-09-18, the fifth
-// 2026-10-31): `boxedCard`, the `sceneCover*` family, `focusRung`, `trendIds` and `briefing`, the
-// tour's stop. The cover family is five scalars since
+// The six REACT → ENGINE publish channels (2026-08-19; the fourth 2026-09-18, the fifth
+// 2026-10-31, the sixth 2026-11-27): `boxedCard`, the `sceneCover*` family, `focusRung`, `trendIds`,
+// `briefing`, the tour's stop, and `submitterPalette`, the organisations the Data blocks chamber
+// colours its bands with (the read route's `palette`, fetched data that lives in React's cache). The cover family is five scalars since
 // 2026-09-28: `sceneCoverL`/`R` (a tablet side sheet's MEASURED width) and `sceneCoverBExplore`/
 // `BDetails`/`BVitals` (each phone dock's bottom height, published from the dock's own target-height
 // STATE, so the scene shift eases once rather than chasing a grow). Each carries a fact only React can know
@@ -20,10 +21,10 @@ import { join } from "node:path";
 // four rules below are recorded as ⚠️ comments in CLAUDE.md or at their call sites; this makes them
 // executable.
 //
-// EXEMPTIONS: none. All five channels are covered, and adding a sixth means adding it here.
+// EXEMPTIONS: none. All six channels are covered, and adding a seventh means adding it here.
 // Their consumers are separately covered — `components/calloutBoundary.test.ts` pins that both
 // callout owners consult `boxedCard`, which is the READ half of that channel.
-const CHANNELS = ["setBoxedCard", "setSceneCover", "requestFocusRung", "setTrendIds", "setBriefing"] as const;
+const CHANNELS = ["setBoxedCard", "setSceneCover", "requestFocusRung", "setTrendIds", "setBriefing", "publishSubmitterPalette"] as const;
 
 const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {
@@ -57,6 +58,17 @@ describe("the React → Engine publish channels are one-way", () => {
 
   it("the tour's stop has one writer", () => {
     expect(callersOf("setBriefing", ["app", "components"])).toEqual([join("components", "Briefing.tsx")]);
+  });
+
+  it("the organisation palette has one writer, and no component renders from it", () => {
+    // The bridge fetches the palette only while the chamber draws bands; the card that names the
+    // organisations reads the same answer through its own `useSubmitters`, never back out of the
+    // store (it would render one commit late, from its own publish).
+    expect(callersOf("publishSubmitterPalette", ["app", "components", "src"])).toEqual([join("components", "SubmitterPaletteBridge.tsx")]);
+    const readers = ["app", "components"]
+      .flatMap(walk)
+      .filter((p) => /\bs\.submitterPalette\b|\bstate\.submitterPalette\b|\bsubmitterPalette\s*[,}]/.test(read(p)));
+    expect(readers, `submitterPalette is write-only from React: ${readers.join(", ")}`).toEqual([]);
   });
 
   it("trendIds is published, never subscribed — React must not render from it", () => {

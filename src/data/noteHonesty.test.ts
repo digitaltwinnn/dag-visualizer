@@ -546,3 +546,44 @@ describe("checkNote — a clock time a time fact holds is not a number (the Data
     expect(checkNote("As of 09:00 UTC, 5 data blocks were carried.", early, []).ok).toBe(true);
   });
 });
+
+// WHO MOVED (2026-11-27): inside one network's note, a share or a change belongs to the actor its
+// label names — Digital Evidence's organisations — and only a sentence naming that actor cites it.
+describe("checkNote — a share or a change is said only of the actor it belongs to", () => {
+  const facts: Fact[] = [
+    fact("Open Poker batches, per day, at the end of the span", 96, "count"),
+    changeShare("Open Poker batches, per day, at the end of the span", "at the start of the span", 100),
+    fact("Open Poker, share of the span's batches", 0.5, "share"),
+    fact("Gate AI batches, per day, at the end of the span", 48, "count"),
+    { ...fact("Digital Evidence metagraph snapshots anchored, per day, at the end of the span, change against at the start of the span, up", 3, "ratio"), text: "3x", move: "up" as const },
+  ];
+  const names = ["Digital Evidence", "Open Poker", "Gate AI"];
+  const opts = { subject: "Digital Evidence", actors: ["Open Poker", "Gate AI"] };
+
+  it("backs an actor's change and share only in a sentence naming it", () => {
+    expect(checkNote("Open Poker's batches rose 100% to 96 per day.", facts, names, opts)).toEqual({ ok: true });
+    expect(checkNote("Open Poker sent 50% of the batches.", facts, names, opts)).toEqual({ ok: true });
+    expect(checkNote("Gate AI's batches rose 100% to 96 per day.", facts, names, opts).ok).toBe(false);
+    expect(checkNote("Gate AI sent 50% of the batches.", facts, names, opts).ok).toBe(false);
+    // A sentence naming no actor cites none of theirs, and still the network's own.
+    expect(checkNote("Batches rose 100% over the week.", facts, names, opts).ok).toBe(false);
+    expect(checkNote("Its metagraph snapshots rose 3x.", facts, names, opts)).toEqual({ ok: true });
+    // …and a sentence naming an actor cites only that actor's changes.
+    expect(checkNote("Open Poker's metagraph snapshots rose 3x.", facts, names, opts).ok).toBe(false);
+  });
+
+  it("names the actor rule in the retry reason, so the second answer knows where the figure goes", () => {
+    const why = (t: string) => { const r = checkNote(t, facts, names, opts); return r.ok ? [] : r.reasons; };
+    expect(why("Gate AI sent 50% of the batches.")).toContain(`"50%" is Open Poker's share: say it in a sentence about Open Poker alone`);
+    expect(why("Batches rose 100% over the week.")).toContain(`"100%" is Open Poker's change: say it in a sentence about Open Poker alone`);
+    expect(why("Open Poker's metagraph snapshots rose 3x.")).toContain(`"3x" is the network's own change: say it in a sentence of its own, never beside an organisation`);
+    // a figure no fact backs keeps the plain reason
+    expect(why("Gate AI sent 70% of the batches.")).toContain(`"70%" is not backed by any measured fact`);
+  });
+
+  it("leaves a plain count unscoped (the gate's standing limit) and changes nothing without actors", () => {
+    expect(checkNote("Gate AI sent 96 batches a day.", facts, names, opts)).toEqual({ ok: true });
+    expect(checkNote("Gate AI's batches rose 100% to 96 per day.", facts, names, { subject: "Digital Evidence" })).toEqual({ ok: true });
+    expect(checkNote("Gate AI's batches rose 100% to 96 per day.", facts, names, { subject: "Digital Evidence", actors: [] })).toEqual({ ok: true });
+  });
+});

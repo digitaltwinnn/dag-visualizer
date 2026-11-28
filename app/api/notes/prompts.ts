@@ -89,6 +89,11 @@ type KindQuestions = Partial<Record<Exclude<SubjectKind, "view">, string>>;
 // the facts state it only where the measure held (2026-11-02's lesson stands: an average never rose).
 export const TREND_FIGURES = `Figures "at the start of the span" and "at the end of the span" are where the chart stood near each end of the range, as a rate: they are what moved. Write the end figure and how far it moved, as "<what> rose <change> to <end figure>" or "<what> fell <change> to <end figure>", with the change from its "change against" fact, never the start figure. A figure for "this span" is the whole range, as an average per day or a total, never a point in it: never say it rose or fell, write "<what> averaged <figure> per day", or a total as it is. A ratio is for reading: never write it as a figure. Count nothing yourself: a count the facts do not give, such as how many days are listed, is not written.`;
 
+/** WHO SUBMITTED THE DATA (2026-11-27): the History and Data blocks facts name Digital Evidence's
+ *  organisations by the label every surface gives them ("Org" and the start of its id for one with
+ *  no known name) and count Dor's devices, never one of them. One line in those two prompts. */
+export const SUBMITTER_WORDS = "An organisation is named exactly as the facts name it, never shortened, translated or explained; a device is never named or told apart from another, only counted. An organisation's share or change goes in a sentence of its own, never beside the network's own change. A device count the facts label \"about\" is an estimate: write \"about\" before it, never the bare figure.";
+
 /** THE WHOLE NETWORK'S SUBJECT LABELS for the two register notes (`sources.ts` writes them): a
  *  one-network note's label is the network's own name, so its prompt asks the one-network question
  *  (`questionOne`, 2026-11-20 — the card follows the filter in every register). The whole network's
@@ -167,7 +172,7 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
     question: "What data did the networks write over the window? Open with the window in the Span line's own words and its end as the Window end fact gives it, as \"Over the last N minutes to HH:MM UTC\", where HH:MM is that fact's own time. Never say \"now\", \"right now\" or \"currently\": the note is read up to an hour after the window. This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many data blocks were carried over the window and how many updates they held, then each network that carried any, as \"<network> carried N data blocks with M updates\". Only when the facts say how many of the window's global snapshots were read, add in one clause that the counts cover those; otherwise say nothing about reading. A data block carries updates, never transactions or transfers.",
     // ONE NETWORK'S DATA BLOCKS (2026-11-20): the same window, that network's blocks alone.
     questionOne: "What data did this network write over the window? Open with the window in the Span line's own words and its end as the Window end fact gives it, as \"Over the last N minutes to HH:MM UTC\", where HH:MM is that fact's own time. Never say \"now\", \"right now\" or \"currently\": the note is read up to an hour after the window. This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many data blocks the network carried over the window and how many updates they held, as \"<network> carried N data blocks with M updates\". Say nothing about other networks: the facts hold none. Only when the facts say how many of the window's global snapshots were read, add in one clause that the counts cover those; otherwise say nothing about reading. A data block carries updates, never transactions or transfers.",
-    system: (subjectLabel) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${subjectLabel === DATA_WHOLE ? PROMPTS.data.question : PROMPTS.data.questionOne}`,
+    system: (subjectLabel) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${subjectLabel === DATA_WHOLE ? PROMPTS.data.question : PROMPTS.data.questionOne}\n${SUBMITTER_WORDS}`,
   },
   trend: {
     question: "Say what changed over the range: what rose, what fell and when, as the numbers show it.",
@@ -178,7 +183,7 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
       // and ended" came back as the very rise the top card states.
       span: "Describe the range's shape, as a companion to a note above it that already states what rose and fell: the busiest day and the quietest day, each with its date and figure, and a typical day's figure, using only the facts named for those days. If the facts name none, say how quiet or steady the range was. Do not say what rose or fell overall.",
     },
-    system: (subjectLabel, _lead, kind) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("trend", kind)}\n${TREND_FIGURES}`,
+    system: (subjectLabel, _lead, kind) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("trend", kind)}\n${TREND_FIGURES}\n${SUBMITTER_WORDS}`,
   },
 };
 

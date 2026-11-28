@@ -26,6 +26,8 @@ function memStore(): TrendsStore & { data: Map<string, Map<string, string>>; ttl
       for (const [f, v] of Object.entries(map)) h.set(f, String(v));
     },
     async expire(key: string, ttl: number) { ttls.set(key, ttl); },
+    async get() { return null; },
+    async mget(keys: string[]) { return keys.map(() => null); },
     async acquireLock() { if (s.locked) return false; s.locked = true; return true; },
     async releaseLock() { s.locked = false; },
     async applyWrites(writes: TrendsWrite[]) {

@@ -20,7 +20,10 @@ import { METAGRAPHS } from "@/src/engine/config";
 import { assembleSpan, WINDOWS } from "../trends/assemble";
 import { explorerReader, locateRows, type ChainReader } from "./snapshotAt";
 import { chainReadsOf, cursorKeyOf, geoSitesSlotOf, geoSlotOf, ispNamesKeyOf, slotsInWindow, type Tier } from "../trends/keys";
-import { readStore, type TrendsStore } from "../trends/store";
+import { readStore, type StoredHash, type TrendsStore } from "../trends/store";
+import type { SubmittersWindow } from "../submitters/assemble";
+import { readSubmitters } from "../submitters/read";
+import { SUBMITTERS } from "@/src/data/submitters";
 import { CC_TAIL_RE, ISP_TAIL_RE, TYPE_TAIL_RE, isSubjectNote, subjectKindOf, type NoteSpan, type SubjectKind } from "./keys";
 
 // THE SOURCES OF AI NOTES — the impure half of the facts: which stored payloads each view's note
@@ -69,6 +72,9 @@ export interface NoteReads {
   chain?(): ChainReader;
   /** The newest window of exact reads (`dataWindow.ts`). Absent, the data note is not written. */
   dataWindow?(): Promise<DataWindowRead>;
+  /** WHO SUBMITTED A NETWORK'S DATA over [fromMs, toMs) (the `sub:` family, ruling R5), or null for
+   *  a network with no submitter table. Absent, no note states who. */
+  submitters?(net: string, fromMs: number, toMs: number): Promise<SubmittersWindow | null>;
 }
 
 /** ONE TIER over [fromMs, toMs): the tile route's body, at any span. */
@@ -78,7 +84,7 @@ export async function readSpan(
 ): Promise<TrendsWindowData> {
   // `slotsInWindow` is end-INCLUSIVE and the span half-open, as `assembleSpan` reads it.
   const keys = [...new Set(slotsInWindow(tier, fromMs, toMs - 1).map((s) => s.key))];
-  const hashes: Record<string, Record<string, string>> = {};
+  const hashes: Record<string, StoredHash> = {};
   await Promise.all(keys.map(async (k) => {
     const h = await store.hgetall(k);
     if (h) hashes[k] = h;
@@ -105,7 +111,7 @@ export async function readGeoDays(
     Promise.all(months.map((m) => store.hgetall(geoSitesSlotOf(m).key))),
   ]);
   /** A hash's fields into `out`, by day, inside the window. */
-  const regroup = (h: Record<string, string> | null, year: number, out: Record<string, Record<string, number>>) => {
+  const regroup = (h: StoredHash | null, year: number, out: Record<string, Record<string, number>>) => {
     for (const [field, raw] of Object.entries(h ?? {})) {
       const bar = field.indexOf("|");
       if (bar < 0) continue;
@@ -146,14 +152,20 @@ export async function geoInputs(nowMs: number, reads: NoteReads): Promise<GeoDay
 
 /** The default reads for ONE note, or one warm pass: the trends store's read client, each hash read
  *  at most once (a History note's span and its days can read the same daily year-hash). */
-export function storeReads(nowMs: number, store: HashReader = readStore()): NoteReads {
-  const seen = new Map<string, Promise<Record<string, string> | null>>();
+export function storeReads(nowMs: number, store: HashReader & Partial<Pick<TrendsStore, "mget">> = readStore()): NoteReads {
+  const seen = new Map<string, Promise<StoredHash | null>>();
   const once: HashReader = {
     hgetall(key) {
       let p = seen.get(key);
       if (!p) seen.set(key, (p = store.hgetall(key)));
       return p;
     },
+  };
+  // Dor's devices are sketches read by MGET (R22): a store without it has no device read, and the
+  // throw is the note's "no submitter data" (`submittersOrNone`).
+  const mget = (keys: string[]): Promise<(string | null)[]> => {
+    if (!store.mget) throw new Error("no string reads on this store");
+    return store.mget(keys);
   };
   // ONE live window per pass (2026-11-20): every network's Data blocks note in a warm pass reads the
   // same newest window, so the per-network notes cost no read beyond the whole network's.
@@ -170,6 +182,11 @@ export function storeReads(nowMs: number, store: HashReader = readStore()): Note
         (w) => { if (!w.ticks.length) dataWin = null; return w; },
         (e) => { dataWin = null; throw e; },
       )),
+    // The store itself, never the HTTP route; no all-time palette (`years: false`), which no note reads.
+    submitters: async (net, fromMs, toMs) =>
+      Object.hasOwn(SUBMITTERS, net)
+        ? readSubmitters({ hgetall: once.hgetall, mget }, net, { fromMs, toMs }, nowMs, { years: false })
+        : null,
   };
 }
 
@@ -284,6 +301,8 @@ interface Built {
   lead?: NoteLead;
   /** Geography's provider notes: the provider as the facts spell it, the label's to name it by. */
   subjectName?: string;
+  /** The organisations the facts name: the gate's actors (`CheckOptions.actors`). */
+  actors?: string[];
 }
 
 interface Read {
@@ -341,6 +360,17 @@ const TREND_PILLS: Record<TrendPill, { tier: Tier; ms: number; daily: boolean }>
 const LEAD_IN_MS = 30 * D;
 const isPill = (span: string): span is TrendPill => span in TREND_PILLS;
 
+/** A FAILED `sub:` READ IS NO SUBMITTER DATA, never a failed note (ruling R5): the note is written
+ *  as it was before the family existed, without who submitted, rather than going `unavailable`. A
+ *  pass that hits it stores the note without organisation or device facts until its next due
+ *  rewrite. */
+function submittersOrNone(read: Promise<SubmittersWindow | null>, net: string): Promise<SubmittersWindow | null> {
+  return read.catch((e: unknown) => {
+    console.warn(`[notes] submitters read failed for ${net}, writing the note without it: ${e instanceof Error ? e.message : String(e)}`);
+    return null;
+  });
+}
+
 async function readTrend(c: Ctx): Promise<Read | null> {
   const { span, nowMs, reads } = c;
   // THE SPAN FACET reads the base network's facts in their `shape`: no notable days to caption.
@@ -383,11 +413,15 @@ async function readTrend(c: Ctx): Promise<Read | null> {
   // The whole daily record, for what a silent span can still say (`trendFacts`): always the unlisted
   // set's, and a network's only when its span is silent, so an active note reads nothing more.
   const silent = trendSilent(subject, cur);
-  const [history, chainReads] = await Promise.all([
+  // WHO SUBMITTED THE DATA, for a network whose updates name it — not in the span facet, which reads
+  // the range's shape and states no move.
+  const subs = !facet && Object.hasOwn(SUBMITTERS, subject) && reads.submitters ? submittersOrNone(reads.submitters(subject, fromMs, toMs), subject) : null;
+  const [history, chainReads, submitters] = await Promise.all([
     subject === UNLISTED_ID || silent ? reads.span("1d", nowMs - WINDOWS.all.ms, nowMs) : null,
     silent ? reads.chainReads() : null,
+    subs,
   ]);
-  const built = trendFacts({ subject, zoom, span: { fromMs, toMs }, cur, gauges, daily, history, chainReads, shape: facet, names: c.names, blurbs: c.blurbs });
+  const built = trendFacts({ subject, zoom, span: { fromMs, toMs }, cur, gauges, daily, history, chainReads, submitters, shape: facet, names: c.names, blurbs: c.blurbs });
   return {
     built,
     spanFrom: fromMs,
@@ -521,10 +555,17 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
     whole: (subject) => subject === "all",
     async read({ subject, nowMs, reads, names }) {
       if (!reads.dataWindow) return null;
-      const w = await reads.dataWindow();
+      // An organisation's NAME, for a network whose submitters are organisations: the names hash, read
+      // with the last 24 hours of the `sub:` family (the names are the same in every window).
+      const named = SUBMITTERS[subject]?.kind === "organisation" && reads.submitters ? submittersOrNone(reads.submitters(subject, nowMs - 24 * H, nowMs), subject) : null;
+      const [w, sub] = await Promise.all([reads.dataWindow(), named]);
       // ONE NETWORK'S (2026-11-20): its own data blocks over the same window, and no note when it
       // carried none — a network running no data layer among them (`dataFacts`' `only`).
-      const built = dataFacts({ ticks: w.ticks, names, keyOf: (id) => (isTracked(id) ? currentIdOf(id) : null), endMs: w.toMs, ...(subject === "all" ? {} : { only: subject }) });
+      const built = dataFacts({
+        ticks: w.ticks, names, keyOf: (id) => (isTracked(id) ? currentIdOf(id) : null), endMs: w.toMs,
+        ...(subject === "all" ? {} : { only: subject }),
+        ...(sub ? { submitterNames: sub.names } : {}),
+      });
       const spanFrom = w.fromMs ?? nowMs;
       const spanTo = w.toMs ?? nowMs;
       return { built, spanFrom, spanTo, windows: [["Span length", secondsOf(spanFrom, spanTo)]] };
@@ -581,6 +622,9 @@ export interface NoteFacts {
   driftKeys?: Record<string, string>;
   /** Snapshots only (R71): "change" when a pair moved, else "now" — the prompt's question follows. */
   lead?: NoteLead;
+  /** The organisations the facts name (History's and the Data blocks' DED notes): the gate's
+   *  ACTORS, so a share or a change is said only of the organisation it belongs to. */
+  actors?: string[];
 }
 
 /** THE FACTS FOR ONE NOTE: that view's reads, its builder, and the span's length. Null when the
@@ -621,5 +665,6 @@ export async function factsFor(
     ...(built.setKey != null ? { setKey: built.setKey } : {}),
     ...(built.driftKeys != null ? { driftKeys: built.driftKeys } : {}),
     ...(built.lead != null ? { lead: built.lead } : {}),
+    ...(built.actors?.length ? { actors: built.actors } : {}),
   };
 }

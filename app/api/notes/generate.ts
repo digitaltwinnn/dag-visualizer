@@ -241,6 +241,8 @@ async function write(
   const days = input.days.length ? input.days : null;
   // A sentence naming no one speaks of the subject (R39): absent for the whole network.
   const subject = input.subjectName;
+  // Who did the moving inside this network's note (DED's organisations): a share or change is theirs.
+  const actors = input.actors;
   const wantsLine = isBriefingNote(req.view, req.subject, req.span);
   const span = spanWords(req.view, req.span, input.spanFrom, input.spanTo);
   /** The notable-change rows the model words, in the order code picked them. */
@@ -269,7 +271,7 @@ async function write(
     const note = parsed.note.trim();
     lastNote = note;
     const line = parsed.line?.trim();
-    const check = checkNote(note, facts, input.names, { maxSentences: 3, minWords: NOTE_MIN_WORDS, subject });
+    const check = checkNote(note, facts, input.names, { maxSentences: 3, minWords: NOTE_MIN_WORDS, subject, actors });
     if (!check.ok) {
       if (held) return held;
       reasons = check.reasons;
@@ -291,7 +293,7 @@ async function write(
       const n = (seen.get(iso) ?? 0) + 1;
       seen.set(iso, n);
       const caption = captions.get(n === 1 ? iso : `${iso}#${n}`);
-      if (caption && checkNote(caption, facts, input.names, { maxSentences: 1, subject }).ok)
+      if (caption && checkNote(caption, facts, input.names, { maxSentences: 1, subject, actors }).ok)
         kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, ...(d.measure ? { measure: d.measure } : {}), caption: caption.trim() });
     }
     // The Briefing's line is held to the note's gate and is never worth a retry: one that fails,
@@ -299,13 +301,13 @@ async function write(
     // THE TOUR'S LINE NAMES ITS RANGE (user, 2026-11-03: "the geo intro should mention the range"): a
     // line without the span's words is dropped, and the tour reads the note's opening, which names it.
     const named = line?.toLowerCase().includes(span.replace(/^the /, "").toLowerCase());
-    const brief = wantsLine && line && named && !NEGATIVE_RE.test(line) && checkNote(line, facts, input.names, { maxSentences: 2, subject }).ok ? line : null;
+    const brief = wantsLine && line && named && !NEGATIVE_RE.test(line) && checkNote(line, facts, input.names, { maxSentences: 2, subject, actors }).ok ? line : null;
     // THE ROWS ARE THE MODEL'S (user, 2026-11-03): each line is checked against its own row's figures
     // and the note's, like a caption, and a row whose line is missing or fails is dropped.
     const rows: NoteChange[] = [];
     drafts.forEach((c, i) => {
       const said = parsed.rows.get(i + 1);
-      if (!said || !checkNote(said, [...facts, ...c.brief!.facts], input.names, { maxSentences: 1, subject }).ok) return;
+      if (!said || !checkNote(said, [...facts, ...c.brief!.facts], input.names, { maxSentences: 1, subject, actors }).ok) return;
       // The line must name the subject its click commits: the gate checks figures, not who.
       if (c.brief!.name && !namesSubject(said, c.brief!.name)) return;
       const { brief: _brief, ...draft } = c;

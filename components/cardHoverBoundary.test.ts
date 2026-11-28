@@ -8,8 +8,12 @@
 // file with several cards (Inspector's snapshot, node, country and group cards) lists each card's
 // channel. Two cards of different subjects may never pair on one channel, and every
 // `components/inspector/*Pane.tsx` that pairs must be listed here, so a new card joins the table.
+// The Data block card lists two channels: the card pairs on its data block, and its organisation
+// rows (2026-11-27) on `hoverSubmitter` — each row is an organisation, the subject it previews.
 // Exempt, with its reason: `TrendInstantPane.tsx` pairs the network ROWS inside the Moment card on
-// `hoverFilter` (each row is a network, the subject it commits); the card itself pairs nothing.
+// `hoverFilter` (each row is a network, the subject it commits); the card itself pairs nothing. The
+// Data submitters card's network rows under All (`TrendSubmittersPane.tsx`, 2026-11-27) are the same
+// rows with the same commit, so the same exemption.
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -20,10 +24,10 @@ const CARD_CHANNELS: Record<string, readonly string[]> = {
   "components/ContextCard.tsx": ["hoverFilter"],
   "components/inspector/MetaSnapPane.tsx": ["hoverMetaSnap"],
   "components/inspector/BlockPane.tsx": ["hoverBlock"],
-  "components/inspector/DataBlockPane.tsx": ["hoverDataBlock"],
+  "components/inspector/DataBlockPane.tsx": ["hoverDataBlock", "hoverSubmitter"],
 };
 /** Panes whose pairings are rows inside the card, not the card (see the header). */
-const ROW_PAIRING = new Set(["components/inspector/TrendInstantPane.tsx"]);
+const ROW_PAIRING = new Set(["components/inspector/TrendInstantPane.tsx", "components/inspector/TrendSubmittersPane.tsx"]);
 
 /** The first argument of every `subjectPairing(` call in a source. */
 function pairedChannels(src: string): string[] {
@@ -40,9 +44,9 @@ describe("a subject card hovers its own subject", () => {
     }
     expect(offenders).toEqual([]);
   });
-  it("the Data block card pairs on the data block's channel, never its snapshot's", () => {
+  it("the Data block card pairs on the data block's channel, never its snapshot's; its rows on their organisation's", () => {
     const channels = pairedChannels(readFileSync("components/inspector/DataBlockPane.tsx", "utf8"));
-    expect(channels).toEqual(["hoverDataBlock"]);
+    expect(channels).toEqual(["hoverDataBlock", "hoverSubmitter"]);
   });
   it("no two cards of different subjects share a channel", () => {
     const owner = new Map<string, string>();

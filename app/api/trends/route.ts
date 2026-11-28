@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { assemble, WINDOWS, type WindowId } from "./assemble";
 import { slotsInWindow } from "./keys";
-import { readStore } from "./store";
+import { readStore, type StoredHash } from "./store";
 
 // The trends READ route: 2–3 HGETALLs assembled into one compact window payload, cached by
 // the CDN per URL (the /api/metagraphs idiom — reading searchParams keeps it ƒ Dynamic,
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     const now = Date.now();
     const { tier, ms } = WINDOWS[window];
     const keys = [...new Set(slotsInWindow(tier, now - ms, now).map((s) => s.key))];
-    const hashes: Record<string, Record<string, string>> = {};
+    const hashes: Record<string, StoredHash> = {};
     await Promise.all(keys.map(async (k) => {
       const h = await store.hgetall(k);
       if (h) hashes[k] = h;

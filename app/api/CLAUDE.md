@@ -168,6 +168,74 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   network's new address) is read back to its FIRST snapshot within the same depth
   (`fetchSince.ts`), not just its newest page. The History view (`/trends`) is the read route's
   consumer.
+- **`/api/submitters`** (2026-11-27) is the READ route for who sent a network's data blocks: `?net=` (DED or
+  Dor, anything else 400) with either `window=24h` (the 24 whole hours ending at the CURRENT
+  hour — anchored at now, so a stalled sampler's missing hours read as not measured, never days-old
+  figures as the last 24 hours) or `from`/`to` epoch ms (within ten years), each ON AN HOUR EDGE —
+  anything else is a 400 `no-store` (PR review I3): the HUD asks whole hours (`querySpan`), and an
+  arbitrary millisecond would be a fresh CDN key and a fresh read per request. Answers a `SubmittersWindow` (`assemble.ts`):
+  per-bucket organisation tallies (or Dor's device counts, sketch ESTIMATES — `estimate: true`,
+  ~1.6% standard error, R22: each measured bucket's count field from the same tier hashes, and the
+  range's figure from the union of the measured buckets' `…:sketch:1h|1d:…` strings by MGET, so no
+  device id leaves the store), the names hash, the busiest-of-all-time
+  `palette`, and the measured span — a bucket outside it is null. Same idiom as `/api/trends`: reading
+  searchParams keeps it per-request, `public, s-maxage=300, stale-while-revalidate=600`, the read-only
+  token, 503 `no-store` when the store is down. **What a range costs** (ruling R24, 2026-11-28): each
+  hash it needs read once (at the daily tier the window's hashes are the year hashes the palette reads,
+  so the union is read once), and for Dor one ~7.3 KB sketch per measured bucket on the wire — about
+  2.7 MB for an uncached year at the daily tier, cached per URL. There is no monthly sketch tier: if Dor
+  ranges get heavy, the lever is a `sketch:1mo:YYYY-MM` written by the day recompute (additive, read as
+  12 sketches plus the edges' days), not a cap on the range. **It needs only HGETALL and MGET** on that token
+  (probed 2026-11-28 — GET and MGET answer, PFCOUNT is refused `NOPERM`, Redis classing it a write,
+  which is why R22 replaced R19's Redis HyperLogLogs with our own sketch). Which hashes and sketches a
+  range reads is `readSubmitters` (`read.ts`), shared with the notes.
+- **`/api/submitters/sample`** (2026-11-27) is the Vercel-Cron sampler (quarter-hourly at 3,18,33,48,
+  `CRON_SECRET` auth) for WHO SUBMITS a data block: Digital Evidence's organisations (`orgId`) and Dor's
+  devices (`publicId`), the two networks in `src/data/submitters.ts`. Its own key family `sub:mainnet:`
+  (1h and 1d tiers, `app/api/submitters/keys.ts`; Dor's devices are a SKETCH per UTC hour and day, our
+  own HyperLogLog stored as a plain `hll12:` string, R22 — one hour of Dor is ~1,400 devices, too many to
+  keep a field each: each run GETs the touched sketches, adds its ids, and SETs them with the bucket's
+  count field in its one transaction; a stored sketch that will not decode fails Dor's run alone,
+  `unreadable` in the answer, never overwritten with an empty one). The family's store commands are
+  hashes (HSET / HGETALL / HMGET / HDEL), strings (SET / GET / MGET) and EXPIRE — no PF command
+  anywhere. It sits outside `t:` on purpose: a rebuild wipes `t:`, and
+  per-organisation series would ride every History payload. Its own lock and cursor, so it never waits on
+  the trends sampler. It pages the explorer's snapshot list since the cursor, then reads each snapshot
+  from the network's OWN L0 by ordinal (200 s read budget inside `maxDuration` 300; the prefix read is
+  committed, a failed read stops there and resumes next run). The measured span (`sub:…:span`) is what
+  History reads as measured. **A gap is a HOLE, never a restart** (ruling R20): a run that cannot
+  read contiguously from its cursor (the list's `gap`, an ordinal skipped) keeps the span's `from`
+  and records the hours it could not read, `[hour of the old to, end of the hour of the first new
+  record)`, in `sub:…:holes` (field = start ms, value = end ms; `bucket.holeOf`); the read side nulls
+  every bucket overlapping one. DED's names come from DED's public API (`/v1/fingerprints/latest`), once a
+  run. ⚠️ **A hash value comes back PARSED** (PR review I1, 2026-11-28): `@upstash/redis` JSON-parses
+  every HGETALL and HMGET value, so a count is a number and a stored name an OBJECT. The store's
+  `hgetall` is typed `StoredHash` (`unknown` values) for that reason, `names.ts` `storedName` reads a
+  name in either form, and the tests share `app/api/trends/fakeStore.ts`, which hands values back the
+  client's way and is held to the real client by `fakeStore.test.ts` — a fake that returns strings
+  hides a reader that assumes them. Production-only and fail-closed like the trends sampler; no
+  `force-dynamic`, which would bypass the `unstable_cache` behind `cachedL0Url`.
+  **Back-filling submitters** is `scripts/walk-submitters.ts --net=ded|dor [--from=YYYY-MM-DD]`
+  (defaults: DED 2025-09-15, Dor today − 90 days), a thin CLI over `walkRange` (`runSubmitters.ts`,
+  where the discipline is tested): oldest hour first up to the span's `from` and NEVER past it — the
+  sampler owns those hours; each hour written as a SET of its full tally (Dor's: the hour's sketch
+  built from its ids alone and SET with its count), so a rerun is idempotent;
+  each day's 1d recomputed from ALL its stored 1h fields (1d = Σ1h; Dor's day sketch the merge of its
+  24 hour sketches, day = ∪ hours — the boundary day's sampler hours included, under the sampler's
+  lock); `from` lowered to the walk's start only once the walk reaches it
+  contiguously, under the same lock. A day's records are found by seeking (`seekBoundary` + a crafted
+  `{hash}` cursor, the trends fill's), since the list pages only from its tip. A read that still fails
+  after `retrying` stops the walk at its hour; the state file (`.walk-submitters.<net>.json`,
+  gitignored) resumes it. Run it AFTER the sampler's first run (no span, it refuses).
+  An undecodable Dor hour sketch fails the day's flush (R22, never replaced by an empty one); before
+  span.from it is the walk's own territory, so re-walking that day from its start (`--from=<day>`,
+  deleting the state file) SETs a fresh sketch and the flush succeeds — only sampler-owned hours and
+  Dor's sampler-side keys need a hand fix.
+  **`--holes`** walks the holes instead (`walkHoles`): each hole the sampler has moved past, its hours
+  SET to their full tally, then under the lock its days' 1d recomputed and its field deleted in one
+  transaction; a hole the sampler is still inside is left for a later run. DED's names
+  for organisations that stopped before the sampler started come from `scripts/seed-ded-names.ts`, a
+  one-off read of dagscan's evidence summary merged as source `dagscan` (never over a `ded` name).
 - **`/api/notes`, `/api/notes/request`, `/api/notes/warm`** (2026-10-27) are the AI notes: a few
   sentences a paid model (the Constellation Gate, `GATE_API_KEY`, `GATE_MODEL`, default `z-ai/glm-5-3-flash` with thinking held low, `gate.ts`) writes about the
   figures a view is showing. Notes live in
@@ -256,6 +324,18 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   call, and `retried`, every note that needed its second attempt), and
   `npx tsx scripts/notes-stats.ts` prints the last 14 days on the read-only token: it is the
   instrument for how the model is holding up.
+  **Submitter facts** (2026-11-27): a DED or Dor History/Data note also states who submitted — DED's
+  organisations (named, with their start/end inside the span, `readSubmitters` through
+  `NoteReads.submitters`) and Dor's active devices (counted, never named; over a History span an
+  estimate, its facts labelled "about" and the prompt asking for "about N", R19; read from the
+  sketches, R22). A failed or absent
+  `sub:` read is no submitter data, and the note is written as before; the Data blocks note states no
+  organisation when no names were read. The gate is actor-scoped for SHARES AND CHANGES only: a share
+  or a % / multiplier labelled with an organisation is held to the sentence that names that
+  organisation, and the network's own to a sentence that names none; the retry reason says which
+  sentence the figure belongs in, and `SUBMITTER_WORDS` asks for an organisation's share or change in
+  a sentence of its own. A plain count is NOT actor-scoped: the gate checks that the figure is one the
+  facts hold, never whose count the prose says it is.
   **Subject notes** (user, 2026-10-29) are a card's own note: a country, a provider, a node make-up.
   The grammar has ONE home, `notes/keys.ts` — `CC_TAIL_RE`, `ISP_TAIL_RE`, `TYPE_TAIL_RE`,
   `subjectKindOf`, `isSubjectNote`: `cc:XX` (fleet country), `<net>/cc:XX`, `isp:<key>`,
@@ -354,7 +434,7 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   decode. **A deterministic miss (the channel provably isn't in this immutable global) is cached
   like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
   the whole global, an anonymous amplification loop; only transient failures throw and retry.
-- **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, the transfer totals in DAG and each transfer's `{ from, to, amount, fee }` in `transfers`, signature count; hashes paired by index from the explorer record, `""` where it lists none) — never its `tips`, which nothing reads (`decodeBlocks.ts`; cache key `snapshot-exact-v11` — v7 added the rows' data updates, the hashes read apart and cached on success only; v8 re-keys after an undecodable row's data updates became unknown rather than 0, so no cached entry still states the 0; v9 the state's shape and dL1 signers; v10 one summary per data block; v11 an unreadable data block is `unread` and its snapshot's data updates unknown — `cachedExact.ts` keeps the history).
+- **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, the transfer totals in DAG and each transfer's `{ from, to, amount, fee }` in `transfers`, signature count; hashes paired by index from the explorer record, `""` where it lists none) — never its `tips`, which nothing reads (`decodeBlocks.ts`; cache key `snapshot-exact-v12` — v7 added the rows' data updates, the hashes read apart and cached on success only; v8 re-keys after an undecodable row's data updates became unknown rather than 0, so no cached entry still states the 0; v9 the state's shape and dL1 signers; v10 one summary per data block; v11 an unreadable data block is `unread` and its snapshot's data updates unknown; v12 each data block's submitters — `cachedExact.ts` keeps the history).
 - **`/api/network/[address]/snapshots/[ordinal]/blocks`** is a metagraph snapshot's blocks, read from the chain's own L0 (`urls.l0` from the directory, 5 min; `network/metaL0.ts`) through the same `decodeBlocks` (cache key `metagraph-snap-blocks-v3`); the snapshots route's address gate (catalog + unlisted), `public, max-age=86400, s-maxage=86400, immutable`, 503 `no-store` on upstream failure (its
   `route.test.ts` and `snapshot/decodeBlocks.test.ts` pin the answer). The ordinal is a number; anything else, `latest` included, is a 400 — the chain's newest snapshot is read nowhere.
 - **`/api/network/unlisted`** lists the UNLISTED chains — the explorer's `/currency` list less every

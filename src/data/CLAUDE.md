@@ -181,7 +181,8 @@ since the chain publishes none; `snapshot-exact-v10`): the Data block card reads
 reads deep for a data block. **A data block the decoder cannot read is UNREAD** (`unread: true`,
 review M3, 2026-11-09; `snapshot-exact-v11`): its snapshot's `dataTxCount` is absent (unknown), so
 every sum of data updates and the register switch's data-block count read that tick as unread, never
-a 0.
+a 0. **Each data block also carries who submitted it** (`DataBlockSummary.submitters`,
+`snapshot-exact-v12`; see "Who submits the data" below).
 
 **A block's parents come only from a FULL READ** of the snapshot that accepted it
 (`blockReads.ts`, `components/BlockReadsBridge.tsx`): one read per block-bearing snapshot in the
@@ -315,6 +316,66 @@ backend and the chain holds the tamper-proof roots. So the decoder surfaces deco
 and the card shows "Data updates: N". This is structural, not per-network: probed across all anchoring
 channels over 12 live ticks, zero undecodable entries and three distinct payload shapes all rendering
 honestly through the same generic extraction.
+
+## Who submits the data
+
+**One table, `src/data/submitters.ts`** (2026-11-27, pinned by `submitters.test.ts`): one row per network
+whose updates name their submitter, read mechanically off the update (`submitterOf`, `tallySubmitters`).
+Digital Evidence's updates are `MetagraphBatchMessage`s carrying an `orgId` — an ORGANISATION, unit
+"batches"; Dor's carry a `publicId` — a DEVICE, unit "check-ins". Every other network has no row and
+answers null: absent is absent, never a guess (rule 10). An update naming no submitter is not counted;
+the block's other figures never depend on it.
+
+**Dor is counted, not named.** A device id is lower-cased and cut to `DEVICE_ID_LEN` — a spelling that is part of the sketch's
+fixed-forever format (ruling R25) — and only ever counted, never given
+a name, a colour or a breakdown — a device is not a party anyone can name. **The count over time is an
+ESTIMATE** (ruling R19, 2026-11-27): measured, one hour of Dor holds ~1,400 distinct devices, which as
+per-device hash fields came to ~1M fields per month hash. **The estimate is our OWN HyperLogLog**
+(ruling R22, 2026-11-28, `app/api/submitters/sketch.ts`): p = 12 (4,096 one-byte registers, ~1.6%
+standard error), sha256 of each id, stored as a plain string `hll12:<base64>` per UTC hour and per
+UTC day (`sub:mainnet:<DOR>:sketch:1h:YYYY-MM-DD-HH`, `…:sketch:1d:YYYY-MM-DD`, `keys.subSketchKeyOf`).
+Why not Redis's own HLL: the public read route runs on the READ-ONLY token, and that token is refused
+PFCOUNT (Redis classes it a write — it caches its count in the key); GET and MGET it may do. The
+format is fixed forever once shipped. Beside each sketch, in the same transaction, the bucket's
+COUNT FIELD — `estimate()` of that sketch — sits in the tier hash DED's fields live in (`subSlotOf`;
+a Dor field is the bucket label alone, `DD-HH` / `MM-DD`, where DED's always holds a `|`), so a
+bucket's line is a plain HGETALL. **The day is the union of its hours**: the sampler adds the same
+ids to both, and the walk rebuilds the day as the merge of its 24 hour sketches — the devices' form
+of 1d = Σ1h. **A range's figure is the estimate of the UNION** of its measured buckets' sketches
+(a device seen in two hours is one device), fetched by MGET: on the daily tier each measured day's
+sketch; on the hourly tier each UTC day's DAY sketch when all 24 of its hours lie in the range and
+are measured, else that day's measured hours (`assemble.measuredSketchKeys`). An absent sketch is no
+devices; one that will not decode makes the range's figure null (not measured, never a guess), while
+the buckets' lines still read — and on the write side it fails Dor's sampler run rather than being
+replaced by an empty one, which would drop its history silently. No device id leaves the store. Every surface says so: the window
+carries `estimate: true`, and History's line and "about N devices checked in", the Metagraph card's
+"Active devices" and the notes' device facts all read "about N". One data block's own "Checked in by
+N devices" is exact (its ids are in hand), and so is the Data blocks note's count over the live window.
+DED's organisations are named from DED's own public API (`/v1/fingerprints/latest`, read each sampler
+run) and, for organisations that stopped before the sampler started, a one-off seed from dagscan's
+evidence summary (`scripts/seed-ded-names.ts`, never over a name DED gave). An organisation without a
+name is "Org xxxxxxxx" (its id's first eight characters), never a made-up one.
+
+**Colour is a PALETTE, not a hue per organisation** (`src/palette/submitterHue.ts`,
+`SubmittersWindow.palette`): the seven busiest organisations of all time, the same in every window,
+take distinct hues kept clear of DED's and Dor's identity hues and of the chamber's core cyan; every
+other organisation draws the neutral "Other". The chamber reads the palette from the store's
+`submitterPalette` (a single-publisher channel, `components/publishChannelBoundary.test.ts`); every
+surface hovers an organisation on `hoverSubmitter`.
+
+**The honesty rules.** The sampler measures a SPAN (`sub:…:span`, `from`–`to`); a bucket is measured
+only when it lies wholly inside the span at its tier and overlaps no HOLE (ruling R20: the hours a gap
+left unread, `sub:…:holes`, until `walk-submitters --holes` fills them), and everything else is NULL —
+"not measured", never a zero (`app/api/submitters/assemble.test.ts`). A gap never restarts the span: the
+history before it stays measured. An organisation's day (1d) is exactly the sum of its hours (1h): the
+sampler adds both tiers in one transaction (`bucket.test.ts`) and the walk recomputes each day it
+touched from its stored hours (`runSubmitters.test.ts`, "1d = Σ1h"). A device day is its own HLL, the
+union of its hours by construction, never a sum of per-bucket counts. The in-progress bucket is null, History's partial-edge rule. A network with no
+submitters row says only what is true by construction — "<network>'s data names no submitter this app
+reads, so there is no one to show" (`trendSubmitters.noSubmitterLine`, R21) — never what its chain carried
+in a range, which nothing here measures.
+Read through `/api/submitters` (`useSubmitters`), written by the sampler and `scripts/walk-submitters.ts`
+(`app/api/CLAUDE.md`).
 
 ## The measured history — one data path
 

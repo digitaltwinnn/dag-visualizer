@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NoteView, NotableDay } from "@/src/data/noteTypes";
-import { BLOCKS_WHOLE, CAPTION_FORMAT, DATA_WHOLE, LINE_FORMAT, PROMPTS, VOICE, buildMessages, parseAnswer, spanWords, TREND_FIGURES } from "./prompts";
+import { BLOCKS_WHOLE, CAPTION_FORMAT, DATA_WHOLE, LINE_FORMAT, PROMPTS, SUBMITTER_WORDS, VOICE, buildMessages, parseAnswer, spanWords, TREND_FIGURES } from "./prompts";
 
 const VIEWS: NoteView[] = ["hyper", "geo", "ledger", "trend", "blocks"];
 
@@ -256,6 +256,26 @@ describe("History's figures", () => {
   it("leaves the tour's line to write figures as the note does", () => {
     expect(LINE_FORMAT).not.toContain("from X to Y");
     expect(LINE_FORMAT).toMatch(/its figures and changes as the note writes them/);
+  });
+});
+
+// WHO SUBMITTED THE DATA (2026-11-27): an organisation is named as the facts name it, a device never.
+describe("who submitted the data", () => {
+  it("is one line in History's and the Data blocks' prompts, and in no other view's", () => {
+    expect(SUBMITTER_WORDS).toMatch(/organisation is named exactly as the facts name it/);
+    expect(SUBMITTER_WORDS).toMatch(/device is never named/);
+    // The actor rule (the gate holds a share or a change to its own actor): taught, not only enforced.
+    expect(SUBMITTER_WORDS).toMatch(/organisation's share or change goes in a sentence of its own, never beside the network's own change/);
+    // Dor's device counts are estimates (R19): the model says "about" before them.
+    expect(SUBMITTER_WORDS).toMatch(/device count the facts label "about" is an estimate: write "about" before it/);
+    for (const label of ["Digital Evidence", DATA_WHOLE]) expect(PROMPTS.data.system(label)).toContain(SUBMITTER_WORDS);
+    expect(PROMPTS.trend.system("Digital Evidence")).toContain(SUBMITTER_WORDS);
+    for (const v of ["hyper", "geo", "ledger", "blocks"] as const) expect(PROMPTS[v].system("x")).not.toContain(SUBMITTER_WORDS);
+  });
+  it("holds no digit, no dash clause and no house word (R59)", () => {
+    expect(SUBMITTER_WORDS).not.toMatch(/\d/);
+    expect(SUBMITTER_WORDS).not.toMatch(/—|\s[–-]\s/);
+    expect(SUBMITTER_WORDS).not.toMatch(/fleet|machine/i);
   });
 });
 

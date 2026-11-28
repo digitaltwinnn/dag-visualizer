@@ -1,6 +1,7 @@
 {
   "crons": [
     { "path": "/api/trends/sample", "schedule": "*/15 * * * *" },
+    { "path": "/api/submitters/sample", "schedule": "3,18,33,48 * * * *" },
     { "path": "/api/notes/warm", "schedule": "7,22,37,52 * * * *" }
   ]
 }

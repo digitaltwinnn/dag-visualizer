@@ -1,10 +1,12 @@
 import { chainReadThrough, changeFact, fact, moveOf, gaugeChange, networksAnchored, type ChainReads } from "@/src/data/noteFacts";
 import { NOTABLE_CAPS, rangeNotableCap, NOTABLE_FLOOR, notableDays, rangeExtremes } from "@/src/data/notableDays";
 import type { Fact, NotableDay } from "@/src/data/noteTypes";
+import { submitterLabel } from "@/src/data/submitters";
 import { formatDag, globalSeries, lastSeen, METRIC_ORDER, metricLabel, metricSeries, spanAverage, trimCounterEdges, TREND_METRICS, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
 import type { TrendMetric } from "@/src/store/store";
+import type { SubmittersWindow } from "@/app/api/submitters/assemble";
 
 // HISTORY'S FACTS BUILDER — what the History note's model is shown. It turns the trends store's
 // payloads (`TrendsWindowData`) into labelled `Fact`s with every ratio and share already worked
@@ -48,6 +50,16 @@ import type { TrendMetric } from "@/src/store/store";
 //     (R60). A floor (", at least") is never an end: the hypergraph's floored totals state their
 //     average alone.
 //
+// WHO SUBMITTED THE DATA (2026-11-27): a network whose updates name their submitter (`submitters.ts`)
+// states who, from the `sub:` family over the same range (`submitters`, null outside its measured
+// span). Digital Evidence's ORGANISATIONS by name — the range's top three by batches, each one's
+// batches per day at the start and the end (`edgeLevels`' own edges, a pair) and its share of the
+// range's batches — every organisation of the range joining `names`, so the gate strips a label's
+// digits ("Org 0f3a9b12") and scopes a ratio word to the organisation it names. Dor's DEVICES are
+// counted, never named: how many were active over the range and in an hour at either end (a level,
+// `gaugeChange`). A range reaching before the measured span states no start (the gauges' late-start
+// rule), and its counts are a floor or a share of what was measured. Any other note: nothing.
+//
 // WHICH ZOOMS GET NOTABLE DAYS: 7d, 30d, 90d, 1y and all (`NOTABLE_CAPS`), and a brushed range of a
 // week or more (`rangeNotableCap`). A 1h, 24h or shorter note describes a stretch too short for "a
 // day that stood out".
@@ -74,6 +86,9 @@ export interface TrendFactsInput {
   history?: TrendsWindowData | null;
   /** When the sampler last read each chain, for a silent span (`chainReadThrough`). */
   chainReads?: ChainReads | null;
+  /** WHO SUBMITTED THE NETWORK'S DATA over the span (`readSubmitters`), for a network with a
+   *  submitter table; a window for any other network than `subject` is ignored. */
+  submitters?: SubmittersWindow | null;
   /** THE SPAN FACET (`<net>/span`): the span's busiest, quietest and typical day, by those names,
    *  in place of the notable days. Left to pick them out of the notable days the model called a
    *  chain's thin last day the busiest (live 2026-10-30), and the gate checks figures, not meaning. */
@@ -91,6 +106,9 @@ export interface TrendFacts {
   names: string[];
   /** "<name> is: <blurb>" lines for the networks a first / last day on the hypergraph names. */
   blurbs: string[];
+  /** The organisations the facts name (`submitterFacts`): the gate's ACTORS (`CheckOptions.actors`),
+   *  so a share or a change is said only of the organisation it belongs to. Absent when none. */
+  actors?: string[];
 }
 
 const TOP_NETWORKS = 3;
@@ -162,17 +180,86 @@ function edgeLevels(metric: TrendMetric, id: string, data: TrendsWindowData): { 
   const { points, weights } = pointsOf(metric, id, data);
   const pts = trimCounterEdges(points, data.stepMs);
   const wts = weights && trimCounterEdges(weights, data.stepMs);
-  if (pts.length < EDGE_SPAN_MIN) return null;
-  let n = Math.max(EDGE_MIN, Math.ceil(EDGE_SHARE * pts.length));
   const counted = wts ?? (valueKind(metric) === "count" ? pts : trimCounterEdges(pointsOf("snapshots", id, data).points, data.stepMs));
-  const sum = (a: readonly (number | null)[]) => a.reduce<number>((t, v) => t + (v ?? 0), 0);
-  const held = (k: number) => sum(counted.slice(0, k)) + sum(counted.slice(-k));
-  const most = Math.max(n, Math.ceil(EDGE_SHARE_MAX * pts.length));
-  while (n < most && held(n) < EDGE_EVENTS) n++;
-  if (held(n) < EDGE_EVENTS) return null;
+  const n = edgeWidth(counted);
+  if (n == null) return null;
   const from = spanAverage(metric, pts.slice(0, n), data.stepMs, wts?.slice(0, n));
   const to = spanAverage(metric, pts.slice(-n), data.stepMs, wts?.slice(-n));
   return from != null && to != null ? { from, to, n } : null;
+}
+
+/** HOW MANY TRIMMED BUCKETS EACH EDGE SPANS: `EDGE_SHARE` of them, at least `EDGE_MIN`, widened
+ *  until the two edges hold `EDGE_EVENTS` of `counted` between them, up to `EDGE_SHARE_MAX`. Null on
+ *  a span too short to have two edges, or whose widest edges still hold too few. */
+function edgeWidth(counted: readonly (number | null)[]): number | null {
+  if (counted.length < EDGE_SPAN_MIN) return null;
+  let n = Math.max(EDGE_MIN, Math.ceil(EDGE_SHARE * counted.length));
+  const sum = (a: readonly (number | null)[]) => a.reduce<number>((t, v) => t + (v ?? 0), 0);
+  const held = (k: number) => sum(counted.slice(0, k)) + sum(counted.slice(-k));
+  const most = Math.max(n, Math.ceil(EDGE_SHARE_MAX * counted.length));
+  while (n < most && held(n) < EDGE_EVENTS) n++;
+  return held(n) < EDGE_EVENTS ? null : n;
+}
+
+/** One submitter's start and end, per day: its mean over each edge's measured buckets (`edgeWidth`,
+ *  on its own updates) scaled to a day. `pts` is already edge-trimmed. */
+function submitterEdges(pts: readonly (number | null)[], stepMs: number): { from: number; to: number } | null {
+  const n = edgeWidth(pts);
+  if (n == null) return null;
+  const perDay = (a: readonly (number | null)[]) => {
+    const xs = a.filter((v): v is number => v != null);
+    return xs.length ? (xs.reduce((t, v) => t + v, 0) / xs.length) * (DAY_MS / stepMs) : null;
+  };
+  const from = perDay(pts.slice(0, n));
+  const to = perDay(pts.slice(-n));
+  return from != null && to != null ? { from, to } : null;
+}
+
+/** The organisations stated by name: the range's busiest. */
+const TOP_SUBMITTERS = 3;
+
+/** WHO SUBMITTED THE DATA over the span (the header's rule): the facts, and every organisation's
+ *  label the gate must know. Nothing where no bucket of the span was measured. */
+function submitterFacts(w: SubmittersWindow, perDay: boolean): { facts: Fact[]; names: string[] } {
+  const facts: Fact[] = [];
+  const cut = <T,>(a: readonly T[]) => trimCounterEdges(a, w.stepMs);
+  const distinct = cut(w.distinct);
+  const first = distinct.findIndex((v) => v != null);
+  if (first < 0) return { facts, names: [] };
+  const whole = distinct.every((v) => v != null);
+  const late = first > LATE_START * distinct.length;
+  if (w.kind === "device") {
+    // Dor's counts are HyperLogLog ESTIMATES (R19): every device fact says "about", and the prompt
+    // (`SUBMITTER_WORDS`) asks the model to write it so.
+    const about = w.estimate ? ", about" : "";
+    if (w.rangeDistinct != null) facts.push(fact(`Active devices, this span${about}${whole ? "" : ", at least"}`, w.rangeDistinct, "count"));
+    const label = `Active devices in ${w.stepMs >= DAY_MS ? "a day" : "an hour"}${about}`;
+    const ch = gaugeChange(distinct);
+    if (!ch) return { facts, names: [] };
+    if (late) {
+      facts.push(fact(`${label}, at the end of the span`, ch.to, "count"));
+      return { facts, names: [] };
+    }
+    facts.push(fact(`${label}, at the start of the span`, ch.from, "count", undefined, { key: label, end: "from" }));
+    facts.push(fact(`${label}, at the end of the span`, ch.to, "count", undefined, { key: label, end: "to" }));
+    if (ch.from > 0 && ch.to !== ch.from) facts.push(fact(`${label}, ratio end to start`, ch.to / ch.from, "ratio"));
+    return { facts, names: [] };
+  }
+  const names = w.totals.map((t) => submitterLabel(t.id, w.names));
+  const all = w.totals.reduce((a, t) => a + t.updates, 0);
+  for (const t of w.totals.slice(0, TOP_SUBMITTERS)) {
+    if (!(t.updates > 0)) break;
+    const name = submitterLabel(t.id, w.names);
+    const edges = perDay && !late ? submitterEdges(cut(w.series.find((s) => s.id === t.id)?.points ?? []), w.stepMs) : null;
+    if (edges) {
+      const key = `${name} ${w.unit}, per day`;
+      facts.push(fact(`${key}, at the start of the span`, edges.from, "count", undefined, { key, end: "from" }));
+      facts.push(fact(`${key}, at the end of the span`, edges.to, "count", undefined, { key, end: "to" }));
+      if (edges.from > 0 && edges.to !== edges.from) facts.push(fact(`${name} ${w.unit}, ratio end to start`, edges.to / edges.from, "ratio"));
+    }
+    facts.push(fact(`${name}, share of the span's ${whole ? "" : "measured "}${w.unit}`, t.updates / all, "share"));
+  }
+  return { facts, names };
 }
 
 /** A counter's TOTAL over the (edge-trimmed) span: the sum of its buckets. Null unless EVERY
@@ -297,6 +384,13 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
     facts.push(fact(`${key}, at the start of the span`, edges.from, kind, format, { key, end: "from" }));
     facts.push(fact(`${key}, at the end of the span`, edges.to, kind, format, { key, end: "to" }));
     if (edges.from > 0 && edges.to !== edges.from) facts.push(fact(`${label}, ratio end to start`, edges.to / edges.from, "ratio"));
+  }
+
+  // WHO SUBMITTED THE DATA (the header's rule): this network's own window, nothing for any other.
+  const subs = !dag && !unlisted && input.submitters?.net === subject ? submitterFacts(input.submitters, perDay) : null;
+  if (subs) {
+    facts.push(...subs.facts);
+    for (const n of subs.names) mentioned.add(n);
   }
 
   if (dag) {
@@ -488,5 +582,6 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
   }
 
   if (unlisted) blurbs.push(UNLISTED_SET_BLURB);
-  return { facts, days, names: [...new Set([...Object.values(catalog), ...mentioned])], blurbs };
+  const actors = subs?.names ?? [];
+  return { facts, days, names: [...new Set([...Object.values(catalog), ...mentioned])], blurbs, ...(actors.length ? { actors } : {}) };
 }

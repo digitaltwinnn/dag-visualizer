@@ -809,7 +809,28 @@ registers that read the same source re-lays the trail (`_refreshLedger`) rather 
 only a switch to or from Transaction blocks changes the source and re-seats (`Engine`, the register
 subscription).
 
-Pinned by `domain/dataMark.test.ts` (which snapshot is marked, how many boxes its column holds).
+**A DED box is BANDED BY ITS ORGANISATIONS** (2026-11-27, the data-submitters feature;
+`domain/dataMark.ts`: `DATA_BANDS`, `dataBoxBands`): each data block's box stacks up to
+`DATA_BANDS.max` sub-boxes, each its organisation's share of the block's attributed updates (busiest
+first; past the ceiling the busiest `max − 1` and one unnamed remainder band), read off the exact row's
+`dataBlockRows[bx].submitters`. Only an ORGANISATION network bands (`SUBMITTERS[id].kind`): Dor's
+devices are counted, never broken down, and a block with no submitters draws as one plain box, as
+before. The bands live in the same packed pool, grown to `META_TRAIL_MAX × DATA_BANDS.max`
+(`DATA_POOL`); the per-box band count, start, share and interned organisation are resolved at event
+time with the pick table (`_fillBands`), and each organisation's ink once per palette change and theme
+flip (`_resolveOrgCols`), never per frame. **The colour is the column's own rule** (user's ruling: "own
+hues, chamber rule"): down the neutral trail a banded box is one neutral column; on a LIT column — the
+active row, a hover into it (its tile, its row, its data block, or `hoverSubmitter` naming an
+organisation it holds), the committed network's trail — each band wears its organisation's scene ink
+(`palette/submitterHue.submitterSceneHex`: the seven-strong palette's hue, the chamber's neutral
+outside it and for the remainder). A hovered organisation's bands take the subject's full weight — still
+through their tile's fades (rewind, horizon, view fade, entry beat), since the hover reaches every
+column down the trail — and the other bands of its columns step back (`BAND_BACK`). The palette is plain data from the Engine
+(`setSubmitterPalette`), published by `components/SubmitterPaletteBridge.tsx` (a React → Engine
+channel, `components/publishChannelBoundary.test.ts`); the hover arrives as `setHoveredSubmitter`.
+
+Pinned by `domain/dataMark.test.ts` (which snapshot is marked, how many boxes its column holds, how a
+box is banded).
 
 ### The unlisted network
 

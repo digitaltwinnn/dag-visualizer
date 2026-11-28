@@ -7,9 +7,9 @@ import { join } from "node:path";
 // row naming a plane that is not in the stack, two surfaces landing a reader in different places
 // from the same words, or a number in the rail that no chart on screen agrees with.
 //
-//  1. ONE CLICK BUILDER. Three surfaces focus a plane — the plane's own header strip, the Layers
-//     row, the cursor card's per-network row — and all three express that intent through
-//     `trendPlaneActions` and the one executor (rule 2). A fourth surface writing the channel
+//  1. ONE CLICK BUILDER. Four surfaces focus a plane — the plane's own header strip, the Layers
+//     row, the cursor card's per-network row, the Data submitters card's network row — and all four
+//     express that intent through `trendPlaneActions` and the one executor (rule 2). A fourth surface writing the channel
 //     directly is separately caught by `selectionBoundary.test.ts`; what this adds is the positive
 //     half, that the three known ones still go through the table.
 //
@@ -52,11 +52,12 @@ describe("one click builder for a plane focus", () => {
       "components/TrendExplore.tsx", // the Layers row
       "components/TrendStack.tsx", // the plane's header strip and its interactive body
       "components/inspector/TrendInstantPane.tsx", // the cursor card's per-network row
+      "components/inspector/TrendSubmittersPane.tsx", // the Data submitters card's network row (under All)
     ]);
   });
 
   it("each of them applies it through the ONE executor", () => {
-    for (const path of ["components/TrendExplore.tsx", "components/TrendStack.tsx", "components/inspector/TrendInstantPane.tsx"]) {
+    for (const path of ["components/TrendExplore.tsx", "components/TrendStack.tsx", "components/inspector/TrendInstantPane.tsx", "components/inspector/TrendSubmittersPane.tsx"]) {
       const code = stripComments(readFileSync(path, "utf8"));
       expect(code, `${path} must apply the builder's actions, not read them`).toMatch(
         /applyClickActions\(\s*trendPlaneActions/,

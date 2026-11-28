@@ -138,6 +138,7 @@ export class Picking {
     if (st.hoverMetaSnap != null) st.setHoverMetaSnap(null);
     if (st.hoverBlock != null) st.setHoverBlock(null);
     if (st.hoverDataBlock != null) st.setHoverDataBlock(null);
+    if (st.hoverSubmitter != null) st.setHoverSubmitter(null);
     if (st.hoverFilter != null) st.setHoverFilter(null);
     if (st.hoverCountry != null) st.setHoverCountry(null);
     if (st.hoverCohort != null) st.setHoverCohort(null);

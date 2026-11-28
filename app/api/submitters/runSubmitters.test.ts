@@ -1,0 +1,613 @@
+import { describe, it, expect } from "vitest";
+import { runSubmitters, seedNames, walkHoles, walkRange, type SubmittersDeps, type WalkDeps } from "./runSubmitters";
+import { assembleSubmitters } from "./assemble";
+import { subSketchKeyOf, subHolesKeyOf, subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
+import { DED_ID, DOR_ID } from "@/src/data/submitters";
+import type { MetaRec } from "../trends/bucketing";
+import type { ChainPage } from "../trends/fetchSince";
+import type { TrendsStore } from "../trends/store";
+import { fakeStore } from "../trends/fakeStore";
+import { addIds, decodeSketch, encodeSketch, newSketch } from "./sketch";
+
+// The shared in-memory store (`trends/fakeStore.ts`): values stored as Redis holds them and handed
+// back as `@upstash/redis` does — a count as a number, DED's names as objects (PR review I1).
+const MIN = 60000, HOUR = 3600000;
+/** Two organisations (ids are UUIDs: `submitters.ts` counts no other shape). */
+const O1 = "00000000-0000-4000-8000-000000000001", O2 = "00000000-0000-4000-8000-000000000002";
+const NOW = Date.UTC(2026, 10, 27, 14, 10);
+const PREV_HOUR = Date.UTC(2026, 10, 27, 13, 0);
+
+/** One record a minute from 12:00 to 14:09 (130 records, ordinals 1000…1129): more than the
+ *  tip page, so a first run pages back to the hour boundary. */
+const CHAIN: MetaRec[] = Array.from({ length: 130 }, (_, i) => ({
+  ordinal: 1000 + i,
+  timestamp: new Date(Date.UTC(2026, 10, 27, 12, 0) + i * MIN).toISOString(),
+}));
+const tsOf = (o: number) => Date.parse(CHAIN.find((r) => r.ordinal === o)!.timestamp);
+
+/** Every record carries one data block: two batches by `o1`, and one by `o2` on odd ordinals. */
+function root(ordinal: number): Record<string, unknown> {
+  const updates = [{ MetagraphBatchMessage: { orgId: O1 } }, { MetagraphBatchMessage: { orgId: O1 } }];
+  if (ordinal % 2) updates.push({ MetagraphBatchMessage: { orgId: O2 } });
+  const blk = { proofs: [], value: { updates: updates.map((v) => ({ value: v })) } };
+  return { value: { ordinal, dataApplication: { blocks: [Array.from(Buffer.from(JSON.stringify(blk)))] } }, proofs: [] };
+}
+
+/** Dor: every record carries one data block of two check-ins, by devices `ordinal % 5` and
+ *  `(ordinal + 1) % 5` — hex ids, cut to 16 characters by `submitters.ts`. */
+const dev = (k: number) => String(k).padEnd(40, "f");
+function dorRoot(ordinal: number): Record<string, unknown> {
+  const updates = [{ publicId: dev(ordinal % 5) }, { publicId: dev((ordinal + 1) % 5) }];
+  const blk = { proofs: [], value: { updates: updates.map((v) => ({ value: v })) } };
+  return { value: { ordinal, dataApplication: { blocks: [Array.from(Buffer.from(JSON.stringify(blk)))] } }, proofs: [] };
+}
+/** The five devices as the sketch sees them (cut to 16 characters), and their sketch. */
+const DEVICES = [0, 1, 2, 3, 4].map((k) => dev(k).slice(0, 16));
+const FIVE = encodeSketch(addIds(newSketch(), DEVICES));
+/** A Dor bucket's count field (R22): the bucket label alone, no `|`. */
+const countOf = (s: { data: Map<string, Map<string, string>> }, tier: "1h" | "1d", ts: number) => {
+  const { key, bucket } = subSlotOf(DOR_ID, tier, ts);
+  return s.data.get(key)?.get(bucket);
+};
+
+/** A newest-first pager over the chain's records up to `tip`; `next` is an offset. */
+function pager(tip: () => number) {
+  return async (_id: string, limit: number, next?: string): Promise<ChainPage<MetaRec>> => {
+    const all = CHAIN.filter((r) => r.ordinal <= tip()).reverse();
+    const off = next ? Number(next) : 0;
+    const data = all.slice(off, off + limit);
+    return { data, next: off + limit < all.length ? String(off + limit) : undefined };
+  };
+}
+
+function deps(store: TrendsStore, over: Partial<SubmittersDeps> = {}): SubmittersDeps {
+  return {
+    store,
+    nets: [DED_ID],
+    pageMeta: pager(() => 1129),
+    fetchSnap: async (_net, o) => root(o),
+    now: () => NOW,
+    ...over,
+  };
+}
+
+const span = (s: ReturnType<typeof fakeStore>, net = DED_ID) => s.data.get(subSpanKeyOf(net));
+const h1 = (s: ReturnType<typeof fakeStore>, ts: number) => s.data.get(subSlotOf(DED_ID, "1h", ts).key);
+const subData = (s: ReturnType<typeof fakeStore>) =>
+  [...s.data].filter(([k]) => k.includes(":1h:") || k.includes(":1d:")).map(([k, h]) => [k, Object.fromEntries([...h].sort())]);
+
+describe("runSubmitters", () => {
+  it("first run: reads from the start of the previous UTC hour, buckets by timestamp, ONE transaction", async () => {
+    const store = fakeStore();
+    const res = await runSubmitters(deps(store));
+    // 13:00 … 14:09 = ordinals 1060 … 1129.
+    expect(res.read[DED_ID]).toBe(70);
+    expect(res.failed[DED_ID]).toBeNull();
+    expect(store.applies).toHaveLength(1);
+    const sp = span(store)!;
+    expect(sp.get("from")).toBe(String(PREV_HOUR));
+    expect(sp.get("to")).toBe(String(tsOf(1129)));
+    expect(sp.get("cursor")).toBe("1129");
+    // The 13h hour: 60 records, 2 batches each by o1, 30 odd ordinals with one by o2.
+    const hour = h1(store, PREV_HOUR)!;
+    expect(hour.get(`27-13|${O1}`)).toBe("120");
+    expect(hour.get(`27-13|${O2}`)).toBe("30");
+    expect(hour.get(`27-14|${O1}`)).toBe("20");
+    expect(hour.get(`27-14|${O2}`)).toBe("5");
+    expect(hour.has(`27-12|${O1}`)).toBe(false); // before the boundary: not read
+    expect(store.data.get(subSlotOf(DED_ID, "1d", NOW).key)!.get(`11-27|${O1}`)).toBe("140");
+    expect(store.locked).toBe(false);
+  });
+
+  it("an L0 failure mid-batch counts the prefix only, and the next run resumes with no double count", async () => {
+    // A clean run over the same records.
+    const clean = fakeStore();
+    await runSubmitters(deps(clean));
+
+    const store = fakeStore();
+    let down = true;
+    const fetchSnap = async (_net: string, o: number) => {
+      if (down && o === 1062) throw new Error("L0 502"); // the 3rd record of the batch
+      return root(o);
+    };
+    const res = await runSubmitters(deps(store, { fetchSnap }));
+    expect(res.read[DED_ID]).toBe(2);
+    expect(res.failed[DED_ID]).toBe(1062);
+    expect(span(store)!.get("cursor")).toBe("1061");
+    expect(span(store)!.get("to")).toBe(String(tsOf(1061)));
+    expect(span(store)!.get("from")).toBe(String(PREV_HOUR));
+    expect(h1(store, PREV_HOUR)!.get(`27-13|${O1}`)).toBe("4");
+    expect(h1(store, PREV_HOUR)!.get(`27-13|${O2}`)).toBe("1");
+
+    down = false;
+    const res2 = await runSubmitters(deps(store, { fetchSnap, now: () => NOW + MIN }));
+    expect(res2.read[DED_ID]).toBe(68);
+    expect(res2.failed[DED_ID]).toBeNull();
+    expect(subData(store)).toEqual(subData(clean));
+    expect(span(store)!.get("from")).toBe(String(PREV_HOUR)); // contiguous by ordinal: extended
+    expect(span(store)!.get("to")).toBe(String(tsOf(1129)));
+  });
+
+  it("a held lock skips the run and writes nothing", async () => {
+    const store = fakeStore();
+    store.locked = true;
+    const res = await runSubmitters(deps(store));
+    expect(res.skipped).toBe("locked");
+    expect(store.applies).toHaveLength(0);
+    expect(store.locked).toBe(true);
+  });
+
+  it("takes the lock on the sub family's own key", async () => {
+    const store = fakeStore();
+    const keys: string[] = [];
+    store.acquireLock = async (k: string) => { keys.push(k); return true; };
+    await runSubmitters(deps(store));
+    expect(keys).toEqual([subLockKeyOf()]);
+  });
+
+  it("a warm run contiguous by ordinal extends the span; a gap keeps its from and records a hole", async () => {
+    const store = fakeStore();
+    let tip = 1100;
+    await runSubmitters(deps(store, { pageMeta: pager(() => tip) }));
+    expect(span(store)!.get("cursor")).toBe("1100");
+
+    tip = 1129;
+    await runSubmitters(deps(store, { pageMeta: pager(() => tip) }));
+    expect(span(store)!.get("from")).toBe(String(PREV_HOUR));
+    expect(span(store)!.get("to")).toBe(String(tsOf(1129)));
+
+    // A hole: the chain's list no longer reaches the cursor (records 1130… are absent; the
+    // stored cursor is set back past what the pager can prove).
+    const gapped = fakeStore();
+    await gapped.hset(subSpanKeyOf(DED_ID), { from: PREV_HOUR - 5 * HOUR, to: PREV_HOUR - 4 * HOUR, cursor: 900 });
+    const res = await runSubmitters(deps(gapped));
+    expect(res.read[DED_ID]).toBe(130);
+    // R20: the span KEEPS its from; the gap's hours are a hole, from the hour holding the old `to`
+    // (09:00) to the end of the hour holding the first record read (12:00 → 13:00).
+    expect(span(gapped)!.get("from")).toBe(String(PREV_HOUR - 5 * HOUR));
+    expect(span(gapped)!.get("to")).toBe(String(tsOf(1129)));
+    expect(span(gapped)!.get("cursor")).toBe("1129");
+    expect(Object.fromEntries(gapped.data.get(subHolesKeyOf(DED_ID))!)).toEqual({ [String(PREV_HOUR - 4 * HOUR)]: String(PREV_HOUR) });
+    expect(gapped.applies).toHaveLength(1); // the hole rides the run's one transaction
+  });
+
+  it("a second gap from the same hour keeps the hole's later end", async () => {
+    const store = fakeStore();
+    await store.hset(subSpanKeyOf(DED_ID), { from: PREV_HOUR - 5 * HOUR, to: PREV_HOUR - 4 * HOUR, cursor: 900 });
+    await store.hset(subHolesKeyOf(DED_ID), { [String(PREV_HOUR - 4 * HOUR)]: String(PREV_HOUR + 5 * HOUR) });
+    await runSubmitters(deps(store));
+    expect(store.data.get(subHolesKeyOf(DED_ID))!.get(String(PREV_HOUR - 4 * HOUR))).toBe(String(PREV_HOUR + 5 * HOUR));
+  });
+
+  it("a contiguous run writes no hole", async () => {
+    const store = fakeStore();
+    await runSubmitters(deps(store, { pageMeta: pager(() => 1100) }));
+    await runSubmitters(deps(store));
+    expect(store.data.has(subHolesKeyOf(DED_ID))).toBe(false);
+  });
+
+  it("maxRecs reads the OLDEST records and leaves the rest, the span staying contiguous", async () => {
+    const store = fakeStore();
+    await runSubmitters(deps(store, { maxRecs: 50 }));
+    expect(span(store)!.get("cursor")).toBe("1109");
+    expect(span(store)!.get("to")).toBe(String(tsOf(1109)));
+    const res = await runSubmitters(deps(store, { maxRecs: 50 }));
+    expect(res.read[DED_ID]).toBe(20);
+    expect(span(store)!.get("from")).toBe(String(PREV_HOUR));
+    const clean = fakeStore();
+    await runSubmitters(deps(clean));
+    expect(subData(store)).toEqual(subData(clean));
+  });
+
+  it("a deadline passed mid-batch commits the prefix as a truncation, and the next run resumes to clean totals", async () => {
+    const clean = fakeStore();
+    await runSubmitters(deps(clean));
+
+    // A slow L0: each read costs the fake clock 10 s; the run's budget is 100 s.
+    const store = fakeStore();
+    let clock = NOW;
+    const slow = { now: () => clock, fetchSnap: async (_n: string, o: number) => { clock += 10000; return root(o); } };
+    const res = await runSubmitters(deps(store, { ...slow, deadlineMs: NOW + 100000, pool: 1 }));
+    expect(res.read[DED_ID]).toBe(10);
+    expect(res.failed[DED_ID]).toBeNull();
+    expect(store.applies).toHaveLength(1);
+    expect(span(store)!.get("cursor")).toBe("1069");
+    expect(span(store)!.get("to")).toBe(String(tsOf(1069)));
+    expect(span(store)!.get("from")).toBe(String(PREV_HOUR));
+
+    // The default budget: 200 s from the run's own start.
+    const res2 = await runSubmitters(deps(store, { ...slow, pool: 1 }));
+    expect(res2.read[DED_ID]).toBe(20);
+    const res3 = await runSubmitters(deps(store, { now: () => NOW + HOUR / 6 }));
+    expect(res3.read[DED_ID]).toBe(40);
+    expect(span(store)!.get("from")).toBe(String(PREV_HOUR)); // contiguous throughout
+    expect(subData(store)).toEqual(subData(clean));
+  });
+
+  it("a network whose list cannot be read reports -1 and moves nothing; the others still commit", async () => {
+    const store = fakeStore();
+    const OTHER = "DAG0other";
+    const base = pager(() => 1129);
+    const res = await runSubmitters(deps(store, {
+      nets: [DED_ID, OTHER],
+      pageMeta: async (id, limit, next) => { if (id === OTHER) throw new Error("explorer 504"); return base(id, limit, next); },
+    }));
+    expect(res.failed[OTHER]).toBe(-1);
+    expect(res.read[OTHER]).toBe(0);
+    expect(store.data.has(subSpanKeyOf(OTHER))).toBe(false);
+    expect(span(store)!.get("cursor")).toBe("1129");
+  });
+
+  it("no submitters in a record writes no empty hash", async () => {
+    const store = fakeStore();
+    await runSubmitters(deps(store, { fetchSnap: async (_n, o) => ({ value: { ordinal: o } }) }));
+    expect(store.applies).toHaveLength(1);
+    expect(store.applies[0].map((w) => w.key)).toEqual([subSpanKeyOf(DED_ID)]);
+    expect(store.applies[0].every((w) => Object.keys(w.map).length > 0)).toBe(true);
+  });
+
+  it("DED's names ride the same transaction, only those that changed", async () => {
+    const store = fakeStore();
+    await store.hset(subNamesKeyOf(DED_ID), { o1: JSON.stringify({ name: "Open Poker", source: "ded", namedAt: 1 }) });
+    const res = await runSubmitters(deps(store, {
+      dedLatest: async () => ({ data: [{ orgId: "o1", orgName: "Open Poker" }, { orgId: "o2", orgName: "Gate AI" }] }),
+    }));
+    expect(res.names).toBe(1);
+    expect(store.applies).toHaveLength(1);
+    const w = store.applies[0].find((x) => x.key === subNamesKeyOf(DED_ID))!;
+    expect(Object.keys(w.map)).toEqual(["o2"]);
+    expect(JSON.parse(String(w.map.o2))).toEqual({ name: "Gate AI", source: "ded", namedAt: NOW });
+  });
+
+  // THE NAMES THROUGH THE REAL CLIENT'S SHAPES (PR review I1): the fake hands a stored name back as an
+  // OBJECT, as `@upstash/redis` does, so these hold on production's client.
+  describe("DED's names, read back as the client hands them", () => {
+    const stored = (name: string, source: "ded" | "dagscan", namedAt: number) => JSON.stringify({ name, source, namedAt });
+    const namesOf = (s: ReturnType<typeof fakeStore>) => Object.fromEntries(s.data.get(subNamesKeyOf(DED_ID)) ?? []);
+
+    it("a stored ded name survives a sampler run unchanged: nothing written, namedAt not bumped", async () => {
+      const store = fakeStore();
+      await store.hset(subNamesKeyOf(DED_ID), { o1: stored("Open Poker", "ded", 1) });
+      const before = namesOf(store);
+      const res = await runSubmitters(deps(store, { dedLatest: async () => ({ data: [{ orgId: "o1", orgName: "Open Poker" }] }) }));
+      expect(res.names).toBe(0);
+      expect(store.applies.flat().some((w) => w.key === subNamesKeyOf(DED_ID))).toBe(false);
+      expect(namesOf(store)).toEqual(before);
+    });
+
+    it("a stored ded name survives a seed run unchanged, and the seed adds the names it alone knows", async () => {
+      const store = fakeStore();
+      await store.hset(subNamesKeyOf(DED_ID), { o1: stored("Open Poker", "ded", 1) });
+      const n = await seedNames(store, { o1: "OpenPoker (dagscan)", o3: "Lotto Works" }, "dagscan", NOW);
+      expect(n).toBe(1);
+      expect(namesOf(store)).toEqual({ o1: stored("Open Poker", "ded", 1), o3: stored("Lotto Works", "dagscan", NOW) });
+      expect(store.locked).toBe(false);
+      // a second seed writes nothing: every name it knows is held
+      expect(await seedNames(store, { o1: "OpenPoker (dagscan)", o3: "Lotto Works" }, "dagscan", NOW + 1)).toBe(0);
+      expect(namesOf(store).o3).toBe(stored("Lotto Works", "dagscan", NOW));
+    });
+
+    it("a dagscan name never overwrites a ded one; a ded name does replace a dagscan one", async () => {
+      const store = fakeStore();
+      await store.hset(subNamesKeyOf(DED_ID), { o1: stored("Open Poker", "ded", 1), o2: stored("Gate ai", "dagscan", 1) });
+      await seedNames(store, { o1: "Open poker", o2: "Gate AI?" }, "dagscan", NOW);
+      expect(namesOf(store).o1).toBe(stored("Open Poker", "ded", 1));
+      await runSubmitters(deps(store, { dedLatest: async () => ({ data: [{ orgId: "o2", orgName: "Gate AI" }] }) }));
+      expect(namesOf(store)).toEqual({ o1: stored("Open Poker", "ded", 1), o2: stored("Gate AI", "ded", NOW) });
+    });
+
+    it("seedNames waits for a sampler run holding the lock", async () => {
+      const store = fakeStore();
+      store.locked = true;
+      let waits = 0;
+      expect(await seedNames(store, { o1: "Open Poker" }, "dagscan", NOW, async () => { waits++; store.locked = false; })).toBe(1);
+      expect(waits).toBe(1);
+    });
+  });
+
+  it("Dor: device ids go into the hour's and the day's SKETCH and their count fields, in the one transaction (R22)", async () => {
+    const store = fakeStore();
+    const res = await runSubmitters(deps(store, { nets: [DOR_ID], fetchSnap: async (_n, o) => dorRoot(o) }));
+    expect(res.read[DOR_ID]).toBe(70);
+    expect(store.applies).toHaveLength(1);
+    const keys = [subSketchKeyOf(DOR_ID, "1d", NOW), subSketchKeyOf(DOR_ID, "1h", PREV_HOUR), subSketchKeyOf(DOR_ID, "1h", NOW)];
+    expect(store.applies[0].filter((w) => w.value != null).map((w) => w.key).sort()).toEqual([...keys].sort());
+    for (const k of keys) expect(store.str.get(k)).toBe(FIVE); // every bucket saw all five devices
+    expect(countOf(store, "1h", PREV_HOUR)).toBe("5");
+    expect(countOf(store, "1h", NOW)).toBe("5");
+    expect(countOf(store, "1d", NOW)).toBe("5");
+    // A device field never exists: the hashes hold one count per bucket, no `|`.
+    expect([...store.data.get(subSlotOf(DOR_ID, "1h", NOW).key)!.keys()].sort()).toEqual(["27-13", "27-14"]);
+    expect(span(store, DOR_ID)!.get("cursor")).toBe("1129");
+  });
+
+  it("Dor: a later run MERGES its ids into the stored sketches, and the count follows the union (R22)", async () => {
+    const store = fakeStore();
+    let tip = 1125;
+    const d = { nets: [DOR_ID], pageMeta: pager(() => tip), fetchSnap: async (_n: string, o: number) => dorRoot(o) };
+    const other = [dev(7).slice(0, 16), dev(8).slice(0, 16)];
+    const hourKey = subSketchKeyOf(DOR_ID, "1h", NOW), dayKey = subSketchKeyOf(DOR_ID, "1d", NOW);
+    await runSubmitters(deps(store, d));
+    // Two more devices already in the stored 14:00 sketch (as if an earlier run had seen them).
+    store.str.set(hourKey, encodeSketch(addIds(decodeSketch(store.str.get(hourKey))!, other)));
+    tip = 1129;
+    await runSubmitters(deps(store, d));
+    expect(store.str.get(hourKey)).toBe(encodeSketch(addIds(newSketch(), [...DEVICES, ...other])));
+    expect(countOf(store, "1h", NOW)).toBe("7");
+    expect(store.str.get(dayKey)).toBe(FIVE); // the day had all five; nothing else was added to it
+    expect(store.applies).toHaveLength(2);
+  });
+
+  it("Dor: an undecodable stored sketch fails Dor's run alone — nothing of Dor written, its cursor kept; DED commits", async () => {
+    const store = fakeStore();
+    let tip = 1125;
+    const fetchSnap = async (n: string, o: number) => (n === DOR_ID ? dorRoot(o) : root(o));
+    const d = { nets: [DED_ID, DOR_ID], pageMeta: pager(() => tip), fetchSnap };
+    await runSubmitters(deps(store, d));
+    const before = { span: new Map(span(store, DOR_ID)!), str: new Map(store.str), hash: new Map(store.data.get(subSlotOf(DOR_ID, "1h", NOW).key)!) };
+    store.str.set(subSketchKeyOf(DOR_ID, "1h", NOW), "hll12:garbage");
+    tip = 1129;
+    const res = await runSubmitters(deps(store, d));
+    expect(res.failed[DOR_ID]).toBe(1126); // where the next run resumes
+    expect(res.read[DOR_ID]).toBe(0);
+    expect(span(store, DOR_ID)).toEqual(before.span);
+    expect(store.str.get(subSketchKeyOf(DOR_ID, "1d", NOW))).toBe(before.str.get(subSketchKeyOf(DOR_ID, "1d", NOW)));
+    expect(store.data.get(subSlotOf(DOR_ID, "1h", NOW).key)).toEqual(before.hash);
+    expect(res.failed[DED_ID]).toBeNull();
+    expect(span(store)!.get("cursor")).toBe("1129");
+  });
+
+  it("a names-hash read that throws costs the run nothing: names are optional", async () => {
+    const store = fakeStore();
+    const hgetall = store.hgetall.bind(store);
+    store.hgetall = async (k: string) => { if (k === subNamesKeyOf(DED_ID)) throw new Error("upstash 502"); return hgetall(k); };
+    const res = await runSubmitters(deps(store, { dedLatest: async () => ({ data: [{ orgId: O1, orgName: "Open Poker" }] }) }));
+    expect(res.names).toBe(0);
+    expect(store.applies).toHaveLength(1);
+    expect(span(store)!.get("cursor")).toBe("1129");
+    expect(h1(store, PREV_HOUR)!.get(`27-13|${O1}`)).toBe("120");
+  });
+
+  it("a names read that fails costs the run nothing", async () => {
+    const store = fakeStore();
+    const res = await runSubmitters(deps(store, { dedLatest: async () => { throw new Error("ded down"); } }));
+    expect(res.names).toBe(0);
+    expect(span(store)!.get("cursor")).toBe("1129");
+  });
+});
+
+// THE BACK-FILL WALK (`walkRange`, `scripts/walk-submitters.ts`): oldest hour first up to the
+// sampler's span.from, SETS not increments, each day's 1d recomputed from its stored 1h fields.
+describe("walkRange", () => {
+  const DAY = 24 * HOUR;
+  const D0 = Date.UTC(2026, 10, 25), D1 = D0 + DAY, D2 = D1 + DAY;
+  /** One record every 10 minutes from D0 00:00 to D2 14:00 (ordinals 5000 … 5372). */
+  const W: MetaRec[] = Array.from({ length: 373 }, (_, i) => ({ ordinal: 5000 + i, timestamp: new Date(D0 + i * 10 * MIN).toISOString() }));
+  const wTs = (o: number) => Date.parse(W[o - 5000].timestamp);
+  const NOW_W = D2 + 14 * HOUR + 10 * MIN;
+  const SPAN_FROM = D2 + 13 * HOUR; // the sampler's first run: the start of the previous hour
+
+  const wPager = async (_id: string, limit: number, next?: string): Promise<ChainPage<MetaRec>> => {
+    const all = W.slice().reverse();
+    const off = next ? Number(next) : 0;
+    return { data: all.slice(off, off + limit), next: off + limit < all.length ? String(off + limit) : undefined };
+  };
+  /** An inclusive cursor ON the oldest record at/after `ms`; undefined: all older; null: none older. */
+  const cursorAt = async (_net: string, ms: number): Promise<string | undefined | null> => {
+    if (Date.parse(W[0].timestamp) >= ms) return null;
+    const nf = W.slice().reverse();
+    const firstOlder = nf.findIndex((r) => Date.parse(r.timestamp) < ms);
+    return firstOlder === 0 ? undefined : String(firstOlder - 1);
+  };
+  /** The walk never reads a record the sampler owns: such a read fails the walk. */
+  const walkSnap = async (_net: string, o: number) => {
+    if (wTs(o) >= SPAN_FROM) throw new Error(`read a sampler record: ${o}`);
+    return root(o);
+  };
+  const wdeps = (store: TrendsStore, over: Partial<WalkDeps> = {}): WalkDeps => ({
+    store, pageMeta: wPager, cursorAt, fetchSnap: walkSnap, pool: 3, sleep: async () => {}, ...over,
+  });
+  async function sampled() {
+    const store = fakeStore();
+    await runSubmitters({ store, nets: [DED_ID], pageMeta: wPager, fetchSnap: async (_n, o) => root(o), now: () => NOW_W });
+    return store;
+  }
+  const field = (s: ReturnType<typeof fakeStore>, tier: "1h" | "1d", ts: number, id: string) => {
+    const { key, bucket } = subSlotOf(DED_ID, tier, ts);
+    return s.data.get(key)?.get(`${bucket}|${id}`);
+  };
+  const sum1h = (s: ReturnType<typeof fakeStore>, day: number, id: string) => {
+    let t = 0;
+    for (let h = 0; h < 24; h++) t += Number(field(s, "1h", day + h * HOUR, id) ?? 0);
+    return String(t);
+  };
+  const progress = () => {};
+
+  it("writes each hour as a SET of its tally, never reads or writes an hour the sampler owns, and a rerun changes nothing", async () => {
+    const store = await sampled();
+    expect(span(store)!.get("from")).toBe(String(SPAN_FROM));
+    const samplerHours = [13, 14].map((h) => [field(store, "1h", D2 + h * HOUR, O1), field(store, "1h", D2 + h * HOUR, O2)]);
+    expect(samplerHours).toEqual([["12", "3"], ["2", undefined]]); // 14:00 is ordinal 5372, even
+
+    const days: number[] = [];
+    const res = await walkRange(wdeps(store), DED_ID, D0, SPAN_FROM, (p) => days.push(p.tsMs));
+    expect(res.failedAt).toBeNull();
+    expect(res.nextMs).toBe(SPAN_FROM);
+    expect(res.read).toBe(2 * 144 + 13 * 6);
+    expect(days).toEqual([D1, D2, SPAN_FROM]); // progress once a day
+    // 6 records an hour: 12 batches by o1, 3 by o2 (odd ordinals).
+    expect(field(store, "1h", D0, O1)).toBe("12");
+    expect(field(store, "1h", D0, O2)).toBe("3");
+    expect(field(store, "1h", D2 + 12 * HOUR, O1)).toBe("12");
+    // The sampler's hours untouched.
+    expect([13, 14].map((h) => [field(store, "1h", D2 + h * HOUR, O1), field(store, "1h", D2 + h * HOUR, O2)])).toEqual(samplerHours);
+    // 1d = Σ1h, the boundary day's from ALL its hours (the sampler's included).
+    for (const d of [D0, D1, D2]) for (const id of [O1, O2]) expect(field(store, "1d", d, id)).toBe(sum1h(store, d, id));
+    expect(field(store, "1d", D0, O1)).toBe("288");
+    expect(field(store, "1d", D2, O1)).toBe(String(85 * 2));
+
+    const once = subData(store);
+    await walkRange(wdeps(store), DED_ID, D0, SPAN_FROM, progress);
+    expect(subData(store)).toEqual(once);
+  });
+
+  it("a walk stopped by a failed read leaves 1d = Σ1h, and resumed at its hour equals one uninterrupted walk", async () => {
+    const clean = await sampled();
+    await walkRange(wdeps(clean), DED_ID, D0, SPAN_FROM, progress);
+
+    const store = await sampled();
+    const BAD = 5000 + 144 + 5 * 6 + 2; // D1 05:20
+    const res = await walkRange(wdeps(store, { fetchSnap: async (n, o) => { if (o === BAD) throw new Error("L0 502"); return walkSnap(n, o); } }), DED_ID, D0, SPAN_FROM, progress);
+    expect(res.failedAt).toBe(BAD);
+    expect(res.nextMs).toBe(D1 + 5 * HOUR);
+    expect(res.lowered).toBe(false);
+    expect(span(store)!.get("from")).toBe(String(SPAN_FROM));
+    expect(field(store, "1h", D1 + 5 * HOUR, O1)).toBeUndefined(); // the failed hour is not written
+    expect(field(store, "1d", D1, O1)).toBe(sum1h(store, D1, O1));
+    expect(field(store, "1d", D1, O1)).toBe(String(5 * 12));
+
+    const res2 = await walkRange(wdeps(store), DED_ID, D0, SPAN_FROM, progress, res.nextMs);
+    expect(res2.failedAt).toBeNull();
+    expect(res2.lowered).toBe(true);
+    expect(subData(store)).toEqual(subData(clean));
+    expect(span(store)).toEqual(span(clean));
+  });
+
+  it("span.from moves to the walk's start only once the walk reaches it; to and cursor stay the sampler's", async () => {
+    const store = await sampled();
+    const before = new Map(span(store)!);
+    const short = await walkRange(wdeps(store), DED_ID, D0, D1, progress);
+    expect(short.lowered).toBe(false);
+    expect(span(store)).toEqual(before);
+
+    const full = await walkRange(wdeps(store), DED_ID, D0, SPAN_FROM, progress);
+    expect(full.lowered).toBe(true);
+    expect(span(store)!.get("from")).toBe(String(D0));
+    expect(span(store)!.get("to")).toBe(before.get("to"));
+    expect(span(store)!.get("cursor")).toBe(before.get("cursor"));
+  });
+
+  it("never walks past span.from, whatever toMs asks", async () => {
+    const store = await sampled();
+    const res = await walkRange(wdeps(store), DED_ID, D0, NOW_W, progress);
+    expect(res.failedAt).toBeNull(); // walkSnap would have failed on a sampler record
+    expect(res.nextMs).toBe(SPAN_FROM);
+    expect(res.lowered).toBe(true);
+  });
+
+  it("recomputes the boundary day and lowers the span under the sampler's lock, waiting for it", async () => {
+    const store = await sampled();
+    store.locked = true;
+    let waits = 0;
+    const res = await walkRange(wdeps(store, { sleep: async () => { waits++; store.locked = false; } }), DED_ID, D2, SPAN_FROM, progress);
+    expect(waits).toBe(1);
+    expect(res.lowered).toBe(true);
+    expect(store.locked).toBe(false);
+    expect(field(store, "1d", D2, O1)).toBe(sum1h(store, D2, O1));
+  });
+
+  it("refuses without a measured span: the sampler must run first", async () => {
+    await expect(walkRange(wdeps(fakeStore()), DED_ID, D0, SPAN_FROM, progress)).rejects.toThrow(/span/);
+  });
+
+  it("walkHoles fills a hole's hours, recomputes its days, deletes the hole, and its buckets read measured", async () => {
+    const clean = await sampled();
+    await walkRange(wdeps(clean), DED_ID, D0, SPAN_FROM, progress);
+
+    const store = await sampled();
+    await walkRange(wdeps(store), DED_ID, D0, SPAN_FROM, progress);
+    // A gap's hours: D1 05:00 and 06:00 lost from the store, the day's 1d stale, the hole recorded.
+    const k1h = subSlotOf(DED_ID, "1h", D1).key;
+    for (const f of [...store.data.get(k1h)!.keys()]) if (f.startsWith("26-05|") || f.startsWith("26-06|")) store.data.get(k1h)!.delete(f);
+    await store.hset(subSlotOf(DED_ID, "1d", D1).key, { [`11-26|${O1}`]: 1 });
+    await store.hset(subHolesKeyOf(DED_ID), { [String(D1 + 5 * HOUR)]: String(D1 + 7 * HOUR) });
+    const read = (s: ReturnType<typeof fakeStore>) => assembleSubmitters({
+      net: DED_ID, tier: "1h", fromMs: D1, toMs: D1 + 24 * HOUR,
+      hashes: { [k1h]: Object.fromEntries(s.data.get(k1h)!) },
+      span: Object.fromEntries(span(s)!), names: null,
+      holes: s.data.has(subHolesKeyOf(DED_ID)) ? Object.fromEntries(s.data.get(subHolesKeyOf(DED_ID))!) : null,
+    });
+    expect(read(store).distinct.slice(4, 8)).toEqual([2, null, null, 2]);
+
+    const res = await walkHoles(wdeps(store), DED_ID);
+    expect(res).toEqual({ filled: 1, left: 0, failedAt: null, read: 12 });
+    expect(store.data.has(subHolesKeyOf(DED_ID))).toBe(false);
+    expect(subData(store)).toEqual(subData(clean));
+    expect(field(store, "1d", D1, O1)).toBe(sum1h(store, D1, O1));
+    expect(read(store).distinct.slice(4, 8)).toEqual([2, 2, 2, 2]);
+    expect(store.locked).toBe(false);
+  });
+
+  it("walkHoles leaves a hole the sampler is still inside, and a failed read leaves its hole", async () => {
+    const store = await sampled();
+    await store.hset(subHolesKeyOf(DED_ID), { [String(D2 + 13 * HOUR)]: String(D2 + 15 * HOUR) });
+    let reads = 0;
+    const res = await walkHoles(wdeps(store, { fetchSnap: async (n, o) => { reads++; return walkSnap(n, o); } }), DED_ID);
+    expect(res).toEqual({ filled: 0, left: 1, failedAt: null, read: 0 });
+    expect(reads).toBe(0);
+
+    const bad = await sampled();
+    await bad.hset(subHolesKeyOf(DED_ID), { [String(D1)]: String(D1 + 2 * HOUR) });
+    const r2 = await walkHoles(wdeps(bad, { fetchSnap: async (n, o) => { if (o === 5000 + 144 + 7) throw new Error("L0 502"); return walkSnap(n, o); } }), DED_ID);
+    expect(r2.failedAt).toBe(5000 + 144 + 7);
+    expect(r2.filled).toBe(0);
+    expect(bad.data.get(subHolesKeyOf(DED_ID))!.get(String(D1))).toBe(String(D1 + 2 * HOUR));
+  });
+
+  it("Dor: the walk SETs each hour's sketch from its own ids, the day as the union of its hours, with count fields — idempotent (R22)", async () => {
+    const dorSnap = async (_n: string, o: number) => { if (wTs(o) >= SPAN_FROM) throw new Error(`read a sampler record: ${o}`); return dorRoot(o); };
+    const store = fakeStore();
+    await runSubmitters({ store, nets: [DOR_ID], pageMeta: wPager, fetchSnap: async (_n, o) => dorRoot(o), now: () => NOW_W });
+    // A stale hour sketch the walk must overwrite, never merge with (the SET discipline).
+    store.str.set(subSketchKeyOf(DOR_ID, "1h", D0), encodeSketch(addIds(newSketch(), ["stale"])));
+    const res = await walkRange(wdeps(store, { fetchSnap: dorSnap }), DOR_ID, D0, SPAN_FROM, progress);
+    expect(res.failedAt).toBeNull();
+    expect(res.lowered).toBe(true);
+    // 6 records an hour, ordinals 5000+6h…: devices (o % 5) and (o + 1) % 5 — every hour sees all five.
+    expect(store.str.get(subSketchKeyOf(DOR_ID, "1h", D0))).toBe(FIVE);
+    expect(countOf(store, "1h", D0)).toBe("5");
+    for (const d of [D0, D1, D2]) {
+      expect(store.str.get(subSketchKeyOf(DOR_ID, "1d", d))).toBe(FIVE);
+      expect(countOf(store, "1d", d)).toBe("5");
+    }
+    const once = { str: [...store.str].sort(), data: subData(store) };
+    await walkRange(wdeps(store, { fetchSnap: dorSnap }), DOR_ID, D0, SPAN_FROM, progress);
+    expect({ str: [...store.str].sort(), data: subData(store) }).toEqual(once);
+  });
+
+  it("Dor: the day sketch is the merge of its hour sketches, the boundary day's sampler hours included (R22)", async () => {
+    const store = fakeStore();
+    await runSubmitters({ store, nets: [DOR_ID], pageMeta: wPager, fetchSnap: async (_n, o) => dorRoot(o), now: () => NOW_W });
+    // Only the sampler's 14:00 hour carries a device the walk's hours never see.
+    store.str.set(subSketchKeyOf(DOR_ID, "1h", D2 + 14 * HOUR), encodeSketch(addIds(newSketch(), [...DEVICES, "beef"])));
+    const dorSnap = async (_n: string, o: number) => dorRoot(o);
+    await walkRange(wdeps(store, { fetchSnap: dorSnap }), DOR_ID, D2, SPAN_FROM, progress);
+    expect(store.str.get(subSketchKeyOf(DOR_ID, "1d", D2))).toBe(encodeSketch(addIds(newSketch(), [...DEVICES, "beef"])));
+    expect(countOf(store, "1d", D2)).toBe("6");
+    // An undecodable hour fails the day's recompute rather than dropping that hour from the day.
+    store.str.set(subSketchKeyOf(DOR_ID, "1h", D1 + 3 * HOUR), "hll12:garbage");
+    await expect(walkRange(wdeps(store, { fetchSnap: dorSnap }), DOR_ID, D1 + 5 * HOUR, D2, progress)).rejects.toThrow(/sketch/);
+    expect(store.str.has(subSketchKeyOf(DOR_ID, "1d", D1))).toBe(false);
+  });
+
+  it("inside the sampler's lock it calls only the raw store (`lockedStore`), so the section cannot outlast the lock", async () => {
+    const raw = await sampled();
+    await raw.hset(subHolesKeyOf(DED_ID), { [String(D1)]: String(D1 + HOUR) });
+    // The script's retrying store: a retry loop inside the lock could outlive LOCK_TTL_S.
+    const inLock = (name: "hgetall" | "hmget" | "mget" | "applyWrites") => async (...a: unknown[]) => {
+      if (raw.locked) throw new Error(`a retrying ${name} inside the lock`);
+      return (raw[name] as (...x: unknown[]) => Promise<unknown>)(...a);
+    };
+    const retrying = { ...raw, hgetall: inLock("hgetall"), hmget: inLock("hmget"), mget: inLock("mget"), applyWrites: inLock("applyWrites") } as unknown as TrendsStore;
+    const w = await walkRange(wdeps(retrying, { lockedStore: raw }), DED_ID, D2, SPAN_FROM, progress);
+    expect(w.lowered).toBe(true);
+    const h = await walkHoles(wdeps(retrying, { lockedStore: raw }), DED_ID);
+    expect(h.filled).toBe(1);
+    expect(raw.locked).toBe(false);
+    // Dor's boundary day: its 24 hour sketches are MGET inside the lock, through the raw store too (R22).
+    await runSubmitters({ store: raw, nets: [DOR_ID], pageMeta: wPager, fetchSnap: async (_n, o) => dorRoot(o), now: () => NOW_W });
+    const d = await walkRange(wdeps(retrying, { lockedStore: raw, fetchSnap: async (_n, o) => dorRoot(o) }), DOR_ID, D2, SPAN_FROM, progress);
+    expect(d.lowered).toBe(true);
+    expect(raw.str.get(subSketchKeyOf(DOR_ID, "1d", D2))).toBe(FIVE);
+  });
+});

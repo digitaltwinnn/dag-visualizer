@@ -128,6 +128,12 @@ function resolve(id: string): IdentityHue | null {
   return resolved;
 }
 
+/** One network's identity hue in degrees, or null for a falsy id — what an organisation hue keeps
+ *  clear of (submitterHue.ts). */
+export function identityHueDeg(id: string): number | null {
+  return resolve(id)?.hueDeg ?? null;
+}
+
 export function identityHudHex(id: string): string { return resolve(id)?.hudHex ?? CORE_HEX; }
 
 // CSS-deferred HUD colour: the value never encodes L/C at all, so a theme switch retints every

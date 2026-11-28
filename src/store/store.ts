@@ -437,6 +437,14 @@ interface AppState {
   // The DATA BLOCK the cursor is hovering (`dataBlockHoverKey`) — its own channel (2026-11-09): the
   // Data block card hovered its snapshot's, so the snapshot lit for a data block.
   hoverDataBlock: string | null;
+  // The ORGANISATION the cursor is hovering (a DED submitter id, 2026-11-27): the Data block card's
+  // organisation rows preview it and the chamber lights its bands in the data columns. Previews only.
+  hoverSubmitter: string | null;
+  // THE ORGANISATION PALETTE the chamber's bands are coloured from (the read route's `palette`: up
+  // to seven DED organisations, busiest of all time first). A React → Engine PUBLISH CHANNEL with
+  // one writer, `components/SubmitterPaletteBridge.tsx`; the Engine hands it to the chamber as plain
+  // data and no component renders from it (`components/publishChannelBoundary.test.ts`).
+  submitterPalette: readonly string[];
   // Block reads, keyed `${chain}:${ordinal}`; "dag:<ord>" mirrors `snapshotExact`'s blocks.
   blockReads: Record<string, HeldBlockRead>;
   // Block reads that FAILED (retry spent): the tick stays, its blocks draw with no links (rule 10).
@@ -586,6 +594,10 @@ interface AppState {
   advanceDataBlock: (b: DataBlockSel | null) => void;
   setHoverBlock: (hash: string | null) => void;
   setHoverDataBlock: (key: string | null) => void;
+  setHoverSubmitter: (id: string | null) => void;
+  /** Publish the organisation palette (see `submitterPalette`). Pass a fresh array only on a
+   *  content change: the Engine's change signal is `!==`. */
+  publishSubmitterPalette: (ids: readonly string[]) => void;
   setBlockRead: (key: string, v: HeldBlockRead) => void;
   setBlockReadMiss: (key: string) => void;
   /** Drop every block read and miss outside `keep`. Data-bridge setter. */
@@ -721,6 +733,8 @@ export const useStore = create<AppState>((set) => ({
   dataBlock: null,
   hoverBlock: null,
   hoverDataBlock: null,
+  hoverSubmitter: null,
+  submitterPalette: [],
   blockReads: {},
   blockReadMiss: {},
   geoMeasure: "nodes",
@@ -776,7 +790,7 @@ export const useStore = create<AppState>((set) => ({
       // The block leaves with its view, and its recency rank with it (the way `setBlock(null)` drops
       // it) — the focus patch reads the stack it is handed, so it is handed the stack without it.
       const selStack = bumpStack(bumpStack(s.selStack, "block", false), "dataBlock", false);
-      return { ...nav, block: null, dataBlock: null, hoverBlock: null, hoverDataBlock: null, trendRotation: 0, trendScroll: 0, ...focusPatch({ ...s, selStack }, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter), false) };
+      return { ...nav, block: null, dataBlock: null, hoverBlock: null, hoverDataBlock: null, hoverSubmitter: null, trendRotation: 0, trendScroll: 0, ...focusPatch({ ...s, selStack }, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter), false) };
     }),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
@@ -1051,6 +1065,8 @@ export const useStore = create<AppState>((set) => ({
     })),
   setHoverBlock: (hoverBlock) => set({ hoverBlock }),
   setHoverDataBlock: (hoverDataBlock) => set({ hoverDataBlock }),
+  setHoverSubmitter: (hoverSubmitter) => set({ hoverSubmitter }),
+  publishSubmitterPalette: (submitterPalette) => set({ submitterPalette }),
   setBlockRead: (key, v) =>
     set((s) => {
       if (s.blockReadMiss[key] == null) return { blockReads: { ...s.blockReads, [key]: v } };

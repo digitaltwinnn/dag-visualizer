@@ -57,6 +57,11 @@ export interface MetricSpec {
   /** The unit JOINS the label in a caption ("Cadence between snapshots") instead of following
    *  "in" ("Fees in DAG per day") — asked of the spec, as `metricCaption` asks everything. */
   joinUnit?: true;
+  /** The CURRENCY a bare figure of this metric is an amount in ("$DAG"), stated beside the
+   *  number wherever it stands without its chart's unit line — the Range card's average, the
+   *  explorer's DAG row (user, 2026-11-28: "should say $DAG not just the number"). A count or a
+   *  size names no currency, so only an amount carries one. */
+  currency?: "$DAG";
 }
 
 // THE VALUE FORMATTERS, one home — exported because the DOCUMENT's global (`g.*`) charts read
@@ -100,7 +105,7 @@ export const TREND_METRICS: Record<TrendMetric, MetricSpec> = {
   // not one unit. Measured only where the sampler read the transfer lists (`x.cov`, `measuredTx`).
   transfers: { kind: "counter", key: (id) => `m.${id}.tx`, scale: 1, unit: rate },
   // Stored in DATUMS, the chain's own integer unit; read in DAG.
-  fees: { kind: "counter", key: (id) => `m.${id}.fee`, scale: 1e-8, unit: (per) => `$DAG ${per}`, format: formatDag },
+  fees: { kind: "counter", key: (id) => `m.${id}.fee`, scale: 1e-8, unit: (per) => `$DAG ${per}`, format: formatDag, currency: "$DAG" },
   // Stored in KB; read in MB, which is the scale a day of anchoring actually reaches.
   kb: { kind: "counter", key: (id) => `m.${id}.kb`, scale: 1 / 1024, unit: rate, format: formatMb },
   // The fleet gauge: sampled live, never backfillable (no historical record of the fleet exists

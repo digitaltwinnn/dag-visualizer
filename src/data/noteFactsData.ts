@@ -1,6 +1,7 @@
 import { BLOCK_WINDOW_TICKS } from "@/src/data/blockWindow";
 import { fact } from "@/src/data/noteFacts";
 import type { Fact, NoteLead } from "@/src/data/noteTypes";
+import { SUBMITTERS, submitterLabel } from "@/src/data/submitters";
 import type { ChannelSnapRow } from "@/src/data/types";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 
@@ -27,6 +28,14 @@ import { UNLISTED_ID } from "@/src/data/unlistedId";
 // time ("14:05 UTC", the `time` kind — a note is written for every reader, so the zone is the one
 // they share), and the note says the counts are as of then.
 //
+// WHO SUBMITTED THE DATA (2026-11-27): ONE NETWORK'S note, for a network whose updates name their
+// submitter (`submitters.ts`), states who, off the same rows (`DataBlockSummary.submitters`):
+// Digital Evidence each organisation's batches in the window, by the label every surface gives it
+// (`submitterLabel`, "Org 0f3a9b12" for one with no known name), every label joining `names` so the
+// gate strips its digits; Dor how many devices checked in, never one of them. A block with no
+// submitter read (unread, or a row that was not decoded) makes those counts a floor; none read at
+// all states none. The whole network's note is unchanged.
+//
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).
 
 /** The global snapshots the note reads: the chamber's own window (`BLOCK_WINDOW_TICKS`, 50). */
@@ -50,9 +59,40 @@ export interface DataFactsInput {
   /** ONE NETWORK'S NOTE (catalog id, 2026-11-20): its own data blocks alone — no whole-network totals,
    *  no count of networks — and null when it carried none over the window (no note about nothing). */
   only?: string;
+  /** Organisation id → name (the `sub:` family's names hash), for the organisations `only` names.
+   *  Absent (not read), no organisation is stated: "Org <id>" is a label only where the hash was
+   *  read and holds no name. An empty hash is a read. */
+  submitterNames?: Record<string, string>;
 }
 
-export function dataFacts(input: DataFactsInput): { facts: Fact[]; names: string[]; lead: NoteLead } | null {
+/** WHO SUBMITTED ONE NETWORK'S DATA over the ticks read (the header's rule), or nothing. */
+function submitterFacts(input: DataFactsInput, read: DataTickRead[], id: string, floored: boolean): { facts: Fact[]; names: string[] } {
+  const spec = SUBMITTERS[id]!;
+  const by = new Map<string, number>();
+  let known = 0;
+  let floor = floored;
+  for (const t of read) {
+    for (const r of t.rows!) {
+      if (input.keyOf(r.metaId) !== id) continue;
+      if (!r.dataBlockRows) { if ((r.dataBlocks ?? 0) > 0) floor = true; continue; }
+      for (const b of r.dataBlockRows) {
+        if (!b.submitters) { floor = true; continue; }
+        known++;
+        for (const s of b.submitters) by.set(s.id, (by.get(s.id) ?? 0) + s.updates);
+      }
+    }
+  }
+  if (!known) return { facts: [], names: [] };
+  const least = floor ? ", at least" : "";
+  if (spec.kind === "device") return { facts: [fact(`Devices that checked in, in the window${least}`, by.size, "count")], names: [] };
+  const names = input.submitterNames;
+  if (!names) return { facts: [], names: [] };
+  const ranked = [...by].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const labels = ranked.map(([sid]) => submitterLabel(sid, names));
+  return { facts: ranked.map(([, n], i) => fact(`${labels[i]} ${spec.unit} in the window${least}`, n, "count")), names: labels };
+}
+
+export function dataFacts(input: DataFactsInput): { facts: Fact[]; names: string[]; lead: NoteLead; actors?: string[] } | null {
   const read = input.ticks.filter((t) => t.rows != null);
   if (!read.length) return null;
   const facts: Fact[] = [];
@@ -98,5 +138,9 @@ export function dataFacts(input: DataFactsInput): { facts: Fact[]; names: string
     facts.push(fact(e.floor ? `${name} data updates, at least` : `${name} data updates`, e.updates, "count"));
   }
   if (ids.length && !only) facts.push(fact("Networks that carried data blocks", ids.length, "count"));
-  return { facts, names: Object.values(input.names), lead: { kind: "now" } };
+  const subs = only && Object.hasOwn(SUBMITTERS, only) ? submitterFacts(input, read, only, by.get(only)!.floor) : null;
+  if (subs) facts.push(...subs.facts);
+  // The organisations named are the gate's actors (`CheckOptions.actors`), as History's are.
+  const actors = subs?.names ?? [];
+  return { facts, names: [...Object.values(input.names), ...actors], lead: { kind: "now" }, ...(actors.length ? { actors } : {}) };
 }

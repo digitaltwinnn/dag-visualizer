@@ -700,7 +700,7 @@ describe("one list per level — the rail steps the explorer's own lists", () =>
     // A tripwire: a new CHILD_OF entry must earn a one-list assertion here.
     const pairs = Object.entries(CHILD_OF).flatMap(([mode, m]) => Object.keys(m ?? {}).map((k) => `${mode}:${k}`));
     expect(pairs.sort()).toEqual(
-      ["geo:context", "geo:country", "geo:cohort", "hyper:context", "hyper:composition", "ledger:snap", "trend:range"].sort(),
+      ["geo:context", "geo:country", "geo:cohort", "hyper:context", "hyper:composition", "ledger:snap", "trend:range", "trend:submitters"].sort(),
     );
   });
 });
@@ -732,6 +732,19 @@ describe("the Range card's next ghost — the span's first moment (2026-10-18)",
     expect(step).not.toBeNull();
     expect(step!.actions).toEqual([{ kind: "trendCursor", ms: expect.any(Number) }]);
     expect(childStep("range", base({ mode: "trend", trendRange: null, trendWindow: "all" }))).toBeNull();
+  });
+});
+
+// THE DATA SUBMITTERS CARD stands between the Range and the Moment (2026-11-27) and always stands in
+// History, so the lane's subject run ends on it: its next ghost is the Range's own — the span's first
+// moment — or the Moment ghost under it would lose its step.
+describe("the Data submitters card's next ghost — the same span's first moment", () => {
+  it("is the Range card's step, for a window and for a brushed range", () => {
+    for (const over of [{ trendRange: null, trendWindow: "7d" }, { trendRange: { fromMs: Date.UTC(2026, 9, 1), toMs: Date.UTC(2026, 9, 8) }, trendWindow: "30d" }] as const) {
+      const s = base({ mode: "trend", ...over });
+      expect(childStep("submitters", s)).toEqual(childStep("range", s));
+      expect(childStep("submitters", s)).not.toBeNull();
+    }
   });
 });
 

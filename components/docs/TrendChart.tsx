@@ -52,6 +52,9 @@ export interface TrendBand {
    *  beside the label where there is more than one (user, 2026-10-09: "hybrid L0+cL1+dL1 can look
    *  nicer by using the L0, L1 pills instead of + and text"). */
   codes?: string[];
+  /** A BAND IN ITS OWN COLOUR (2026-11-27, History's Data submitters card: one band per
+   *  organisation, each in its hue). Absent, the band is the first line's hue at its opacity step. */
+  hue?: string;
 }
 /** A band's name as the legend and the tooltip print it: the word, then its layer pills. */
 function BandName({ b }: { b: TrendBand }) {
@@ -70,6 +73,11 @@ const bandKey = (b: TrendBand): string => `s:${b.key ?? b.label}`;
  *  "are they truly stacked? I feel the overlap" — the fourth band, Data at 14 of DOR's 17 nodes,
  *  sat at 6% and read as the card's own tint, so the stack looked like one area with a sliver). */
 const STACK_STEPS = [0.6, 0.44, 0.32, 0.22, 0.15];
+/** A band in its OWN hue is told apart by the hue, so every such band takes one step. */
+const HUED_BAND_STEP = 0.5;
+/** A band's fill and its fill opacity: its own hue at one step, else the stack's hue on the ramp. */
+const bandPaint = (b: TrendBand, i: number, hue: string): { color: string; opacity: number } =>
+  b.hue ? { color: b.hue, opacity: HUED_BAND_STEP } : { color: hue, opacity: STACK_STEPS[i % STACK_STEPS.length]! };
 
 const PLOT_H = 120;
 const AXIS_H = 18;
@@ -278,6 +286,7 @@ export default function TrendChart({
   rollClassName,
   held,
   stack,
+  legend = true,
   note,
   syncId = "trends",
   compact = false,
@@ -420,6 +429,10 @@ export default function TrendChart({
    *  types). Only for parts that PARTITION the line — they must sum to it, or the stack claims
    *  more than exists. A bucket null in every band is left open (not recorded). */
   stack?: TrendBand[];
+  /** Whether the head draws the series/band legend. Off only where the caller draws its own key
+   *  beside the chart (History's Data submitters card: its share table names every band in its hue,
+   *  and a rail card is too narrow for both). */
+  legend?: boolean;
   /** AN INSTRUMENT STATE THE SERIES CANNOT SAY (2026-09-18). When the caller knows something the
    *  points don't — most concretely that the payload this chart needs is still IN FLIGHT — it
    *  hands the words here and the plot is replaced by them, in the chart's own empty-state frame.
@@ -681,16 +694,19 @@ export default function TrendChart({
         )}
         {/* The pair legend — only when there IS a pair (one series needs no legend, its name is
             the title). `gap-x-3`, not 2 (user, 2026-10-09: "the legend is too tight"). */}
-        {(lines.length > 1 || (stack?.length ?? 0) > 0) && (
+        {legend && (lines.length > 1 || (stack?.length ?? 0) > 0) && (
           <span className="ml-auto inline-flex items-center gap-x-3 text-label text-muted-foreground">
-            {stack?.map((b, i) => (
-              <span key={bandKey(b)} className="inline-flex items-center gap-1">
-                <svg width="10" height="10" aria-hidden>
-                  <rect x="0.5" y="0.5" width="9" height="9" rx="2" fill={lines[0]?.hue ?? "var(--primary)"} fillOpacity={STACK_STEPS[i % STACK_STEPS.length]} stroke={lines[0]?.hue ?? "var(--primary)"} strokeOpacity={0.5} />
-                </svg>
-                <BandName b={b} />
-              </span>
-            ))}
+            {stack?.map((b, i) => {
+              const paint = bandPaint(b, i, lines[0]?.hue ?? "var(--primary)");
+              return (
+                <span key={bandKey(b)} className="inline-flex items-center gap-1">
+                  <svg width="10" height="10" aria-hidden>
+                    <rect x="0.5" y="0.5" width="9" height="9" rx="2" fill={paint.color} fillOpacity={paint.opacity} stroke={paint.color} strokeOpacity={0.5} />
+                  </svg>
+                  <BandName b={b} />
+                </span>
+              );
+            })}
             {/* UNDER A STACK THE LINE IS THE BANDS' TOP EDGE, so it needs no entry of its own (user,
                 2026-10-09: "do we need the nodes line? if stacked it will already be at that
                 height") — the bands name every part, and the title names the whole. The entry
@@ -1352,11 +1368,11 @@ const TrendPlot = memo(function TrendPlot({
                   dataKey={bandKey(b)}
                   stackId="parts"
                   type="linear"
-                  stroke={hue0}
+                  stroke={bandPaint(b, i, hue0).color}
                   strokeOpacity={0.7}
                   strokeWidth={1}
-                  fill={hue0}
-                  fillOpacity={STACK_STEPS[i % STACK_STEPS.length]}
+                  fill={bandPaint(b, i, hue0).color}
+                  fillOpacity={bandPaint(b, i, hue0).opacity}
                   connectNulls={false}
                   isAnimationActive={false}
                   dot={false}

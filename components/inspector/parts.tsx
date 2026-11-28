@@ -18,6 +18,8 @@ import { nodeStatus } from "@/src/data/nodeStatus";
 // "data-L1") used to sit here and fed the composition `parts` strings, so the same layer could
 // read two ways within one card — the chips beside them have always used these codes.
 import { ROLE_SHORT } from "@/src/data/composition";
+import { submitterLabel } from "@/src/data/submitters";
+import type { SubmittersWindow } from "@/app/api/submitters/assemble";
 export { ROLE_SHORT }; // ONE home for the layer-code map (2026-08-16) — this is a re-export
 export const ROLE_ORDER = ["l0", "cl1", "dl1"];
 
@@ -770,4 +772,12 @@ export function ScheduleTable({ axis, parts, className, head }: { axis?: string;
       ))}
     </div>
   );
+}
+
+/** THE METAGRAPH CARD'S ACTIVE ORGANISATIONS (2026-11-27): the last 24 hours' organisations, busiest
+ *  first (the read route's own order), each with its share of the window's batches. An unnamed one
+ *  reads "Org <first 8 of id>" (`submitterLabel`, the one string everywhere). */
+export function activeSubmitterRows(w: Pick<SubmittersWindow, "totals" | "names">): { id: string; label: string; updates: number; share: number }[] {
+  const grand = w.totals.reduce((n, t) => n + t.updates, 0);
+  return w.totals.map((t) => ({ id: t.id, label: submitterLabel(t.id, w.names), updates: t.updates, share: grand > 0 ? t.updates / grand : 0 }));
 }

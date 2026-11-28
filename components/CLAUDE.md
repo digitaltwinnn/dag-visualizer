@@ -503,6 +503,33 @@ and its two dates — the span's own, no fetch — placed by the span's FRACTION
 (the frame's own start date waits for its buckets). A frame that measured nothing, or a failed read,
 still draws nothing. The caption row is one line tall whatever it holds, so nothing jumps.
 
+**Under the Range stands the DATA SUBMITTERS card** (2026-11-27, `inspector/TrendSubmittersPane.tsx`,
+its pure half `inspector/trendSubmitters.ts`): who sent the network's data blocks over the Range card's
+own span (the brushed range, else the window's), on the network the deck stands on (`cardNetwork`; All
+and the DAG's plane read as every network). A card slot with no rung, always present in History, no ×,
+named "Data submitters" in the slot titles. Four bodies (`submittersCardState`): under All, one row per
+network with a `SUBMITTERS` row and its count over the span ("5 organisations", "about 57 devices") —
+a count over a span not wholly measured carries `measuredFloor`'s line for it as the row's muted second
+line (R23) — each row
+bringing that plane forward through `trendPlaneActions` and the executor (paired on `hoverFilter`, the
+Moment's rows' exemption in `cardHoverBoundary`), plain rows under a filter; a network with no row says
+"<network>'s data names no submitter this app reads, so there is no one to show" (`noSubmitterLine`,
+R21 — true by construction, never a claim about what the chain carried) and is never fetched for;
+Digital Evidence draws the span's TOTAL batches per bucket with its organisations as bands that
+partition it (ruling R4 — the top five palette members by the span's totals in their own hue,
+`TrendBand.hue`, every other one "Other (n)" in the neutral), the bands' share table as its key (the
+chart's own legend is off — `TrendChart legend`) and "N active of M seen"; Dor its devices per bucket
+and "about N devices checked in" (an estimate, R19), never named. A bucket outside the sampler's measured span (or in a hole, R20) is null,
+and the line under the chart says every way a bucket is not measured (`measuredFloor`): "Not measured
+since <stamp>" when the range runs past where the sampler stopped, "Measured by the hour; this hour is
+still being read." on the 1h pill (its one bucket is the one being written), "Not measured before
+<first measured bucket>" (`bucketStamp` at the window's step), "Part of this range is not measured"
+over a hole, or "not measured yet" in the plot when nothing is. The read asks the span with both
+ends moved up to the hour (`querySpan`) — a stable URL that keeps the window's length, so 30 days
+stay hourly. Because it always stands under the Range, the lane's subject run ends on it, so its next
+ghost is the Range's (`CHILD_OF.trend.submitters`, the span's first moment), and with no note and
+nothing chosen the Range, not it, is the box (`LANE_REST` in `railCards.ts`).
+
 **The Metagraph card is the committed subject's network, in every view** (2026-10-18, one rule
 after the user asked for Geography's node to "also populate the dossier card"): Snapshots' is the
 network inside the tick (`tickNet`), History's the plane brought forward (`cardNetwork`), and
@@ -516,6 +543,17 @@ stands on a carried node's network again on entry (`viewEntryActions`). **Which 
 policy row, `viewPolicy.metagraphCard`** (PR review, 2026-10-19 — it had become three
 `mode === "geo"` compares): `railCards.metagraphCardNetwork` resolves it, and the card's × and
 the slot's hint read the same row.
+
+**The Metagraph card names who submitted the last 24 hours, for a network with a `SUBMITTERS` row**
+(2026-11-27; `ActiveSubmitters` in `inspector/cards.tsx`, the same in every view — last 24 hours
+always). Digital Evidence's organisations are a `ScheduleGroup` under Online nodes (header count =
+`rangeDistinct`, rows = the History card's own `CUT_ROW`/`UnitMarks`/`TableHead` pieces through
+`activeSubmitterRows`, then "N seen since Mon YYYY" in a UTC month); Dor's devices are one "Active
+devices" Fact, counted, never named. Not yet read is the stars, unmeasured is the dash, a failed read
+says nothing (rule 10); a count over hours not all measured is a FLOOR and carries one muted line under
+it, "23 of 24 hours measured" (ruling R23, `trendSubmitters.measuredHoursLine` — none when all 24 or
+none are); `useSubmitters` is called only inside that component, so no other network
+fetches.
 
 **The node card states the same facts in every view** (user, 2026-11-23; `GeoLiveNode`): place,
 host and ASN no longer yield to a committed country or provider card. A folded entry shows only its
@@ -1400,7 +1438,13 @@ Metagraph snapshots register says "N metagraph snapshots" and its size. **The DA
 own slot under the Metagraph snapshot (`DISPLAY_LANE.ledger`, after `block`, the lane's last; a
 subject of its own, not the snapshot's child rung), present in Data
 blocks alone and only under the snapshot that carried it (`parentHolds`), named by its place in
-that snapshot ("3 of 10"), its UPDATES BY KIND as the body, "Signed by N dL1 validators" and Size as
+that snapshot ("3 of 10"), its UPDATES BY KIND as the body — and on a Digital Evidence block a
+second table, BY ORGANISATION (2026-11-27): each organisation's dot in its palette hue
+(`palette/submitterHue.submitterHudCss`, the muted ink outside the busiest seven), its name or "Org
+<first 8 of id>" (`submitterLabel`, names from `useSubmitters`' 24-hour answer), its batches right-aligned,
+each row previewing its organisation on `hoverSubmitter` (the chamber lights its bands; a preview, never
+a commit), while a Dor block states one fact, "Checked in by N devices" (devices are counted, never
+named), and an unread block keeps its unread wording — "Signed by N dL1 validators" and Size as
 facts (a fact row, as the global and metagraph snapshot cards state theirs), a "Block records" door onto the snapshot's RAW record, and a foot with the
 snapshot's ordinal and the DIGEST (`DataBlockSummary`, never a hash). Its ghost's step is the pinned
 snapshot's first data block (`railSiblings.dataBlockStep`), its pager EVERY data block of its global snapshot,

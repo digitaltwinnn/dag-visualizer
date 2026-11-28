@@ -88,6 +88,8 @@ const FEEDS = {
   // the lane order alone), so it has no cadence of its own to go STALE on. Nothing polls beside it (the per-chain frontier read left with the open
   // tips, D5 2026-11-07).
   "api-blocks": { label: "Block reads", everyMs: null, when: "while shown", tempoMs: 30_000 },
+  // Who submits a metagraph's data (/api/submitters) — read only while the History card or the chamber asks.
+  "api-submitters": { label: "Data submitters", everyMs: null, when: "while shown", tempoMs: POLL.trendsMs },
 } as const;
 export type FeedId = keyof typeof FEEDS;
 const POLL_HEALTH = new Map<string, PollHealth>();

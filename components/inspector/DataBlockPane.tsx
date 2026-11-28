@@ -6,15 +6,18 @@ import { cn } from "@/lib/utils";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { KIND_MARK_CLASS, REGISTER_ICONS } from "@/components/icons";
-import { CUT_ROW, Door, Fact, FactGroup, Foot, FootRow, LayerWho, Lead, QualifierChip, SectionLabel, TABLE_ROW, TableHead, UnitMarks, countable, figWidth } from "@/components/inspector/parts";
+import { CUT_ROW, Door, Fact, FactGroup, Foot, FootRow, IdentityDot, LayerWho, Lead, QualifierChip, SectionLabel, TABLE_ROW, TableHead, UnitMarks, countable, figWidth } from "@/components/inspector/parts";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { openSnapshotRecord } from "@/components/trendDoors";
 import { useFeedRead } from "@/components/useFeedRead";
-import { subjectPairing } from "@/components/useSubjectPairing";
+import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
+import useSubmitters from "@/components/useSubmitters";
 import { dataBlockHoverKey } from "@/src/data/types";
 import { SIGNER_GROUPS, metagraphById } from "@/src/data/network";
 import { fmtKB, midHash, shortBlockHash } from "@/src/util/format";
 import { identityHudCss } from "@/src/palette/identity";
+import { submitterHudCss } from "@/src/palette/submitterHue";
+import { DED_ID, SUBMITTERS, submitterLabel } from "@/src/data/submitters";
 import { useStore } from "@/src/store/store";
 
 // THE DATA BLOCK CARD (the Data blocks register, 2026-11-07 — user: "a data block is just like a tx
@@ -27,8 +30,16 @@ import { useStore } from "@/src/store/store";
 // Its live follow is the register's (`follow.ts`'s `followNewestData` seats the newest data-carrying
 // snapshot, and the scene callout says "live" for it); the card itself carries no state mark — the
 // Global snapshot card above it holds the LIVE / PINNED control.
+//
+// WHO SUBMITTED IT (2026-11-27, the data-submitters feature): a Digital Evidence block's updates BY
+// ORGANISATION as a second table under the kinds — the organisation's dot in its palette hue (the
+// busiest seven carry one, every other the muted ink), its name or "Org <first 8>", its batches —
+// each row previewing its organisation on `hoverSubmitter`, which lights its bands in the chamber's
+// columns (a preview, never a commit). A Dor block states only how many devices checked in: devices
+// are counted, never named or broken down. An unread block names no submitter (the row has none).
 
 const DATA_ICON = REGISTER_ICONS.data;
+const NO_IDS: readonly string[] = [];
 
 export default function DataBlockPane({ onClose, collapsed, onToggle }: { onClose: () => void; collapsed?: boolean; onToggle?: () => void }) {
   useFeedRead(["exact"], "DataBlockPane");
@@ -40,6 +51,18 @@ export default function DataBlockPane({ onClose, collapsed, onToggle }: { onClos
   const hoverDataBlock = useStore((s) => s.hoverDataBlock);
   const setHoverDataBlock = useStore((s) => s.setHoverDataBlock);
   const pulseKey = useEdgePulse(sel ? `${sel.snap.metaId}:${sel.snap.ordinal}:${sel.index}` : null);
+  const kind = sel && Object.hasOwn(SUBMITTERS, sel.snap.metaId) ? SUBMITTERS[sel.snap.metaId].kind : null;
+  // The names and the palette are the read route's (the last 24 hours' answer is the one the chamber's
+  // bridge reads too, so card and bands agree); asked only for an organisation network — DED's alone.
+  const { data: who } = useSubmitters(kind === "organisation" ? { net: DED_ID, window: "24h" } : null, "DataBlockPane");
+  const hoverSubmitter = useStore((s) => s.hoverSubmitter);
+  const subs = useStore((s) => {
+    if (!s.dataBlock) return null;
+    const r = s.snapshotExact[s.dataBlock.snap.globalOrdinal]?.rows.find((x) => x.metaId === s.dataBlock!.snap.metaId && x.ordinal === s.dataBlock!.snap.ordinal);
+    return r?.dataBlockRows?.[s.dataBlock.index]?.submitters ?? null;
+  });
+  const orgIds = kind === "organisation" && subs ? subs.map((x) => x.id) : NO_IDS;
+  const setHoverSubmitter = useHoverRelease(hoverSubmitter, orgIds, useStore((s) => s.setHoverSubmitter));
   if (!sel) return null;
 
   const { snap, index } = sel;
@@ -116,8 +139,50 @@ export default function DataBlockPane({ onClose, collapsed, onToggle }: { onClos
               </div>
             </div>
           )}
+          {b && !b.unread && kind === "organisation" && b.submitters && b.submitters.length > 0 && (
+            <div className="mt-2 mb-2">
+              {/* BY ORGANISATION: the card table, a count by category like the kinds above — each
+                  organisation's share of the batches it can be credited with (an update naming no
+                  organisation is not counted), marked in its own hue. */}
+              <SectionLabel label="By organisation" total={b.submitters.reduce((n, x) => n + x.updates, 0).toLocaleString()} className="mb-0.5" />
+              <div className="flex flex-col text-label" style={figWidth(b.submitters.map((x) => x.updates.toLocaleString()))}>
+                <TableHead name="Name" figure="#" />
+                {(() => {
+                  const palette = who?.palette ?? NO_IDS;
+                  const names = who?.names ?? {};
+                  const total = Math.max(1, b.submitters.reduce((n, x) => n + x.updates, 0));
+                  return b.submitters.map((x) => {
+                    const orgHue = submitterHudCss(x.id, palette);
+                    const pair = subjectPairing<string>(hoverSubmitter, x.id, setHoverSubmitter, orgHue);
+                    return (
+                      <div
+                        key={x.id}
+                        className={cn(CUT_ROW, TABLE_ROW, "rounded-sm", pair.className)}
+                        style={pair.style}
+                        onMouseEnter={pair.onMouseEnter}
+                        onMouseMove={pair.onMouseMove}
+                        onMouseLeave={pair.onMouseLeave}
+                      >
+                        <span className="min-w-0 inline-flex items-center gap-1.5">
+                          <IdentityDot hue={orgHue} className="w-1.5 h-1.5" />
+                          <span className="min-w-0 truncate text-foreground-dim">{submitterLabel(x.id, names)}</span>
+                        </span>
+                        <UnitMarks count={x.updates} color={orgHue} units={countable(total)} frac={x.updates / total} />
+                        <span className="font-mono tabular-nums text-right text-foreground">{x.updates.toLocaleString()}</span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          )}
           {b && (
             <FactGroup>
+              {!b.unread && kind === "device" && b.submitters && (
+                <Fact label="Checked in by">
+                  {b.submitters.length.toLocaleString()} {b.submitters.length === 1 ? "device" : "devices"}
+                </Fact>
+              )}
               {!b.unread && (
                 <Fact label="Signed by">
                   <span className="inline-flex items-center gap-1">{b.signers.toLocaleString()} <LayerWho who={SIGNER_GROUPS.dataBlocks.who} /></span>

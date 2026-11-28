@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { trendFacts, trendSilent, type TrendFactsInput } from "@/src/data/noteFactsTrend";
 import { formatDag } from "@/src/data/trendSeries";
 import { checkNote } from "@/src/data/noteHonesty";
-import { factsBlock } from "@/src/data/noteFacts";
+import { factsBlock, withChangeFacts } from "@/src/data/noteFacts";
+import type { SubmittersWindow } from "@/app/api/submitters/assemble";
 import { pairsOf } from "@/src/data/testkit/notePairs";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
 
@@ -761,5 +762,118 @@ describe("a notable day of global snapshots", () => {
     const daily = win(n, { "g.ticks": row(n, (i) => (i === 20 ? 1000 : 5000)), "g.anchors": row(n, () => 40000) }, T0 - 20 * DAY);
     const r = trendFacts(input({ zoom: "30d", span: { fromMs: T0 - 20 * DAY, toMs: T0 + 10 * DAY }, daily }))!;
     expect(r.facts.find((f) => /^Notable day 1 dip, /.test(f.label))).toMatchObject({ label: "Notable day 1 dip, global snapshots that day", value: 1000 });
+  });
+});
+
+// WHO SUBMITTED THE DATA (2026-11-27): DED's organisations by name, start to end and share, the top
+// three of the range; Dor's devices only counted. Every other note is unchanged.
+describe("who submitted a network's data", () => {
+  const HOUR = 3_600_000;
+  const DED = "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M";
+  const DOR = "DAG0CyySf35ftDQDQBnd1bdQ9aPyUdacMghpnCuM";
+  const CAT = { ...NAMES, [DED]: "Digital Evidence", [DOR]: "Dor Technologies" };
+  const N = 168; // a week of hours
+  const OP = "op-1111", GA = "ga-2222", UN = "0f3a9b12-aaaa", ACME = "acme-3333";
+  const ORG_NAMES = { [OP]: "Open Poker", [GA]: "Gate AI", [ACME]: "Acme" };
+  /** A week at the hourly tier, every bucket measured unless `from` says it began later. */
+  function subWin(kind: "organisation" | "device", over: Partial<SubmittersWindow> = {}): SubmittersWindow {
+    const buckets = row(N, (i) => T0 + i * HOUR) as number[];
+    return {
+      net: kind === "organisation" ? DED : DOR, kind, unit: kind === "organisation" ? "batches" : "check-ins",
+      tier: "1h", stepMs: HOUR, buckets, measured: { from: T0, to: T0 + N * HOUR }, holes: [], estimate: kind === "device",
+      names: {}, series: [], distinct: row(N, () => 0), rangeDistinct: 0, totals: [],
+      seenTotal: 0, firstSeenMs: null, palette: [], ...over,
+    };
+  }
+  const sum = (p: (number | null)[]) => p.reduce<number>((a, v) => a + (v ?? 0), 0);
+  /** DED's week: Open Poker doubles halfway, Gate AI and an unnamed organisation hold, Acme sends one. */
+  function dedWin(points: Record<string, (number | null)[]> = {}): SubmittersWindow {
+    const p: Record<string, (number | null)[]> = {
+      [OP]: row(N, (i) => (i < N / 2 ? 2 : 4)),
+      [GA]: row(N, () => 2),
+      [UN]: row(N, () => 1),
+      [ACME]: row(N, (i) => (i === 5 ? 1 : 0)),
+      ...points,
+    };
+    const totals = Object.entries(p).map(([id, pts]) => ({ id, updates: sum(pts) })).sort((a, b) => b.updates - a.updates || (a.id < b.id ? -1 : 1));
+    return subWin("organisation", {
+      names: ORG_NAMES,
+      series: totals.map(({ id }) => ({ id, points: p[id]! })),
+      distinct: row(N, () => 4), rangeDistinct: 4, totals,
+    });
+  }
+  const weekOf = (net: string) => ({
+    subject: net, zoom: "7d" as const, span: { fromMs: T0, toMs: T0 + N * HOUR }, names: CAT,
+    cur: win(7, week(2, { [`m.${net}.snaps`]: row(7, () => 50) })),
+  });
+
+  it("states each of the top three organisations' batches per day at the start and the end, as a pair, and its share", () => {
+    const r = trendFacts(input({ ...weekOf(DED), submitters: dedWin() }))!;
+    const pairs = pairsOf(r.facts);
+    expect(pairs.get("Open Poker batches, per day")).toEqual(["Open Poker batches, per day, at the start of the span", 48, "Open Poker batches, per day, at the end of the span", 96]);
+    expect(pairs.get("Gate AI batches, per day")).toEqual(["Gate AI batches, per day, at the start of the span", 48, "Gate AI batches, per day, at the end of the span", 48]);
+    // An organisation with no known name is "Org" and the first 8 of its id, in the note as everywhere.
+    expect(pairs.has("Org 0f3a9b12 batches, per day")).toBe(true);
+    // Acme is fourth: no figure of its own.
+    expect(r.facts.some((f) => f.label.startsWith("Acme"))).toBe(false);
+    expect(find(r, /^Open Poker, share of the span's batches$/)[0]).toMatchObject({ kind: "share", text: "50%" });
+    expect(find(r, /^Open Poker batches, ratio end to start$/)[0]!.value).toBe(2);
+    // Every organisation of the range is a name the gate knows.
+    expect(r.names).toEqual(expect.arrayContaining(["Open Poker", "Gate AI", "Org 0f3a9b12", "Acme"]));
+  });
+
+  it("the change is a fact, and the gate holds the note to it and to the organisations the facts name", () => {
+    const r = trendFacts(input({ ...weekOf(DED), submitters: dedWin() }))!;
+    const facts = withChangeFacts(r.facts);
+    expect(find({ ...r, facts }, /^Open Poker batches, per day, at the end of the span, change against/)[0]).toMatchObject({ text: "100%", move: "up" });
+    // The organisations are the gate's actors: a change or share is said only of its own.
+    expect(r.actors).toEqual(["Open Poker", "Gate AI", "Org 0f3a9b12", "Acme"]);
+    const opts = { subject: "Digital Evidence", actors: r.actors };
+    expect(checkNote("Open Poker's batches rose 100% to 96 per day over the week.", facts, r.names, opts)).toEqual({ ok: true });
+    expect(checkNote("Gate AI's batches rose 100% to 96 per day over the week.", facts, r.names, opts).ok).toBe(false);
+    expect(checkNote("Open Poker doubled its batches over the week.", facts, r.names, opts)).toEqual({ ok: true });
+    // Acme sent batches in the range, but the facts hold no move of Acme's.
+    expect(checkNote("Acme doubled its batches over the week.", facts, r.names, opts).ok).toBe(false);
+    // The unnamed organisation's digits are its name, never a figure.
+    expect(checkNote("Org 0f3a9b12 sent 17% of the span's batches.", facts, r.names, opts)).toEqual({ ok: true });
+    expect(checkNote("Open Poker's batches rose 100% to 120 per day.", facts, r.names, opts).ok).toBe(false);
+  });
+
+  it("a rise of tenfold or more is a multiple", () => {
+    const r = trendFacts(input({ ...weekOf(DED), submitters: dedWin({ [GA]: row(N, (i) => (i < N / 2 ? 1 : 12)) }) }))!;
+    const change = withChangeFacts(r.facts).find((f) => /^Gate AI batches, per day, at the end of the span, change against/.test(f.label));
+    expect(change).toMatchObject({ kind: "ratio", text: "12x", move: "up" });
+  });
+
+  it("a range reaching before the measured span states no start, and its share is of what was measured", () => {
+    const late = (p: (number | null)[]) => p.map((v, i) => (i < N / 2 ? null : v));
+    const w = dedWin();
+    const r = trendFacts(input({ ...weekOf(DED), submitters: { ...w, series: w.series.map((s) => ({ ...s, points: late(s.points) })), distinct: late(w.distinct) } }))!;
+    expect(r.facts.some((f) => /batches, per day/.test(f.label))).toBe(false);
+    expect(find(r, /^Open Poker, share of the span's measured batches$/)).toHaveLength(1);
+  });
+
+  it("Dor's devices are counted over the range and read start to end, never named, and labelled ABOUT: an estimate (R19)", () => {
+    const distinct = row(N, (i) => (i < N / 2 ? 10 : 20));
+    const r = trendFacts(input({ ...weekOf(DOR), submitters: subWin("device", { distinct, rangeDistinct: 40 }) }))!;
+    expect(find(r, /^Active devices, this span, about$/)[0]).toMatchObject({ value: 40, kind: "count" });
+    expect(pairsOf(r.facts).get("Active devices in an hour, about")).toEqual(["Active devices in an hour, about, at the start of the span", 10, "Active devices in an hour, about, at the end of the span", 20]);
+    expect(r.facts.filter((f) => /devices/i.test(f.label)).every((f) => /\babout\b/.test(f.label))).toBe(true);
+    // The gate takes the estimate as the model is asked to write it: "about N".
+    expect(checkNote("Dor saw about 40 active devices this span.", r.facts, r.names)).toEqual({ ok: true });
+    // Part of the range unmeasured: the count is a floor.
+    const part = trendFacts(input({ ...weekOf(DOR), submitters: subWin("device", { distinct: distinct.map((v, i) => (i < 20 ? null : v)), rangeDistinct: 40 }) }))!;
+    expect(find(part, /^Active devices, this span, about, at least$/)[0]!.value).toBe(40);
+  });
+
+  it("changes nothing without a window, for another network, or for the whole network", () => {
+    const strip = (r: ReturnType<typeof trendFacts>) => r!.facts.map((f) => f.label);
+    expect(strip(trendFacts(input({ ...weekOf(DED), submitters: null })))).toEqual(strip(trendFacts(input(weekOf(DED)))));
+    expect(trendFacts(input(weekOf(DED)))!.facts.some((f) => /batches|devices/i.test(f.label))).toBe(false);
+    // A window for DED handed to USDC.dag's or the hypergraph's note is not theirs.
+    expect(strip(trendFacts(input({ ...weekOf("usdc"), submitters: dedWin() })))).toEqual(strip(trendFacts(input(weekOf("usdc")))));
+    expect(strip(trendFacts(input({ submitters: dedWin() })))).toEqual(strip(trendFacts(input())));
+    expect(trendFacts(input({ submitters: dedWin() }))!.names).not.toContain("Open Poker");
+    expect(trendFacts(input({ submitters: dedWin() }))!.actors).toBeUndefined();
   });
 });

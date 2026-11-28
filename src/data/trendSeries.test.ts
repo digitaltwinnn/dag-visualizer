@@ -107,6 +107,13 @@ describe("the unit word", () => {
     expect(metricUnit("nodes", DAY)).toBe("nodes");
     expect(metricUnit("continuity", 300000)).toBe("between snapshots");
   });
+
+  it("names a currency only for an amount — fees are $DAG, a count or a size none", () => {
+    expect(TREND_METRICS.fees.currency).toBe("$DAG");
+    for (const m of Object.keys(TREND_METRICS) as (keyof typeof TREND_METRICS)[]) {
+      if (m !== "fees") expect(TREND_METRICS[m].currency).toBeUndefined();
+    }
+  });
 });
 
 describe("trimCounterEdges", () => {

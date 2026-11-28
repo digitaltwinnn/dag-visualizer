@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { assembleSpan } from "../../../assemble";
 import { slotsInWindow, type Tier } from "../../../keys";
-import { readStore } from "../../../store";
+import { readStore, type StoredHash } from "../../../store";
 
 // THE TILE READ — the range zoom's map-tile pattern (2026-09-10, convention 12's zoom made
 // deep): user ranges are snowflakes, so the cacheable unit is the CALENDAR UNIT a tier is
@@ -44,7 +44,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ tier: string; 
   try {
     const store = readStore();
     const keys = [...new Set(slotsInWindow(tier, span.startMs, span.endMs).map((s) => s.key))];
-    const hashes: Record<string, Record<string, string>> = {};
+    const hashes: Record<string, StoredHash> = {};
     await Promise.all(keys.map(async (k) => {
       const h = await store.hgetall(k);
       if (h) hashes[k] = h;
