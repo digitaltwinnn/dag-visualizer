@@ -10,7 +10,10 @@ export type SubTier = "1h" | "1d";
 const p2 = (n: number) => String(n).padStart(2, "0");
 
 /** The (redis key, bucket label) a timestamp lands in: `sub:mainnet:<net>:1h:YYYY-MM` / `DD-HH`,
- *  `sub:mainnet:<net>:1d:YYYY` / `MM-DD`. */
+ *  `sub:mainnet:<net>:1d:YYYY` / `MM-DD`. The hash's FIELDS differ by kind: an organisation's is
+ *  `<bucket>|<id>` (`subField`, always a `|`) holding its updates; a device network's is the bucket
+ *  alone (no `|`) holding `estimate()` of that bucket's sketch (`subSketchKeyOf`, R22), written in the
+ *  same transaction as the sketch. */
 export function subSlotOf(netId: string, tier: SubTier, tsMs: number): { key: string; bucket: string } {
   const step = stepMsOf(tier);
   const d = new Date(Math.floor(tsMs / step) * step);
@@ -19,18 +22,20 @@ export function subSlotOf(netId: string, tier: SubTier, tsMs: number): { key: st
   return { key: `sub:${STORE_NS}:${netId}:1d:${y}`, bucket: `${mo}-${da}` };
 }
 
-/** DOR'S DEVICES ARE A HYPERLOGLOG (ruling R19): one HLL key per network per UTC hour
- *  (`sub:mainnet:<net>:hll:1h:YYYY-MM-DD-HH`) and per UTC day (`…:hll:1d:YYYY-MM-DD`), PFADDed with the
- *  bucket's device ids. Measured, one hour of Dor holds ~1,400 distinct devices, ≈1M per-device fields
- *  in a month hash; an HLL is ~12 KB at most and its count carries ~0.81% standard error. */
-export function subHllKeyOf(netId: string, tier: SubTier, tsMs: number): string {
+/** DOR'S DEVICES ARE A SKETCH (ruling R22, replacing R19's Redis HyperLogLog): one string key per
+ *  network per UTC hour (`sub:mainnet:<net>:sketch:1h:YYYY-MM-DD-HH`) and per UTC day
+ *  (`…:sketch:1d:YYYY-MM-DD`), holding `sketch.ts`'s `hll12:` encoding of the bucket's device ids.
+ *  Measured, one hour of Dor holds ~1,400 distinct devices, ≈1M per-device fields in a month hash; a
+ *  sketch is ~5.5 KB and its count carries ~1.6% standard error. A plain string because the read
+ *  route's read-only token may GET/MGET it, where it is refused PFCOUNT. */
+export function subSketchKeyOf(netId: string, tier: SubTier, tsMs: number): string {
   const step = stepMsOf(tier);
   const d = new Date(Math.floor(tsMs / step) * step);
   const day = `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`;
-  return `sub:${STORE_NS}:${netId}:hll:${tier}:${tier === "1h" ? `${day}-${p2(d.getUTCHours())}` : day}`;
+  return `sub:${STORE_NS}:${netId}:sketch:${tier}:${tier === "1h" ? `${day}-${p2(d.getUTCHours())}` : day}`;
 }
 
-/** `<bucket>|<submitter>`. Submitter ids never hold `|`: `src/data/submitters.ts` counts only a DED UUID
+/** `<bucket>|<submitter>`, an ORGANISATION's field. Submitter ids never hold `|`: `src/data/submitters.ts` counts only a DED UUID
  *  or a hex Dor id (cut to 16 chars), so the throw below is a guard, never a reachable stall. */
 export function subField(bucket: string, submitter: string): string {
   if (submitter.includes("|")) throw new Error(`submitter id may not contain "|": ${submitter}`);

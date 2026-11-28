@@ -1,7 +1,7 @@
 import { SUBMITTERS } from "@/src/data/submitters";
 import { stepMsOf } from "../trends/keys";
 import type { TrendsStore } from "../trends/store";
-import { assembleSubmitters, measuredHllKeys, parseSpan, windowRange24h, type SubmittersWindow } from "./assemble";
+import { assembleSubmitters, measuredSketchKeys, parseSpan, windowRange24h, type SubmittersWindow } from "./assemble";
 import { subHolesKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf, type SubTier } from "./keys";
 
 // THE SUBMITTERS READ — one network's range of the `sub:` family, gathered and folded
@@ -21,7 +21,7 @@ export function subTierOf(fromMs: number, toMs: number): SubTier {
  *  the notes need none of them. The network must have a `SUBMITTERS` row; a read that throws
  *  propagates. */
 export async function readSubmitters(
-  store: Pick<TrendsStore, "hgetall" | "pfcount" | "pfcountEach">,
+  store: Pick<TrendsStore, "hgetall" | "mget">,
   net: string,
   range: { fromMs: number; toMs: number } | "24h",
   nowMs: number,
@@ -32,13 +32,6 @@ export async function readSubmitters(
   ]);
   const { fromMs, toMs } = range === "24h" ? windowRange24h(nowMs) : range;
   const tier: SubTier = range === "24h" ? "1h" : subTierOf(fromMs, toMs);
-  if (SUBMITTERS[net]!.kind === "device") {
-    // DOR (R19): no fields to read — PFCOUNT of each measured bucket's HLL and of their union.
-    const hll = measuredHllKeys(net, tier, fromMs, toMs, span, holes);
-    const [each, union] = await Promise.all([store.pfcountEach(hll), store.pfcount(hll)]);
-    const counts = Object.fromEntries(hll.map((k, i) => [k, each[i] ?? 0]));
-    return assembleSubmitters({ net, tier, fromMs, toMs, hashes: {}, span, names, holes, devices: { counts, union } });
-  }
   const step = stepMsOf(tier);
   const keys = new Set<string>();
   for (let t = Math.floor(fromMs / step) * step; t < toMs; t += step) keys.add(subSlotOf(net, tier, t).key);
@@ -47,6 +40,12 @@ export async function readSubmitters(
     await Promise.all(ks.map(async (k) => { const h = await store.hgetall(k); if (h) out[k] = h; }));
     return out;
   };
+  if (SUBMITTERS[net]!.kind === "device") {
+    // DOR (R22): each bucket's count field from the same tier hashes, and the sketches of the measured
+    // buckets by MGET for the range's union — strings only, so the read-only token suffices.
+    const [hashes, sketches] = await Promise.all([read([...keys]), store.mget(measuredSketchKeys(net, tier, fromMs, toMs, span, holes))]);
+    return assembleSubmitters({ net, tier, fromMs, toMs, hashes, span, names, holes, sketches });
+  }
   const years: string[] = [];
   if (opts.years !== false) {
     const first = new Date(parseSpan(span)?.from ?? nowMs).getUTCFullYear();

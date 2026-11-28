@@ -82,7 +82,8 @@ async function main(): Promise<void> {
     hgetall: (k: string) => retrying(() => raw.hgetall(k)),
     hmget: (k: string, f: string[]) => retrying(() => raw.hmget(k, f)),
     hset: (k: string, m: Record<string, string | number>) => retrying(() => raw.hset(k, m)),
-    pfadd: (k: string, ids: string[]) => retrying(() => raw.pfadd(k, ids)),
+    get: (k: string) => retrying(() => raw.get(k)),
+    mget: (k: string[]) => retrying(() => raw.mget(k)),
     applyWrites: (w: Parameters<typeof raw.applyWrites>[0]) => retrying(() => raw.applyWrites(w)),
   };
 

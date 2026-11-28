@@ -5,7 +5,8 @@
 // null, like History's partial edges. Outside the span, or in a hole, is null, never 0.
 import { SUBMITTERS, type SubmitterKind } from "@/src/data/submitters";
 import { stepMsOf } from "../trends/keys";
-import { subHllKeyOf, subSlotOf, type SubTier } from "./keys";
+import { subSketchKeyOf, subSlotOf, type SubTier } from "./keys";
+import { decodeSketch, estimate, mergeInto, newSketch } from "./sketch";
 
 /** How many organisations carry a hue of their own (the palette); every other one reads neutral. */
 export const ORG_PALETTE_MAX = 7;
@@ -25,13 +26,14 @@ export interface SubmittersWindow {
   names: Record<string, string>;
   /** Per organisation (full id); empty for devices. Null outside `measured`, 0 inside where quiet. */
   series: { id: string; points: (number | null)[] }[];
-  /** Submitters per bucket, both kinds; null outside `measured`. Devices: the bucket's HLL count. */
+  /** Submitters per bucket, both kinds; null outside `measured`. Devices: the bucket's count field. */
   distinct: (number | null)[];
   /** Distinct ids across the measured part of the range; null when none of it is measured. Devices:
-   *  PFCOUNT over every measured bucket's HLL key — the union, never a sum. */
+   *  the estimate of the UNION of the measured buckets' sketches (`measuredSketchKeys`), never a sum;
+   *  null too when one of them will not decode (not measured, never a guess). */
   rangeDistinct: number | null;
-  /** True for devices (R19): `distinct` and `rangeDistinct` are HyperLogLog ESTIMATES (~0.81%
-   *  standard error), which every surface states as "about N"; organisations are exact. */
+  /** True for devices (R22): `distinct` and `rangeDistinct` are sketch ESTIMATES (~1.6% standard
+   *  error), which every surface states as "about N"; organisations are exact. */
   estimate: boolean;
   /** The range's per-organisation sums, busiest first; devices give []. */
   totals: { id: string; updates: number }[];
@@ -54,8 +56,8 @@ export interface AssembleInput {
   names: Record<string, string> | null;
   /** The holes hash (`subHolesKeyOf`): field = start ms, value = end ms. */
   holes?: Record<string, string> | null;
-  /** Devices (R19): PFCOUNT of each measured bucket's HLL key (`measuredHllKeys`), and of their union. */
-  devices?: { counts: Record<string, number>; union: number } | null;
+  /** Devices (R22): the stored values of `measuredSketchKeys`' keys (MGET), null where absent. */
+  sketches?: (string | null)[] | null;
   /** Every 1d year hash, for "N seen since <month year>". */
   yearHashes?: Record<string, Record<string, string>>;
 }
@@ -94,10 +96,11 @@ export function bucketMeasured(
   return !holes.some((h) => t < h.to && t + step > h.from);
 }
 
-/** THE HLL KEYS A DEVICE RANGE COUNTS (R19): one per MEASURED bucket (`bucketMeasured`), so the
- *  union is taken over exactly what the window reads as measured. The read asks PFCOUNT of each and
- *  of all of them; no device id ever leaves the store. */
-export function measuredHllKeys(
+/** THE SKETCHES A DEVICE RANGE UNIONS (R22), so the union is taken over exactly the buckets the
+ *  window reads as measured (`bucketMeasured`). The daily tier: each measured day's sketch. The hourly
+ *  tier, day by UTC day: the DAY sketch when all 24 of its hours lie in the range and are measured (one
+ *  key for 24 — day = ∪ hours, `bucket.ts`), else the sketches of its measured hours in the range. */
+export function measuredSketchKeys(
   net: string,
   tier: SubTier,
   fromMs: number,
@@ -108,8 +111,17 @@ export function measuredHllKeys(
   const step = stepMsOf(tier);
   const measured = parseSpan(span), holes = parseHoles(holesRaw);
   const out: string[] = [];
-  for (let t = Math.floor(fromMs / step) * step; t < toMs; t += step) {
-    if (bucketMeasured(t, step, measured, holes)) out.push(subHllKeyOf(net, tier, t));
+  const first = Math.floor(fromMs / step) * step;
+  if (tier === "1d") {
+    for (let t = first; t < toMs; t += step) if (bucketMeasured(t, step, measured, holes)) out.push(subSketchKeyOf(net, "1d", t));
+    return out;
+  }
+  const DAY = stepMsOf("1d");
+  for (let day = Math.floor(first / DAY) * DAY; day < toMs; day += DAY) {
+    const hours: number[] = [];
+    for (let t = Math.max(day, first); t < Math.min(day + DAY, toMs); t += step) if (bucketMeasured(t, step, measured, holes)) hours.push(t);
+    if (hours.length === 24) out.push(subSketchKeyOf(net, "1d", day));
+    else for (const t of hours) out.push(subSketchKeyOf(net, "1h", t));
   }
   return out;
 }
@@ -162,14 +174,31 @@ export function assembleSubmitters(input: AssembleInput): SubmittersWindow {
   const isMeasured = buckets.map((t) => bucketMeasured(t, step, measured, holes));
   const anyMeasured = isMeasured.some(Boolean);
 
-  // DEVICES (R19): each bucket's HLL count, and the union's, as the read counted them.
+  // DEVICES (R22): each bucket's count field (the bucket label alone, `subSlotOf`), and the estimate
+  // of the union of the range's sketches — an absent one empty, an undecodable one no range figure.
   if (!isOrg) {
-    const counts = input.devices?.counts ?? null;
+    let union: number | null = null;
+    if (anyMeasured && input.sketches) {
+      const all = newSketch();
+      let ok = true;
+      for (const v of input.sketches) {
+        if (v == null) continue;
+        const sk = decodeSketch(v);
+        if (!sk) { ok = false; break; }
+        mergeInto(all, sk);
+      }
+      union = ok ? estimate(all) : null;
+    }
     return {
       net, kind: spec.kind, unit: spec.unit, tier, stepMs: step, buckets,
       measured, holes: holes.filter((h) => h.from < toMs && h.to > (buckets[0] ?? fromMs)), names, series: [],
-      distinct: buckets.map((t, i) => (isMeasured[i] && counts ? (counts[subHllKeyOf(net, tier, t)] ?? 0) : null)),
-      rangeDistinct: anyMeasured && input.devices ? input.devices.union : null,
+      distinct: buckets.map((t, i) => {
+        if (!isMeasured[i]) return null;
+        const { key, bucket } = subSlotOf(net, tier, t);
+        const v = hashes[key]?.[bucket]; // a number when the client deserialised it
+        return v == null ? 0 : (num(String(v)) ?? 0);
+      }),
+      rangeDistinct: union,
       estimate: true,
       totals: [], seenTotal: 0, firstSeenMs: null, palette: [],
     };

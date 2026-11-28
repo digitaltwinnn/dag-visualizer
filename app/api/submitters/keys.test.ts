@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { subSlotOf, subField, subSpanKeyOf, subNamesKeyOf, subLockKeyOf, subHolesKeyOf, subHllKeyOf } from "./keys";
+import { subSlotOf, subField, subSpanKeyOf, subNamesKeyOf, subLockKeyOf, subHolesKeyOf, subSketchKeyOf } from "./keys";
 
 const DED = "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M";
 const T = Date.UTC(2026, 10, 27, 14, 5);
@@ -9,9 +9,9 @@ describe("sub keys", () => {
     expect(subSlotOf(DED, "1h", T)).toEqual({ key: `sub:mainnet:${DED}:1h:2026-11`, bucket: "27-14" });
     expect(subSlotOf(DED, "1d", T)).toEqual({ key: `sub:mainnet:${DED}:1d:2026`, bucket: "11-27" });
   });
-  it("pins Dor's HyperLogLog keys, one per UTC hour and day (R19)", () => {
-    expect(subHllKeyOf(DED, "1h", T)).toBe(`sub:mainnet:${DED}:hll:1h:2026-11-27-14`);
-    expect(subHllKeyOf(DED, "1d", T)).toBe(`sub:mainnet:${DED}:hll:1d:2026-11-27`);
+  it("pins Dor's sketch keys, one string per UTC hour and day (R22)", () => {
+    expect(subSketchKeyOf(DED, "1h", T)).toBe(`sub:mainnet:${DED}:sketch:1h:2026-11-27-14`);
+    expect(subSketchKeyOf(DED, "1d", T)).toBe(`sub:mainnet:${DED}:sketch:1d:2026-11-27`);
   });
   it("pins fields and utility keys", () => {
     expect(subField("27-14", "abc")).toBe("27-14|abc");

@@ -37,16 +37,23 @@
 // onto the stored values read with `hmget`, and ONE `applyWrites` commits every network's fields,
 // spans and cursors, plus DED's names when `dedLatest` is given (read once a run; a failed read
 // writes no names and costs the run nothing). The family keeps forever: no TTL.
+// DOR'S DEVICES (R22) are SKETCHES, not fields (`sketch.ts`): for each hour and day the run touched,
+// the stored sketch is read (GET; absent = empty), the new ids added, and the sketch SET with its
+// bucket's count field (`estimate()`) in the same one transaction. A stored sketch that will not
+// decode is never replaced by an empty one — that would silently drop its history: Dor's run is not
+// committed (`unreadable` names the key, `failed` the ordinal the next run resumes at) and the other
+// networks commit as usual.
 import { decodeSnapshotRoot } from "../snapshot/decodeChannel";
 import type { MetaRec } from "../trends/bucketing";
 import { listSince, type ChainPage } from "../trends/fetchSince";
 import type { TrendsStore, TrendsWrite } from "../trends/store";
 import { DED_ID, SUBMITTERS } from "@/src/data/submitters";
-import { bucketDevices, bucketSubmitters, holeOf, nextSpan } from "./bucket";
+import { bucketDevices, bucketSubmitters, holeOf, nextSpan, type DeviceAdds } from "./bucket";
 import { parseHoles } from "./assemble";
-import { subField, subHllKeyOf, subHolesKeyOf, subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
+import { subField, subHolesKeyOf, subLockKeyOf, subNamesKeyOf, subSketchKeyOf, subSlotOf, subSpanKeyOf, type SubTier } from "./keys";
 import { mergeNames, parseDedLatest } from "./names";
 import { readL0Snapshots } from "./readL0";
+import { addIds, decodeSketch, encodeSketch, estimate, mergeInto, newSketch, type Sketch } from "./sketch";
 
 export interface SubmittersDeps {
   store: TrendsStore;
@@ -74,6 +81,9 @@ export interface SubmittersResult {
   failed: Record<string, number | null>;
   /** DED names added or changed. */
   names: number;
+  /** Per network whose run was not committed because a stored device sketch would not decode (R22):
+   *  that key. Absent when every sketch read. */
+  unreadable?: Record<string, string>;
 }
 
 const HOUR_MS = 3600000;
@@ -101,8 +111,42 @@ async function listFromHour(page: (limit: number, next?: string) => Promise<Chai
 
 type Tally = { id: string; updates: number }[];
 
-/** Whether a network's submitters are DEVICES, counted in HyperLogLogs (R19), not fields. */
+/** Whether a network's submitters are DEVICES, counted in sketches (R22), not fields. */
 const isDevices = (net: string): boolean => Object.hasOwn(SUBMITTERS, net) && SUBMITTERS[net]!.kind === "device";
+
+/** A stored device sketch that will not decode (R22): never replaced by an empty one, which would drop
+ *  its history without a trace. */
+class UnreadableSketch extends Error {
+  constructor(readonly key: string) { super(`unreadable device sketch at ${key}`); }
+}
+
+/** The stored sketch at `key` (absent = empty), or the throw. */
+function storedSketch(key: string, raw: string | null): Sketch {
+  if (raw == null) return newSketch();
+  const s = decodeSketch(raw);
+  if (!s) throw new UnreadableSketch(key);
+  return s;
+}
+
+/** A device bucket's two writes (R22): its sketch SET as a string, and its count — `estimate()` of
+ *  that sketch — as the bucket's field in the tier hash DED's fields live in (`subSlotOf`). */
+function sketchWrites(net: string, tier: SubTier, tsMs: number, sketch: Sketch): TrendsWrite[] {
+  const { key, bucket } = subSlotOf(net, tier, tsMs);
+  return [
+    { key: subSketchKeyOf(net, tier, tsMs), map: {}, ttlS: null, value: encodeSketch(sketch) },
+    { key, map: { [bucket]: estimate(sketch) }, ttlS: null },
+  ];
+}
+
+/** The sampler's device writes for one network's reads: each touched hour's and day's stored sketch
+ *  (GET) with the new ids added. */
+async function deviceWrites(store: TrendsStore, net: string, read: { rec: MetaRec; tally: Tally }[]): Promise<TrendsWrite[]> {
+  const adds: DeviceAdds = new Map();
+  for (const { rec, tally } of read) if (tally.length) bucketDevices(adds, net, Date.parse(rec.timestamp), tally);
+  const entries = [...adds];
+  const stored = await Promise.all(entries.map(([key]) => store.get(key)));
+  return entries.flatMap(([key, { tier, tsMs, ids }], i) => sketchWrites(net, tier, tsMs, addIds(storedSketch(key, stored[i]!), ids)));
+}
 
 /** The records' snapshots read from L0 (`readL0Snapshots`' contiguous prefix), each summed into its
  *  submitters' updates. A snapshot that cannot be decoded ends the prefix like a failed read. The
@@ -192,20 +236,27 @@ export async function runSubmitters(deps: SubmittersDeps): Promise<SubmittersRes
     );
 
     const inc = new Map<string, Map<string, number>>();
-    const devices = new Map<string, Set<string>>();
     const writes: TrendsWrite[] = [];
+    let unreadable: Record<string, string> | undefined;
     for (const run of runs) {
       read[run.net] = run.read.length;
       failed[run.net] = run.failedAt;
-      const dev = isDevices(run.net);
-      for (const { rec, tally } of run.read) {
-        if (!tally.length) continue;
-        if (dev) bucketDevices(devices, run.net, Date.parse(rec.timestamp), tally);
-        else bucketSubmitters(inc, run.net, Date.parse(rec.timestamp), tally);
+      if (isDevices(run.net)) {
+        // Dor (R22): its sketches read and merged now, so an undecodable one drops Dor's run alone.
+        try {
+          writes.push(...(await deviceWrites(store, run.net, run.read)));
+        } catch (e) {
+          if (!(e instanceof UnreadableSketch)) throw e;
+          (unreadable ??= {})[run.net] = e.key;
+          read[run.net] = 0;
+          failed[run.net] = run.read[0]!.rec.ordinal; // deviceWrites reads nothing without a record
+          run.span = null;
+          run.hole = null;
+        }
+        continue;
       }
+      for (const { rec, tally } of run.read) if (tally.length) bucketSubmitters(inc, run.net, Date.parse(rec.timestamp), tally);
     }
-    // Dor's devices (R19): PFADD needs no read of the stored value, and rides the same transaction.
-    for (const [key, ids] of devices) if (ids.size) writes.push({ key, map: {}, ttlS: null, pfadd: [...ids] });
     for (const [key, fields] of inc) {
       if (!fields.size) continue;
       const names = [...fields.keys()];
@@ -240,7 +291,7 @@ export async function runSubmitters(deps: SubmittersDeps): Promise<SubmittersRes
     }
 
     if (writes.length) await store.applyWrites(writes);
-    return { read, failed, names };
+    return { read, failed, names, ...(unreadable ? { unreadable } : {}) };
   } finally {
     await store.releaseLock(subLockKeyOf());
   }
@@ -252,11 +303,14 @@ export async function runSubmitters(deps: SubmittersDeps): Promise<SubmittersRes
 // - It never reads or writes an hour at or after span.from: the sampler owns those. The walk ends on
 //   the hour edge at or below span.from, whatever `toMs` asks.
 // - An hour is written as a SET of that hour's full tally (`hset`), never an increment, so a rerun
-//   (or a resume over an hour already written) writes the same values: idempotent. Dor's devices are
-//   PFADDed into the hour's and the day's HyperLogLog instead (R19), idempotent by nature.
+//   (or a resume over an hour already written) writes the same values: idempotent. Dor's hour sketch
+//   (R22) is likewise BUILT from the hour's ids alone and SET with its count field, never merged with
+//   the stored one.
 // - After each day it walked (and where it stops), the day's 1d fields are SET to the sum of ALL its
 //   1h fields read back from the store — the 1d = Σ1h invariant (`bucket.ts`), including, on the
-//   boundary day, the sampler's own hours. That day's read-and-set runs under the sampler's lock,
+//   boundary day, the sampler's own hours. Its device form: the day's sketch is SET to the merge of
+//   its 24 hour sketches (MGET; an absent hour is empty, an undecodable one fails the walk), day =
+//   ∪ hours, with its 1d count field. That day's read-and-set runs under the sampler's lock,
 //   or a sampler run between the read and the write would be lost from the day.
 // - span.from is lowered to the walk's start only when the walk reached span.from CONTIGUOUSLY (no
 //   failed hour between; a resumed walk passes the original start and `resumeMs`), under the same
@@ -326,10 +380,18 @@ async function listWindow(deps: WalkDeps, net: string, a: number, b: number): Pr
   return out.reverse();
 }
 
-/** The day's 1d fields as the sum of every 1h field of that day in the store — organisations only:
- *  a device day is its HLL, PFADDed with every hour's ids (R19), so it has nothing to recompute. */
-async function dayWrite(store: TrendsStore, net: string, dayMs: number): Promise<TrendsWrite | null> {
-  if (isDevices(net)) return null;
+/** The day's 1d fields as the sum of every 1h field of that day in the store (1d = Σ1h); for
+ *  devices (R22) the day's sketch as the merge of its 24 hour sketches (day = ∪ hours) and its count.
+ *  No hour stored: no write. */
+async function dayWrite(store: TrendsStore, net: string, dayMs: number): Promise<TrendsWrite[]> {
+  if (isDevices(net)) {
+    const hours = Array.from({ length: 24 }, (_, i) => subSketchKeyOf(net, "1h", dayMs + i * HOUR_MS));
+    const got = await store.mget(hours);
+    if (got.every((v) => v == null)) return [];
+    const day = newSketch();
+    got.forEach((v, i) => { if (v != null) mergeInto(day, storedSketch(hours[i]!, v)); });
+    return sketchWrites(net, "1d", dayMs, day);
+  }
   const h1 = subSlotOf(net, "1h", dayMs);
   const day = h1.bucket.slice(0, 2); // the "DD" of "DD-HH"
   const sums = new Map<string, number>();
@@ -339,27 +401,23 @@ async function dayWrite(store: TrendsStore, net: string, dayMs: number): Promise
     const id = f.slice(bar + 1);
     if (id) sums.set(id, (sums.get(id) ?? 0) + Number(v));
   }
-  if (!sums.size) return null;
+  if (!sums.size) return [];
   const d1 = subSlotOf(net, "1d", dayMs);
   const map: Record<string, number> = {};
   for (const [id, n] of sums) map[subField(d1.bucket, id)] = n;
-  return { key: d1.key, map, ttlS: null };
+  return [{ key: d1.key, map, ttlS: null }];
 }
 
 /** ONE HOUR OF THE WALK (the back-fill and the holes alike): the hour's records read from L0 and
- *  the hour's 1h fields SET to its full tally — never an increment, so a rerun writes the same. */
+ *  the hour's 1h fields SET to its full tally — never an increment, so a rerun writes the same. Dor's
+ *  hour (R22): its sketch built from the hour's ids alone and SET with its count; no day write here. */
 async function writeHour(deps: WalkDeps, net: string, h: number, hourRecs: MetaRec[]): Promise<{ read: number; failedAt: number | null }> {
   const got = await readTallies(hourRecs, net, (o) => deps.fetchSnap(net, o), deps.pool ?? 8);
   if (got.failedAt != null) return { read: 0, failedAt: got.failedAt };
   if (isDevices(net)) {
-    // Dor (R19): the hour's devices PFADDed into the hour's AND the day's HLL — idempotent by nature,
-    // so the day stays the union of its hours with no recompute.
     const ids = new Set<string>();
     for (const { tally } of got.read) for (const { id } of tally) ids.add(id);
-    if (ids.size) {
-      await deps.store.pfadd(subHllKeyOf(net, "1h", h), [...ids]);
-      await deps.store.pfadd(subHllKeyOf(net, "1d", h), [...ids]);
-    }
+    if (ids.size) await deps.store.applyWrites(sketchWrites(net, "1h", h, addIds(newSketch(), ids)));
     return { read: got.read.length, failedAt: null };
   }
   const inc = new Map<string, number>();
@@ -392,14 +450,12 @@ export async function walkRange(
   const flushDay = async (dayMs: number, lower: boolean): Promise<boolean> => {
     if (dayMs !== samplerDay && !lower) {
       const w = await dayWrite(store, net, dayMs);
-      if (w) await store.applyWrites([w]);
+      if (w.length) await store.applyWrites(w);
       return false;
     }
     return withSubmittersLock(store, async () => {
       const ls = deps.lockedStore ?? store; // no retry loop inside the lock
-      const writes: TrendsWrite[] = [];
-      const w = await dayWrite(ls, net, dayMs);
-      if (w) writes.push(w);
+      const writes: TrendsWrite[] = await dayWrite(ls, net, dayMs);
       const now = (await ls.hgetall(subSpanKeyOf(net))) ?? {};
       const lowered = lower && Number(now.from) === spanFrom && fromMs < spanFrom;
       if (lowered) writes.push({ key: subSpanKeyOf(net), map: { from: fromMs }, ttlS: null });
@@ -453,7 +509,7 @@ export async function walkRange(
 // - each hour SET to its full tally (`writeHour`, idempotent), outside the lock, since no sampler
 //   run writes an hour behind its own `to`;
 // - then, under the sampler's lock and in ONE transaction, every touched day's 1d recomputed from its
-//   1h fields (1d = Σ1h) and the hole's field deleted — only if the field still holds the end walked
+//   1h fields (1d = Σ1h; Dor's day sketch = ∪ its hour sketches) and the hole's field deleted — only if the field still holds the end walked
 //   (a later gap from the same hour may have pushed it out; that hole is left to walk again).
 // - a failed read stops the walk at that hole, which stays: a rerun walks it again from its start.
 
@@ -501,10 +557,7 @@ export async function walkHoles(
     const closed = await withSubmittersLock(store, async () => {
       const ls = deps.lockedStore ?? store; // no retry loop inside the lock
       const writes: TrendsWrite[] = [];
-      for (const d of days) {
-        const w = await dayWrite(ls, net, d);
-        if (w) writes.push(w);
-      }
+      for (const d of days) writes.push(...(await dayWrite(ls, net, d)));
       const field = String(hole.from);
       const [now] = await ls.hmget(subHolesKeyOf(net), [field]);
       const same = now != null && Number(now) === hole.to;

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { DED_ID, DOR_ID } from "@/src/data/submitters";
-import { assembleSubmitters, measuredHllKeys, windowRange24h, ORG_PALETTE_MAX } from "./assemble";
-import { subField, subHllKeyOf, subSlotOf } from "./keys";
+import { assembleSubmitters, measuredSketchKeys, windowRange24h, ORG_PALETTE_MAX } from "./assemble";
+import { subField, subSketchKeyOf, subSlotOf } from "./keys";
+import { addIds, encodeSketch, newSketch } from "./sketch";
 
 const H = 3600000;
 const T0 = Date.UTC(2026, 10, 10, 0); // an hour boundary
@@ -31,31 +32,67 @@ describe("assembleSubmitters", () => {
     expect(w.measured).toEqual({ from: T0 + 2 * H, to: T0 + 5 * H + 1800000 });
   });
 
-  it("counts Dor devices from their HyperLogLogs: a bucket its key's count, the range the union's (R19)", () => {
-    const k0 = subHllKeyOf(DOR_ID, "1h", T0), k1 = subHllKeyOf(DOR_ID, "1h", T0 + H);
-    const w = assembleSubmitters({
-      net: DOR_ID, tier: "1h", fromMs: T0, toMs: T0 + 3 * H, hashes: {},
+  it("counts Dor devices from their sketches: a bucket its count field, the range the estimate of the union (R22)", () => {
+    const { key, bucket } = subSlotOf(DOR_ID, "1h", T0);
+    const a = encodeSketch(addIds(newSketch(), ["d1", "d2"])), b = encodeSketch(addIds(newSketch(), ["d2", "d3"]));
+    const input = {
+      net: DOR_ID, tier: "1h" as const, fromMs: T0, toMs: T0 + 3 * H,
+      hashes: { [key]: { [bucket]: "2" } },
       span: { from: String(T0), to: String(T0 + 2 * H + 1) }, names: null,
-      devices: { counts: { [k0]: 2 }, union: 3 },
-    });
+    };
+    const w = assembleSubmitters({ ...input, sketches: [a, b] });
     expect(w.kind).toBe("device");
     expect(w.estimate).toBe(true);
-    expect(w.distinct).toEqual([2, 0, null]); // k1 holds no device (PFCOUNT 0); the third is in progress
-    expect(w.rangeDistinct).toBe(3);
+    expect(w.distinct).toEqual([2, 0, null]); // the second hour has no count field (measured, none); the third is in progress
+    expect(w.rangeDistinct).toBe(3); // d2 in both hours is one device
     expect(w.series).toEqual([]);
     expect(w.totals).toEqual([]);
-    expect(k1).not.toBe(k0);
-    // nothing measured: no count, even with a union handed in
-    const none = assembleSubmitters({ net: DOR_ID, tier: "1h", fromMs: T0, toMs: T0 + H, hashes: {}, span: null, names: null, devices: { counts: {}, union: 9 } });
+    // An absent sketch is no devices; an undecodable one leaves the range unmeasured, the buckets still read.
+    expect(assembleSubmitters({ ...input, sketches: [a, null] }).rangeDistinct).toBe(2);
+    const bad = assembleSubmitters({ ...input, sketches: [a, "hll12:garbage"] });
+    expect(bad.rangeDistinct).toBeNull();
+    expect(bad.distinct).toEqual([2, 0, null]);
+    // nothing measured: no count, even with sketches handed in
+    const none = assembleSubmitters({ net: DOR_ID, tier: "1h", fromMs: T0, toMs: T0 + H, hashes: {}, span: null, names: null, sketches: [a] });
     expect(none.rangeDistinct).toBeNull();
+    expect(none.distinct).toEqual([null]);
     // an organisation window is exact
     expect(assembleSubmitters({ net: DED_ID, tier: "1h", fromMs: T0, toMs: T0 + H, hashes: {}, span: null, names: null }).estimate).toBe(false);
   });
 
-  it("measuredHllKeys: the HLL keys of the measured buckets only, the set the union is counted over", () => {
-    const sp = { from: String(T0), to: String(T0 + 3 * H + 1) };
-    const keys = measuredHllKeys(DOR_ID, "1h", T0 - H, T0 + 4 * H, sp, { [String(T0 + H)]: String(T0 + 2 * H) });
-    expect(keys).toEqual([subHllKeyOf(DOR_ID, "1h", T0), subHllKeyOf(DOR_ID, "1h", T0 + 2 * H)]);
+  describe("measuredSketchKeys — the sketches a device range unions (R22)", () => {
+    const D = 24 * H;
+    const D0 = T0, D1 = T0 + D, D2 = T0 + 2 * D;
+    const sk = (tier: "1h" | "1d", t: number) => subSketchKeyOf(DOR_ID, tier, t);
+    const hours = (from: number, n: number) => Array.from({ length: n }, (_, i) => sk("1h", from + i * H));
+    const wide = { from: String(D0 - 5 * D), to: String(D2 + 10 * D) };
+
+    it("a range of whole days with edge hours: the day sketch for each whole day, hour sketches at the edges", () => {
+      expect(measuredSketchKeys(DOR_ID, "1h", D0 - 2 * H, D2 + 3 * H, wide, null)).toEqual([
+        ...hours(D0 - 2 * H, 2), sk("1d", D0), sk("1d", D1), ...hours(D2, 3),
+      ]);
+    });
+
+    it("a hole inside a day takes that day's measured hours instead of its day sketch", () => {
+      const holes = { [String(D1 + 5 * H)]: String(D1 + 7 * H) };
+      expect(measuredSketchKeys(DOR_ID, "1h", D0, D2, wide, holes)).toEqual([
+        sk("1d", D0), ...hours(D1, 5), ...hours(D1 + 7 * H, 17),
+      ]);
+    });
+
+    it("a day the span covers only in part reads its measured hours: the in-progress hour is not one", () => {
+      const span = { from: String(D0), to: String(D0 + 20 * H + 1) };
+      expect(measuredSketchKeys(DOR_ID, "1h", D0, D1, span, null)).toEqual(hours(D0, 20));
+    });
+
+    it("a 24-hour window anchored mid-day reads hours only", () => {
+      expect(measuredSketchKeys(DOR_ID, "1h", D0 + 10 * H, D1 + 10 * H, wide, null)).toEqual(hours(D0 + 10 * H, 24));
+    });
+
+    it("the daily tier: the day sketch of each measured day", () => {
+      const span = { from: String(D0), to: String(D2 + 5 * H) }; // D2 holds `to`: in progress
+      expect(measuredSketchKeys(DOR_ID, "1d", D0 - D, D2 + D, span, null)).toEqual([sk("1d", D0), sk("1d", D1)]);
+    });
   });
 
   it("carries only the label map in names, and an unnamed organisation is still in series and totals", () => {

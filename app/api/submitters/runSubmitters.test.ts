@@ -1,27 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { runSubmitters, walkHoles, walkRange, type SubmittersDeps, type WalkDeps } from "./runSubmitters";
 import { assembleSubmitters } from "./assemble";
-import { subHllKeyOf, subHolesKeyOf, subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
+import { subSketchKeyOf, subHolesKeyOf, subLockKeyOf, subNamesKeyOf, subSlotOf, subSpanKeyOf } from "./keys";
 import { DED_ID, DOR_ID } from "@/src/data/submitters";
 import type { MetaRec } from "../trends/bucketing";
 import type { ChainPage } from "../trends/fetchSince";
 import type { TrendsStore, TrendsWrite } from "../trends/store";
+import { addIds, decodeSketch, encodeSketch, newSketch } from "./sketch";
 
-// In-memory TrendsStore (runSample.test.ts's), counting transactions. A HyperLogLog is an exact Set
-// here: PFCOUNT's ~0.81% error is the store's, not the sampler's.
-function memStore(): TrendsStore & { data: Map<string, Map<string, string>>; hll: Map<string, Set<string>>; locked: boolean; applies: TrendsWrite[][] } {
+// In-memory TrendsStore (runSample.test.ts's), counting transactions. String keys (Dor's device
+// sketches, R22) live apart from the hashes: a key is one or the other.
+function memStore(): TrendsStore & { data: Map<string, Map<string, string>>; str: Map<string, string>; locked: boolean; applies: TrendsWrite[][] } {
   const data = new Map<string, Map<string, string>>();
-  const hll = new Map<string, Set<string>>();
-  const add = (key: string, ids: readonly string[]) => {
-    let h = hll.get(key);
-    if (!h) hll.set(key, (h = new Set()));
-    for (const id of ids) h.add(id);
-  };
+  const str = new Map<string, string>();
   const s = {
-    data, hll, locked: false, applies: [] as TrendsWrite[][],
-    async pfadd(key: string, ids: string[]) { add(key, ids); },
-    async pfcount(keys: string[]) { return new Set(keys.flatMap((k) => [...(hll.get(k) ?? [])])).size; },
-    async pfcountEach(keys: string[]) { return keys.map((k) => hll.get(k)?.size ?? 0); },
+    data, str, locked: false, applies: [] as TrendsWrite[][],
+    async get(key: string) { return str.get(key) ?? null; },
+    async mget(keys: string[]) { return keys.map((k) => str.get(k) ?? null); },
     async hgetall(key: string) { const h = data.get(key); return h ? Object.fromEntries(h) : null; },
     async hmget(key: string, fields: string[]) { const h = data.get(key); return fields.map((f) => h?.get(f) ?? null); },
     async hset(key: string, map: Record<string, string | number>) {
@@ -40,7 +35,7 @@ function memStore(): TrendsStore & { data: Map<string, Map<string, string>>; hll
         for (const [f, v] of Object.entries(w.map)) h.set(f, String(v));
         for (const f of w.hdel ?? []) h.delete(f);
         if (!h.size) data.delete(w.key);
-        if (w.pfadd?.length) add(w.key, w.pfadd);
+        if (w.value != null) str.set(w.key, w.value);
       }
     },
   };
@@ -77,6 +72,14 @@ function dorRoot(ordinal: number): Record<string, unknown> {
   const blk = { proofs: [], value: { updates: updates.map((v) => ({ value: v })) } };
   return { value: { ordinal, dataApplication: { blocks: [Array.from(Buffer.from(JSON.stringify(blk)))] } }, proofs: [] };
 }
+/** The five devices as the sketch sees them (cut to 16 characters), and their sketch. */
+const DEVICES = [0, 1, 2, 3, 4].map((k) => dev(k).slice(0, 16));
+const FIVE = encodeSketch(addIds(newSketch(), DEVICES));
+/** A Dor bucket's count field (R22): the bucket label alone, no `|`. */
+const countOf = (s: { data: Map<string, Map<string, string>> }, tier: "1h" | "1d", ts: number) => {
+  const { key, bucket } = subSlotOf(DOR_ID, tier, ts);
+  return s.data.get(key)?.get(bucket);
+};
 
 /** A newest-first pager over the chain's records up to `tip`; `next` is an offset. */
 function pager(tip: () => number) {
@@ -287,17 +290,56 @@ describe("runSubmitters", () => {
     expect(JSON.parse(String(w.map.o2))).toEqual({ name: "Gate AI", source: "ded", namedAt: NOW });
   });
 
-  it("Dor: device ids go into the hour's and the day's HyperLogLog in the one transaction, never into fields (R19)", async () => {
+  it("Dor: device ids go into the hour's and the day's SKETCH and their count fields, in the one transaction (R22)", async () => {
     const store = memStore();
     const res = await runSubmitters(deps(store, { nets: [DOR_ID], fetchSnap: async (_n, o) => dorRoot(o) }));
     expect(res.read[DOR_ID]).toBe(70);
     expect(store.applies).toHaveLength(1);
-    expect(store.applies[0].filter((w) => w.pfadd).map((w) => w.key).sort()).toEqual(
-      [subHllKeyOf(DOR_ID, "1d", NOW), subHllKeyOf(DOR_ID, "1h", PREV_HOUR), subHllKeyOf(DOR_ID, "1h", NOW)].sort(),
-    );
-    expect(await store.pfcountEach([subHllKeyOf(DOR_ID, "1h", PREV_HOUR), subHllKeyOf(DOR_ID, "1d", NOW)])).toEqual([5, 5]);
-    expect([...store.data.keys()].filter((k) => k.includes(":1h:") || k.includes(":1d:"))).toEqual([]);
+    const keys = [subSketchKeyOf(DOR_ID, "1d", NOW), subSketchKeyOf(DOR_ID, "1h", PREV_HOUR), subSketchKeyOf(DOR_ID, "1h", NOW)];
+    expect(store.applies[0].filter((w) => w.value != null).map((w) => w.key).sort()).toEqual([...keys].sort());
+    for (const k of keys) expect(store.str.get(k)).toBe(FIVE); // every bucket saw all five devices
+    expect(countOf(store, "1h", PREV_HOUR)).toBe("5");
+    expect(countOf(store, "1h", NOW)).toBe("5");
+    expect(countOf(store, "1d", NOW)).toBe("5");
+    // A device field never exists: the hashes hold one count per bucket, no `|`.
+    expect([...store.data.get(subSlotOf(DOR_ID, "1h", NOW).key)!.keys()].sort()).toEqual(["27-13", "27-14"]);
     expect(span(store, DOR_ID)!.get("cursor")).toBe("1129");
+  });
+
+  it("Dor: a later run MERGES its ids into the stored sketches, and the count follows the union (R22)", async () => {
+    const store = memStore();
+    let tip = 1125;
+    const d = { nets: [DOR_ID], pageMeta: pager(() => tip), fetchSnap: async (_n: string, o: number) => dorRoot(o) };
+    const other = [dev(7).slice(0, 16), dev(8).slice(0, 16)];
+    const hourKey = subSketchKeyOf(DOR_ID, "1h", NOW), dayKey = subSketchKeyOf(DOR_ID, "1d", NOW);
+    await runSubmitters(deps(store, d));
+    // Two more devices already in the stored 14:00 sketch (as if an earlier run had seen them).
+    store.str.set(hourKey, encodeSketch(addIds(decodeSketch(store.str.get(hourKey))!, other)));
+    tip = 1129;
+    await runSubmitters(deps(store, d));
+    expect(store.str.get(hourKey)).toBe(encodeSketch(addIds(newSketch(), [...DEVICES, ...other])));
+    expect(countOf(store, "1h", NOW)).toBe("7");
+    expect(store.str.get(dayKey)).toBe(FIVE); // the day had all five; nothing else was added to it
+    expect(store.applies).toHaveLength(2);
+  });
+
+  it("Dor: an undecodable stored sketch fails Dor's run alone — nothing of Dor written, its cursor kept; DED commits", async () => {
+    const store = memStore();
+    let tip = 1125;
+    const fetchSnap = async (n: string, o: number) => (n === DOR_ID ? dorRoot(o) : root(o));
+    const d = { nets: [DED_ID, DOR_ID], pageMeta: pager(() => tip), fetchSnap };
+    await runSubmitters(deps(store, d));
+    const before = { span: new Map(span(store, DOR_ID)!), str: new Map(store.str), hash: new Map(store.data.get(subSlotOf(DOR_ID, "1h", NOW).key)!) };
+    store.str.set(subSketchKeyOf(DOR_ID, "1h", NOW), "hll12:garbage");
+    tip = 1129;
+    const res = await runSubmitters(deps(store, d));
+    expect(res.failed[DOR_ID]).toBe(1126); // where the next run resumes
+    expect(res.read[DOR_ID]).toBe(0);
+    expect(span(store, DOR_ID)).toEqual(before.span);
+    expect(store.str.get(subSketchKeyOf(DOR_ID, "1d", NOW))).toBe(before.str.get(subSketchKeyOf(DOR_ID, "1d", NOW)));
+    expect(store.data.get(subSlotOf(DOR_ID, "1h", NOW).key)).toEqual(before.hash);
+    expect(res.failed[DED_ID]).toBeNull();
+    expect(span(store)!.get("cursor")).toBe("1129");
   });
 
   it("a names-hash read that throws costs the run nothing: names are optional", async () => {
@@ -497,34 +539,60 @@ describe("walkRange", () => {
     expect(bad.data.get(subHolesKeyOf(DED_ID))!.get(String(D1))).toBe(String(D1 + 2 * HOUR));
   });
 
-  it("Dor: the walk PFADDs each hour's devices into the hour's and the day's HLL, idempotent, with no fields (R19)", async () => {
+  it("Dor: the walk SETs each hour's sketch from its own ids, the day as the union of its hours, with count fields — idempotent (R22)", async () => {
     const dorSnap = async (_n: string, o: number) => { if (wTs(o) >= SPAN_FROM) throw new Error(`read a sampler record: ${o}`); return dorRoot(o); };
     const store = memStore();
     await runSubmitters({ store, nets: [DOR_ID], pageMeta: wPager, fetchSnap: async (_n, o) => dorRoot(o), now: () => NOW_W });
+    // A stale hour sketch the walk must overwrite, never merge with (the SET discipline).
+    store.str.set(subSketchKeyOf(DOR_ID, "1h", D0), encodeSketch(addIds(newSketch(), ["stale"])));
     const res = await walkRange(wdeps(store, { fetchSnap: dorSnap }), DOR_ID, D0, SPAN_FROM, progress);
     expect(res.failedAt).toBeNull();
     expect(res.lowered).toBe(true);
-    expect(await store.pfcount([subHllKeyOf(DOR_ID, "1h", D0)])).toBe(5);
-    expect(await store.pfcount([subHllKeyOf(DOR_ID, "1d", D1)])).toBe(5);
-    expect([...store.data.keys()].filter((k) => k.includes(":1h:") || k.includes(":1d:"))).toEqual([]);
-    const once = [...store.hll].map(([k, v]) => [k, [...v].sort()]);
+    // 6 records an hour, ordinals 5000+6h…: devices (o % 5) and (o + 1) % 5 — every hour sees all five.
+    expect(store.str.get(subSketchKeyOf(DOR_ID, "1h", D0))).toBe(FIVE);
+    expect(countOf(store, "1h", D0)).toBe("5");
+    for (const d of [D0, D1, D2]) {
+      expect(store.str.get(subSketchKeyOf(DOR_ID, "1d", d))).toBe(FIVE);
+      expect(countOf(store, "1d", d)).toBe("5");
+    }
+    const once = { str: [...store.str].sort(), data: subData(store) };
     await walkRange(wdeps(store, { fetchSnap: dorSnap }), DOR_ID, D0, SPAN_FROM, progress);
-    expect([...store.hll].map(([k, v]) => [k, [...v].sort()])).toEqual(once);
+    expect({ str: [...store.str].sort(), data: subData(store) }).toEqual(once);
+  });
+
+  it("Dor: the day sketch is the merge of its hour sketches, the boundary day's sampler hours included (R22)", async () => {
+    const store = memStore();
+    await runSubmitters({ store, nets: [DOR_ID], pageMeta: wPager, fetchSnap: async (_n, o) => dorRoot(o), now: () => NOW_W });
+    // Only the sampler's 14:00 hour carries a device the walk's hours never see.
+    store.str.set(subSketchKeyOf(DOR_ID, "1h", D2 + 14 * HOUR), encodeSketch(addIds(newSketch(), [...DEVICES, "beef"])));
+    const dorSnap = async (_n: string, o: number) => dorRoot(o);
+    await walkRange(wdeps(store, { fetchSnap: dorSnap }), DOR_ID, D2, SPAN_FROM, progress);
+    expect(store.str.get(subSketchKeyOf(DOR_ID, "1d", D2))).toBe(encodeSketch(addIds(newSketch(), [...DEVICES, "beef"])));
+    expect(countOf(store, "1d", D2)).toBe("6");
+    // An undecodable hour fails the day's recompute rather than dropping that hour from the day.
+    store.str.set(subSketchKeyOf(DOR_ID, "1h", D1 + 3 * HOUR), "hll12:garbage");
+    await expect(walkRange(wdeps(store, { fetchSnap: dorSnap }), DOR_ID, D1 + 5 * HOUR, D2, progress)).rejects.toThrow(/sketch/);
+    expect(store.str.has(subSketchKeyOf(DOR_ID, "1d", D1))).toBe(false);
   });
 
   it("inside the sampler's lock it calls only the raw store (`lockedStore`), so the section cannot outlast the lock", async () => {
     const raw = await sampled();
     await raw.hset(subHolesKeyOf(DED_ID), { [String(D1)]: String(D1 + HOUR) });
     // The script's retrying store: a retry loop inside the lock could outlive LOCK_TTL_S.
-    const inLock = (name: "hgetall" | "hmget" | "applyWrites") => async (...a: unknown[]) => {
+    const inLock = (name: "hgetall" | "hmget" | "mget" | "applyWrites") => async (...a: unknown[]) => {
       if (raw.locked) throw new Error(`a retrying ${name} inside the lock`);
       return (raw[name] as (...x: unknown[]) => Promise<unknown>)(...a);
     };
-    const retrying = { ...raw, hgetall: inLock("hgetall"), hmget: inLock("hmget"), applyWrites: inLock("applyWrites") } as unknown as TrendsStore;
+    const retrying = { ...raw, hgetall: inLock("hgetall"), hmget: inLock("hmget"), mget: inLock("mget"), applyWrites: inLock("applyWrites") } as unknown as TrendsStore;
     const w = await walkRange(wdeps(retrying, { lockedStore: raw }), DED_ID, D2, SPAN_FROM, progress);
     expect(w.lowered).toBe(true);
     const h = await walkHoles(wdeps(retrying, { lockedStore: raw }), DED_ID);
     expect(h.filled).toBe(1);
     expect(raw.locked).toBe(false);
+    // Dor's boundary day: its 24 hour sketches are MGET inside the lock, through the raw store too (R22).
+    await runSubmitters({ store: raw, nets: [DOR_ID], pageMeta: wPager, fetchSnap: async (_n, o) => dorRoot(o), now: () => NOW_W });
+    const d = await walkRange(wdeps(retrying, { lockedStore: raw, fetchSnap: async (_n, o) => dorRoot(o) }), DOR_ID, D2, SPAN_FROM, progress);
+    expect(d.lowered).toBe(true);
+    expect(raw.str.get(subSketchKeyOf(DOR_ID, "1d", D2))).toBe(FIVE);
   });
 });

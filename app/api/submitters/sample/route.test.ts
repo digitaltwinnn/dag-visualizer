@@ -40,6 +40,17 @@ describe("GET /api/submitters/sample", () => {
     warn.mockRestore();
   });
 
+  it("names an undecodable device sketch rather than an L0 read (R22)", async () => {
+    vi.stubEnv("CRON_SECRET", "s3cret");
+    run.mockResolvedValueOnce({ read: { [DOR_ID]: 0 }, failed: { [DOR_ID]: 900 }, names: 0, unreadable: { [DOR_ID]: "sub:k" } } as never);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect((await GET(req("Bearer s3cret"))).status).toBe(200);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]![0])).toContain("sub:k");
+    expect(String(warn.mock.calls[0]![0])).not.toContain("L0");
+    warn.mockRestore();
+  });
+
   it("runs the sampler once for DED and Dor with the right bearer", async () => {
     vi.stubEnv("CRON_SECRET", "s3cret");
     const r = await GET(req("Bearer s3cret"));

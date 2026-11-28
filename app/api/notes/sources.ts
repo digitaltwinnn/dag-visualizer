@@ -152,7 +152,7 @@ export async function geoInputs(nowMs: number, reads: NoteReads): Promise<GeoDay
 
 /** The default reads for ONE note, or one warm pass: the trends store's read client, each hash read
  *  at most once (a History note's span and its days can read the same daily year-hash). */
-export function storeReads(nowMs: number, store: HashReader & Partial<Pick<TrendsStore, "pfcount" | "pfcountEach">> = readStore()): NoteReads {
+export function storeReads(nowMs: number, store: HashReader & Partial<Pick<TrendsStore, "mget">> = readStore()): NoteReads {
   const seen = new Map<string, Promise<Record<string, string> | null>>();
   const once: HashReader = {
     hgetall(key) {
@@ -161,11 +161,11 @@ export function storeReads(nowMs: number, store: HashReader & Partial<Pick<Trend
       return p;
     },
   };
-  // Dor's devices are HyperLogLogs (R19): a store without the PF reads has no device read, and the
+  // Dor's devices are sketches read by MGET (R22): a store without it has no device read, and the
   // throw is the note's "no submitter data" (`submittersOrNone`).
-  const hll = (): Pick<TrendsStore, "pfcount" | "pfcountEach"> => {
-    if (!store.pfcount || !store.pfcountEach) throw new Error("no HyperLogLog reads on this store");
-    return store as Pick<TrendsStore, "pfcount" | "pfcountEach">;
+  const mget = (keys: string[]): Promise<(string | null)[]> => {
+    if (!store.mget) throw new Error("no string reads on this store");
+    return store.mget(keys);
   };
   // ONE live window per pass (2026-11-20): every network's Data blocks note in a warm pass reads the
   // same newest window, so the per-network notes cost no read beyond the whole network's.
@@ -185,7 +185,7 @@ export function storeReads(nowMs: number, store: HashReader & Partial<Pick<Trend
     // The store itself, never the HTTP route; no all-time palette (`years: false`), which no note reads.
     submitters: async (net, fromMs, toMs) =>
       Object.hasOwn(SUBMITTERS, net)
-        ? readSubmitters({ hgetall: once.hgetall, pfcount: (k) => hll().pfcount(k), pfcountEach: (k) => hll().pfcountEach(k) }, net, { fromMs, toMs }, nowMs, { years: false })
+        ? readSubmitters({ hgetall: once.hgetall, mget }, net, { fromMs, toMs }, nowMs, { years: false })
         : null,
   };
 }

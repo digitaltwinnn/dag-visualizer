@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { bucketDevices, bucketSubmitters, holeOf, nextSpan } from "./bucket";
-import { subHllKeyOf, subSlotOf } from "./keys";
+import { bucketDevices, bucketSubmitters, holeOf, nextSpan, type DeviceAdds } from "./bucket";
+import { subSketchKeyOf, subSlotOf } from "./keys";
 
 const NET = "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M";
 const T = Date.UTC(2026, 10, 27, 14, 5);
@@ -24,15 +24,16 @@ describe("bucketSubmitters", () => {
   });
 });
 
-describe("bucketDevices — Dor's devices into HyperLogLog keys (R19)", () => {
-  it("adds a tally's device ids to the hour's and the day's HLL, as sets, never fields", () => {
-    const adds = new Map<string, Set<string>>();
+describe("bucketDevices — Dor's devices under their sketch keys (R22)", () => {
+  it("collects a tally's device ids under the hour's and the day's sketch key, as sets, never fields", () => {
+    const adds: DeviceAdds = new Map();
     bucketDevices(adds, NET, T, [{ id: "d1", updates: 1 }, { id: "d2", updates: 3 }]);
     bucketDevices(adds, NET, T + 3600000, [{ id: "d2", updates: 1 }]);
-    expect([...adds.get(subHllKeyOf(NET, "1h", T))!].sort()).toEqual(["d1", "d2"]);
-    expect([...adds.get(subHllKeyOf(NET, "1h", T + 3600000))!]).toEqual(["d2"]);
-    expect([...adds.get(subHllKeyOf(NET, "1d", T))!].sort()).toEqual(["d1", "d2"]); // the day is the union of its hours
+    expect([...adds.get(subSketchKeyOf(NET, "1h", T))!.ids].sort()).toEqual(["d1", "d2"]);
+    expect([...adds.get(subSketchKeyOf(NET, "1h", T + 3600000))!.ids]).toEqual(["d2"]);
+    expect([...adds.get(subSketchKeyOf(NET, "1d", T))!.ids].sort()).toEqual(["d1", "d2"]); // the day is the union of its hours
     expect(adds.size).toBe(3);
+    expect(adds.get(subSketchKeyOf(NET, "1d", T))!.tier).toBe("1d"); // the count field's tier and bucket
   });
 });
 

@@ -4,6 +4,7 @@ import { pickRangeTier } from "@/src/data/trendWindow";
 import { METAGRAPHS } from "@/src/engine/config";
 import type { NoteReads } from "./sources";
 import type { SubmittersWindow } from "../submitters/assemble";
+import { addIds, encodeSketch, newSketch } from "../submitters/sketch";
 import type { ChannelSnapRow } from "@/src/data/types";
 
 // The builders are mocked here: these tests pin what `factsFor` READS (the per-view table: tiers
@@ -721,6 +722,7 @@ describe("who submitted the data", () => {
     expect((await factsFor("trend", USDC, "7d", NOW, fakeReads()))!.actors).toBeUndefined();
   });
 
+  const SEVEN = encodeSketch(addIds(newSketch(), ["a", "b", "c", "d", "e", "f", "g"]));
   it("storeReads reads the sub: family through the store, at the range's tier, and nothing for a network with no submitter table", async () => {
     const asked: string[] = [];
     const store = {
@@ -728,8 +730,7 @@ describe("who submitted the data", () => {
         asked.push(key);
         return key.endsWith(":span") ? { from: String(NOW - 30 * D), to: String(NOW - H) } : null;
       },
-      async pfcount(keys: string[]) { asked.push(`pfcount:${keys.length}`); return 7; },
-      async pfcountEach(keys: string[]) { return keys.map(() => 3); },
+      async mget(keys: string[]) { asked.push(...keys.map((k) => `mget:${k}`)); return keys.map(() => SEVEN); },
     };
     const reads = storeReads(NOW, store);
     const w = await reads.submitters!(DED, NOW - 7 * D, NOW);
@@ -739,8 +740,9 @@ describe("who submitted the data", () => {
     asked.length = 0;
     const dor = (await reads.submitters!(DOR, NOW - 90 * D, NOW))!;
     expect(dor.tier).toBe("1d");
-    expect(dor).toMatchObject({ estimate: true, rangeDistinct: 7 }); // Dor (R19): PFCOUNT, no device field read
-    expect(asked.some((k) => k.includes(":1d:") || k.includes(":1h:"))).toBe(false);
+    expect(dor).toMatchObject({ estimate: true, rangeDistinct: 7 }); // Dor (R22): its sketches by MGET
+    expect(asked).toContain(`mget:sub:mainnet:${DOR}:sketch:1d:2026-10-20`);
+    expect(asked).toContain(`sub:mainnet:${DOR}:1d:2026`); // the daily count fields
     asked.length = 0;
     expect(await reads.submitters!(USDC, NOW - 7 * D, NOW)).toBeNull();
     expect(asked).toEqual([]);

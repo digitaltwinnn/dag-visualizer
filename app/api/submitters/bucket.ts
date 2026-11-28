@@ -1,9 +1,11 @@
-import { subField, subHllKeyOf, subSlotOf, type SubTier } from "./keys";
+import { subField, subSketchKeyOf, subSlotOf, type SubTier } from "./keys";
 
 const TIERS: SubTier[] = ["1h", "1d"];
 
 /** Adds an ORGANISATION tally into BOTH tiers' fields. Invariant: a day's 1d fields equal the sum of
- *  its 1h fields (`bucket.test.ts`, and the walk's recompute in `runSubmitters.test.ts`). */
+ *  its 1h fields (`bucket.test.ts`, and the walk's recompute in `runSubmitters.test.ts`). Its DEVICE
+ *  form (R22): a day's sketch is the UNION of its hours' sketches — the sampler adds the same ids to
+ *  both, and the walk's `dayWrite` rebuilds the day as the merge of its 24 hours. */
 export function bucketSubmitters(
   inc: Map<string, Map<string, number>>,
   netId: string,
@@ -21,19 +23,22 @@ export function bucketSubmitters(
   }
 }
 
-/** Adds a DEVICE tally's ids to BOTH tiers' HyperLogLog keys (R19, `subHllKeyOf`): a set to PFADD,
- *  never a field. PFADD is idempotent, so the day's HLL is the union of its hours by construction. */
+/** Per sketch key: its tier, a time inside its bucket (for the bucket's count field), the ids to add. */
+export type DeviceAdds = Map<string, { tier: SubTier; tsMs: number; ids: Set<string> }>;
+
+/** Collects a DEVICE tally's ids under BOTH tiers' sketch keys (R22, `subSketchKeyOf`): a set to add
+ *  into the stored sketch, never a field. Adding is idempotent, so the day stays the union of its hours. */
 export function bucketDevices(
-  adds: Map<string, Set<string>>,
+  adds: DeviceAdds,
   netId: string,
   tsMs: number,
   tally: { id: string; updates: number }[],
 ): void {
   for (const tier of TIERS) {
-    const key = subHllKeyOf(netId, tier, tsMs);
-    let ids = adds.get(key);
-    if (!ids) adds.set(key, (ids = new Set()));
-    for (const { id } of tally) ids.add(id);
+    const key = subSketchKeyOf(netId, tier, tsMs);
+    let e = adds.get(key);
+    if (!e) adds.set(key, (e = { tier, tsMs, ids: new Set() }));
+    for (const { id } of tally) e.ids.add(id);
   }
 }
 

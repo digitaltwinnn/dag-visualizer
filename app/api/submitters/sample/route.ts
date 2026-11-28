@@ -38,7 +38,9 @@ export async function GET(req: Request) {
     });
     // A network that failed still answers 200 (the others committed): say so in the logs, once each.
     for (const [net, at] of Object.entries(res.failed)) {
-      if (at != null) console.warn(`[submitters] ${net}: ${at < 0 ? "its explorer list would not read" : `L0 snapshot ${at} would not read`}; the next run resumes there`);
+      const bad = res.unreadable?.[net];
+      if (bad) console.warn(`[submitters] ${net}: its stored device sketch ${bad} would not decode; nothing of it is written until it does (R22)`);
+      else if (at != null) console.warn(`[submitters] ${net}: ${at < 0 ? "its explorer list would not read" : `L0 snapshot ${at} would not read`}; the next run resumes there`);
     }
     return NextResponse.json(res);
   } catch (e) {
